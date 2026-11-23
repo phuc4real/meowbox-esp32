@@ -153,14 +153,25 @@ lv_obj_t *ui_button(lv_obj_t *parent, const char *txt, bool primary, int w, int 
 
 lv_obj_t *ui_button_label(lv_obj_t *btn) { return lv_obj_get_child(btn, 0); }
 
+/* Marquee: wait 2 s, scroll one full loop, then rest 8 s. A label that scrolls nonstop redraws ~30 times/s:
+ * on the clock tile that cost 17-30 % of a CPU core (docs/perf/results-0.2.0.md). */
+static lv_anim_t s_marquee;
+
 static void one_line(lv_obj_t *l, lv_label_long_mode_t m)
 {
+    if (!s_marquee.repeat_delay) {
+        lv_anim_init(&s_marquee);
+        lv_anim_set_delay(&s_marquee, 2000);
+        lv_anim_set_repeat_count(&s_marquee, LV_ANIM_REPEAT_INFINITE);
+        lv_anim_set_repeat_delay(&s_marquee, 8000);
+    }
+    lv_obj_set_style_anim(l, &s_marquee, 0);
     lv_label_set_long_mode(l, m);
     const lv_font_t *f = lv_obj_get_style_text_font(l, 0);
     lv_obj_set_height(l, lv_font_get_line_height(f));
 }
 
-/* Long single-line text scrolls (marquee) instead of being cut with "…"; short text stays still. */
+/* Long single-line text scrolls (marquee, one loop then a pause) instead of being cut with "…"; short text stays still. */
 void ui_dot(lv_obj_t *label) { one_line(label, LV_LABEL_LONG_SCROLL_CIRCULAR); }
 void ui_scroll(lv_obj_t *label) { one_line(label, LV_LABEL_LONG_SCROLL_CIRCULAR); }
 
@@ -518,6 +529,31 @@ static void ui_timer(lv_timer_t *tmr)
     if (bri != board_get_brightness()) board_set_brightness(bri);
 }
 
+/* ---------------- redraw stats (temporary, docs/perf: why taskLVGL uses 17-30 % CPU on some clock layouts) ---------------- */
+static struct { uint32_t n, px; lv_area_t big, last[4]; int li; } s_inv;
+
+static void inv_cb(lv_event_t *e)
+{
+    const lv_area_t *a = lv_event_get_param(e);
+    if (!a) return;
+    uint32_t px = lv_area_get_size(a);
+    s_inv.n++;
+    s_inv.px += px;
+    if (px > lv_area_get_size(&s_inv.big)) s_inv.big = *a;
+    s_inv.last[s_inv.li++ & 3] = *a;
+}
+
+static void inv_report(lv_timer_t *t)
+{
+    if (s_inv.n) {
+        ESP_LOGI(TAG, "redraw 10s: %lu areas, %lu px, tile %d, big %d,%d-%d,%d, last %d,%d-%d,%d %d,%d-%d,%d",
+                 (unsigned long)s_inv.n, (unsigned long)s_inv.px, (int)ui_active_tile(), s_inv.big.x1, s_inv.big.y1,
+                 s_inv.big.x2, s_inv.big.y2, s_inv.last[0].x1, s_inv.last[0].y1, s_inv.last[0].x2, s_inv.last[0].y2,
+                 s_inv.last[1].x1, s_inv.last[1].y1, s_inv.last[1].x2, s_inv.last[1].y2);
+    }
+    memset(&s_inv, 0, sizeof(s_inv));
+}
+
 /* ---------------- init ---------------- */
 void ui_init(void)
 {
@@ -535,5 +571,7 @@ void ui_init(void)
     }
     settings_on_change(on_settings, NULL);
     lv_timer_create(ui_timer, 500, NULL);
+    lv_display_add_event_cb(lv_display_get_default(), inv_cb, LV_EVENT_INVALIDATE_AREA, NULL);
+    lv_timer_create(inv_report, 10000, NULL);
     ESP_LOGI(TAG, "ui ready, theme %s", ui_theme()->id);
 }

@@ -6,6 +6,7 @@ Các ý tưởng để dành, chưa xếp vào bản nào. Khi quyết định l
 | Ý tưởng | Khi nào làm | Trạng thái |
 |---|---|---|
 | MeowBox Cloud (Cloudflare Worker) | khi số liệu ở mục 4 của v0.2.0 cho thấy vẫn thiếu băng thông, hoặc cần thông báo khi loa ở ngoài | để dành |
+| Tối ưu lại các theme về UI/UX | sau v0.2.0 | để dành |
 
 ---
 
@@ -57,3 +58,22 @@ chủ chuyển mã luồng nhạc như trên.
 1. Tài khoản Cloudflare và domain dùng cho Worker.
 2. Gói miễn phí hay gói trả phí (cần nếu dùng Containers).
 3. Có dựa vào PC ở nhà (Tunnel) cho YouTube và chuyển mã khi ở ngoài không.
+
+---
+
+## Tối ưu lại các theme về UI/UX
+
+### Vì sao
+- Đo ngày 2026-11-23 (`docs/perf/results-0.2.0.md`): ở màn Đồng hồ, chữ quá dài so với khung (thời tiết, âm lịch) chạy
+  liên tục nên màn hình bị vẽ lại khoảng 85 lần/giây với Swiss (17% CPU một nhân) và khoảng 120 lần/giây với Brutal (30%).
+  Zen và Cyberpunk có chữ vừa khung nên chỉ 3–4%.
+- Tạm thời (v0.2.0): chữ chạy một vòng rồi nghỉ 8 s (`one_line()` trong `components/ui/ui.c`). Chưa sửa tận gốc.
+
+### Việc cần làm
+- Rà từng theme × từng màn (Đồng hồ, Radio, PC, Mèo, Hệ thống) × ngày/đêm: dòng nào hay bị tràn khung, sắp xếp lại
+  bố cục hoặc rút gọn nội dung để vừa khung thay vì phải chạy chữ (ví dụ thời tiết của Swiss chỉ rộng 74 px).
+- Quy ước chung: chỗ nào được chạy chữ (tên bài đang phát), chỗ nào cắt bằng "…", chỗ nào xuống dòng.
+- Đo chi phí vẽ của từng hiệu ứng (lưới của Brutal, scanline và lệch màu của Cyberpunk, chữ nghiêng) và xem lại chế độ
+  tiết kiệm (mục 1.3 của v0.2.0) cho cả màn loa.
+- Có một vùng 1 px ở `x=0` (`0,0-0,26` đến `0,0-0,36`) bị vẽ lại liên tục trên mọi theme: tìm ra object nào.
+- Đồng bộ với giao diện web (mục 1.3 của v0.2.0) để cùng một theme trông và hoạt động giống nhau trên loa và trên web.

@@ -60,7 +60,7 @@ void ui_request_rebuild(void);
 lv_obj_t *ui_label(lv_obj_t *parent, ui_font_t f, ui_color_t c, const char *txt);
 lv_obj_t *ui_button(lv_obj_t *parent, const char *txt, bool primary, int w, int h);
 lv_obj_t *ui_button_label(lv_obj_t *btn);  /* the label inside a ui_button */
-/* Single-line label at its width: text that does not fit scrolls (marquee). ui_dot and ui_scroll behave the same. */
+/* Single-line label at its width: text that does not fit scrolls (marquee: one loop, then an 8 s pause). ui_dot and ui_scroll behave the same. */
 void ui_dot(lv_obj_t *label);
 void ui_scroll(lv_obj_t *label);
 lv_obj_t *ui_bar(lv_obj_t *parent, int w, int h, ui_color_t indicator);

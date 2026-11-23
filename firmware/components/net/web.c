@@ -12,6 +12,7 @@
 #include "esp_system.h"
 #include "esp_random.h"
 #include "esp_heap_caps.h"
+#include "esp_memory_utils.h"
 #include "esp_app_desc.h"
 #include "esp_ota_ops.h"
 #include "psa/crypto.h"
@@ -407,6 +408,47 @@ static esp_err_t h_status(httpd_req_t *req)
     return web_send_json(req, r);
 }
 
+/* GET /api/debug: memory and per-task numbers for tools/memwatch.py (docs/firmware_v0.2.0.md, 5.1).
+ * Task "rt" is the raw run-time counter; CPU % = delta(rt) / delta(rt_total) between two calls. */
+static void add_caps(cJSON *r, const char *name, uint32_t caps)
+{
+    cJSON *o = cJSON_AddObjectToObject(r, name);
+    cJSON_AddNumberToObject(o, "free", heap_caps_get_free_size(caps));
+    cJSON_AddNumberToObject(o, "min", heap_caps_get_minimum_free_size(caps));
+    cJSON_AddNumberToObject(o, "big", heap_caps_get_largest_free_block(caps));
+    cJSON_AddNumberToObject(o, "tot", heap_caps_get_total_size(caps));
+}
+
+static esp_err_t h_debug(httpd_req_t *req)
+{
+    cJSON *r = cJSON_CreateObject();
+    cJSON_AddNumberToObject(r, "up_ms", (double)(esp_timer_get_time() / 1000));
+    add_caps(r, "int", MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    add_caps(r, "dma", MALLOC_CAP_DMA);
+    add_caps(r, "psram", MALLOC_CAP_SPIRAM);
+    UBaseType_t n = uxTaskGetNumberOfTasks() + 4;
+    TaskStatus_t *ts = heap_caps_malloc(n * sizeof(TaskStatus_t), MALLOC_CAP_SPIRAM);
+    if (ts) {
+        configRUN_TIME_COUNTER_TYPE total = 0;
+        n = uxTaskGetSystemState(ts, n, &total);
+        cJSON_AddNumberToObject(r, "rt_total", (double)total);
+        cJSON *a = cJSON_AddArrayToObject(r, "tasks");
+        for (UBaseType_t i = 0; i < n; i++) {
+            cJSON *t = cJSON_CreateObject();
+            cJSON_AddStringToObject(t, "name", ts[i].pcTaskName);
+            cJSON_AddNumberToObject(t, "prio", ts[i].uxCurrentPriority);
+            BaseType_t core = xTaskGetCoreID(ts[i].xHandle);
+            cJSON_AddNumberToObject(t, "core", core == tskNO_AFFINITY ? -1 : (int)core);
+            cJSON_AddNumberToObject(t, "stack_free", ts[i].usStackHighWaterMark); /* bytes on ESP-IDF */
+            cJSON_AddBoolToObject(t, "stack_ext", esp_ptr_external_ram(ts[i].pxStackBase));
+            cJSON_AddNumberToObject(t, "rt", (double)ts[i].ulRunTimeCounter);
+            cJSON_AddItemToArray(a, t);
+        }
+        free(ts);
+    }
+    return web_send_json(req, r);
+}
+
 static const char *group_from_uri(httpd_req_t *req, char *buf, size_t len)
 {
     const char *g = req->uri + strlen("/api/config/");
@@ -646,6 +688,7 @@ esp_err_t web_start(void)
     web_register("/api/session", HTTP_GET, h_session, WEB_AUTH_SESSION);
     web_register("/api/password", HTTP_POST, h_password, WEB_AUTH_SESSION);
     web_register("/api/status", HTTP_GET, h_status, WEB_AUTH_SESSION);
+    web_register("/api/debug", HTTP_GET, h_debug, WEB_AUTH_SESSION);
     web_register("/api/config/*", HTTP_GET, h_cfg_get, WEB_AUTH_SESSION);
     web_register("/api/config/*", HTTP_PUT, h_cfg_put, WEB_AUTH_SESSION);
     web_register("/api/wifi/scan", HTTP_GET, h_scan, WEB_AUTH_SESSION);

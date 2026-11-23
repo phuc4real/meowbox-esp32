@@ -1,0 +1,42 @@
+t=811 int_free=33771 int_min=7796 int_big=14336 dma_free=25267 dma_big=14336 ps_free=7983472 ps_min=7813784 ps_big=7864320 rssi=-48 play=stop
+t=821 int_free=33955 int_min=7796 int_big=14336 dma_free=25867 dma_big=14336 ps_free=7983472 ps_min=7813784 ps_big=7864320 rssi=-48 play=stop
+t=831 int_free=33367 int_min=7796 int_big=14336 dma_free=25651 dma_big=14336 ps_free=7983472 ps_min=7813784 ps_big=7864320 rssi=-49 play=stop
+t=841 int_free=33967 int_min=7796 int_big=14336 dma_free=25879 dma_big=14336 ps_free=7983472 ps_min=7813784 ps_big=7864320 rssi=-48 play=stop
+t=852 int_free=33967 int_min=7796 int_big=14336 dma_free=25879 dma_big=14336 ps_free=7983480 ps_min=7813784 ps_big=7864320 rssi=-48 play=stop
+t=862 int_free=33727 int_min=7796 int_big=14336 dma_free=25639 dma_big=14336 ps_free=7983472 ps_min=7813784 ps_big=7864320 rssi=-48 play=stop
+t=872 int_free=34087 int_min=7796 int_big=14336 dma_free=25999 dma_big=14336 ps_free=7983740 ps_min=7813784 ps_big=7864320 rssi=-49 play=stop
+t=882 int_free=34087 int_min=7796 int_big=14336 dma_free=25803 dma_big=14336 ps_free=7983748 ps_min=7813784 ps_big=7864320 rssi=-49 play=stop
+t=892 int_free=34087 int_min=7796 int_big=14336 dma_free=25999 dma_big=14336 ps_free=7983748 ps_min=7813784 ps_big=7864320 rssi=-47 play=stop
+t=903 int_free=33547 int_min=7796 int_big=14336 dma_free=25763 dma_big=14336 ps_free=7983748 ps_min=7813784 ps_big=7864320 rssi=-50 play=stop
+
+== 59 samples -> ../docs/perf/baseline-idle.csv
+int_free  min     32999  max     34807
+int_min   min      7796  max      7796
+int_big   min     14336  max     14336
+dma_free  min     25267  max     26715
+dma_big   min     14336  max     14336
+ps_free   min   7979544  max   7983748
+ps_min    min   7813784  max   7813784
+ps_big    min   7733248  max   7864320
+
+== tasks: lowest free stack (bytes), peak CPU %
+ipc1             core  1  stack_free    512  cpu_peak   0.1%
+ipc0             core  0  stack_free    552  cpu_peak   0.7%
+IDLE0            core  0  stack_free    768  cpu_peak  96.2%
+IDLE1            core  1  stack_free    776  cpu_peak  83.8%
+Tmr Svc          core -1  stack_free   1424  cpu_peak   0.0%
+tcpip            core -1  stack_free   1816  cpu_peak   2.7%
+wifi_conn        core -1  stack_free   2104  cpu_peak   0.0%
+mdns             core  0  stack_free   2292  cpu_peak   0.0%
+mic              core  0  stack_free   2404  cpu_peak   1.5%
+weather          core -1  stack_free   2448  cpu_peak   0.0%
+sfx              core  0  stack_free   2572  cpu_peak   0.0%
+battery          core  1  stack_free   3020  cpu_peak   0.0%
+esp_timer        core  0  stack_free   3056  cpu_peak   1.6%
+sys_evt          core  0  stack_free   3188  cpu_peak   0.2%
+httpd            core  0  stack_free   3220  cpu_peak   2.4%
+taskLVGL         core  1  stack_free   3884  cpu_peak  17.9%
+wifi             core  0  stack_free   3948  cpu_peak   3.6%
+decode           core  1  stack_free   7224  cpu_peak   0.0%
+
+[exited with code 0]

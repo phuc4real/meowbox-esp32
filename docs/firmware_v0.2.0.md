@@ -560,7 +560,8 @@ Phiên bản 0.2.0 · đã kiểm tra lúc 08:30             [Kiểm tra ngay]
 > `stall`) vì có máy chủ nhỏ giọt vài byte nên không bao giờ hết thời gian chờ đọc; bộ đệm ICY metadata 4 KB chuyển
 > sang PSRAM. Đo với zeno.fm (MP3 128k) ở nhà, Wi-Fi -49 dBm: máy chủ có lúc gửi 0 kbps trong 20 s rồi tự đóng kết
 > nối, loa nối lại và phát tiếp với đệm 10 s; các đài AAC và HLS khác không hết đệm lần nào.
-> Chưa sửa (ghi lại): lúc khởi động loa thử mạng dùng lần cuối trước (khoảng 12 s) dù mạng đó không có ở đây.
+> Đã sửa thêm: lúc khởi động loa quét trước rồi thử các mạng đã lưu đang có sóng (giữ thứ tự ưu tiên), mạng không thấy
+> thử sau; không quét khi Wi-Fi cài đặt đang mở. Vào Wi-Fi nhà lúc 9.3 s thay vì 19.1 s khi mạng đầu danh sách không có ở đây.
 
 ### 4.1 Tắt tiết kiệm điện Wi-Fi khi đang phát
 - Bắt đầu phát (trạng thái `BUF`/`PLAY`) thì gọi `esp_wifi_set_ps(WIFI_PS_NONE)`. Dừng phát hoặc lỗi thì quay về

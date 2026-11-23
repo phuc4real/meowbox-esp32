@@ -319,6 +319,41 @@ static bool try_connect(const net_t *n)
     return false;
 }
 
+/* Order to try the saved networks in: those on the air first (keeping the user's order), then the rest (a hidden
+ * SSID never shows up in a scan). Without this, a saved network that is not here costs ~12 s of trying at every
+ * boot before the one that is. Returns how many indexes were written to order[]. */
+static int order_by_scan(const net_t *nets, int n, int *order)
+{
+    bool seen[MAX_NETS] = {false};
+    int found = 0;
+    /* not while the setup hotspot is up: scanning hops channels and can drop the phone that is setting us up */
+    if (!s_scanning && !s_ap_on) {
+        s_scanning = true;
+        esp_wifi_disconnect();
+        wifi_scan_config_t sc = {.show_hidden = false};
+        if (esp_wifi_scan_start(&sc, true) == ESP_OK) {
+            uint16_t num = 0;
+            esp_wifi_scan_get_ap_num(&num);
+            if (num > 40) num = 40;
+            wifi_ap_record_t *recs = calloc(num ? num : 1, sizeof(*recs));
+            if (recs && esp_wifi_scan_get_ap_records(&num, recs) == ESP_OK) {
+                for (int i = 0; i < n; i++)
+                    for (int j = 0; j < num && !seen[i]; j++)
+                        if (strcmp(nets[i].ssid, (const char *)recs[j].ssid) == 0) seen[i] = true;
+            } else esp_wifi_clear_ap_list();
+            free(recs);
+        }
+        s_scanning = false;
+    }
+    int k = 0;
+    for (int i = 0; i < n; i++)
+        if (seen[i]) order[k++] = i, found++;
+    for (int i = 0; i < n; i++)
+        if (!seen[i]) order[k++] = i;
+    ESP_LOGI(TAG, "%d of %d saved networks on the air", found, n);
+    return k;
+}
+
 static void conn_task(void *arg)
 {
     int fails = 0;
@@ -355,9 +390,12 @@ static void conn_task(void *arg)
             continue;
         }
         bool ok = false;
-        int start = s_force_idx >= 0 ? s_force_idx : 0;
+        int order[MAX_NETS];
+        if (s_force_idx >= 0) { /* a network picked by hand goes first, then the list order */
+            for (int k = 0; k < n; k++) order[k] = (s_force_idx + k) % n;
+        } else order_by_scan(nets, n, order);
         s_force_idx = -1;
-        for (int k = 0; k < n && !ok; k++) ok = try_connect(&nets[(start + k) % n]);
+        for (int k = 0; k < n && !ok; k++) ok = try_connect(&nets[order[k]]);
         if (ok) {
             fails = 0;
             set_mode(NET_MODE_STA);

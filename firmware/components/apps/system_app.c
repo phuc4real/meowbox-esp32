@@ -62,7 +62,7 @@ static void sys_tick(lv_timer_t *t)
         lv_label_set_text_fmt(s_addr, "meowbox.local\nhttp://%s", ip);
     } else if (wifi_mgr_mode() == NET_MODE_AP) {
         lv_label_set_text_fmt(s_net, "%s %s", ui_tr("Cài đặt: vào Wi-Fi", "Setup: join"), wifi_mgr_ap_ssid());
-        lv_label_set_text(s_addr, "http://192.168.4.1");
+        lv_label_set_text_fmt(s_addr, "%s %s\nhttp://192.168.4.1", ui_tr("Mật khẩu", "Password"), wifi_mgr_ap_pass());
     } else {
         lv_label_set_text(s_net, ui_tr("Đang kết nối Wi-Fi…", "Connecting to Wi-Fi…"));
         lv_label_set_text(s_addr, "");
@@ -86,7 +86,9 @@ static void sys_tick(lv_timer_t *t)
 static void portal_clicked(lv_event_t *e)
 {
     wifi_mgr_start_portal();
-    ui_overlay_show(LV_SYMBOL_WIFI, ui_tr("Cài đặt Wi-Fi", "Wi-Fi setup"), wifi_mgr_ap_ssid(), UI_C_ACCENT, 8, NULL, NULL);
+    char txt[96];
+    snprintf(txt, sizeof(txt), "%s\n%s %s", wifi_mgr_ap_ssid(), ui_tr("Mật khẩu", "Password"), wifi_mgr_ap_pass());
+    ui_overlay_show(LV_SYMBOL_WIFI, ui_tr("Cài đặt Wi-Fi", "Wi-Fi setup"), txt, UI_C_ACCENT, 20, NULL, NULL);
 }
 
 /* Long-press the header to toggle the safe-area calibration frames */

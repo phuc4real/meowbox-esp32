@@ -22,6 +22,7 @@ const char *wifi_mgr_mode_str(void);        /* "conn" | "sta" | "ap" */
 bool wifi_mgr_connected(void);
 void wifi_mgr_info(char *ssid, size_t ssid_len, char *ip, size_t ip_len, int *rssi);
 const char *wifi_mgr_ap_ssid(void);         /* MeowBox-XXXX */
+const char *wifi_mgr_ap_pass(void);         /* WPA2 password of that hotspot */
 cJSON *wifi_mgr_get_config(void);           /* API.md GET /api/config/wifi */
 esp_err_t wifi_mgr_set_config(const cJSON *body);
 cJSON *wifi_mgr_scan(void);                 /* NULL if busy */

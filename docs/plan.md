@@ -123,7 +123,7 @@ Firmware hiện khoảng 2.8 MB (kèm font của 4 theme), còn trống gần m�
 | Nút giữa (GPIO1) bấm | tắt báo thức · đóng thông báo · phát/dừng radio |
 | Nút giữa bấm 2 lần | về màn Đồng hồ |
 | Nút giữa giữ lâu | **tắt nguồn** (phần cứng, firmware không chặn được) |
-| Cài Wi-Fi | nút "Wi-Fi" trên màn Hệ thống mở SoftAP `MeowBox-XXXX` |
+| Cài Wi-Fi | nút "Wi-Fi" trên màn Hệ thống mở SoftAP `MeowBox-XXXX` (mật khẩu `meowbox2026`) |
 | Báo thức kêu | chạm màn hình = báo lại 5 phút, nút âm lượng = báo lại, nút giữa = tắt |
 
 Sau 60 s không thao tác: giảm độ sáng. Ban đêm (giờ cấu hình): chế độ đêm theo theme đang dùng.
@@ -168,11 +168,11 @@ MeowBox: phát stream đó như một đài radio bình thường (có tên bài
 - Sau này có máy chạy 24/7 (Raspberry Pi, NAS) thì chạy relay ở đó, khỏi phụ thuộc PC.
 
 ### F3 Trang web cấu hình
-- Lần đầu (chưa có Wi-Fi): SoftAP `MeowBox-XXXX` + captive portal → chọn mạng, nhập mật khẩu.
+- Lần đầu (chưa có Wi-Fi): SoftAP `MeowBox-XXXX` (WPA2, mật khẩu `meowbox2026`, hiện trên màn loa) + captive portal → chọn mạng, nhập mật khẩu.
 - Sau đó: `http://meowbox.local` (mDNS) hoặc IP hiện trên màn.
 - Các trang: Tổng quan (trạng thái, pin, IP, version) · Wi-Fi · Radio (thêm/xoá/sắp xếp đài, test phát) · Báo thức · Thời tiết/vị trí · Hiển thị (độ sáng, giờ đêm) · Thú ảo (tên, reset) · Thông báo (token API, test) · Hệ thống (OTA upload `.bin`, khởi động lại, xoá cấu hình).
 - **Bảo vệ bằng mật khẩu, bật sẵn.**
-  - Mặc định: user `admin`, mật khẩu **`meowbox`**.
+  - Mặc định: user `meowbox`, mật khẩu **`m3owb0x2026`** (trước 2026-11-23 là `admin` / `meowbox`; loa còn mật khẩu cũ tự chuyển sang mặc định mới).
   - Còn dùng mật khẩu mặc định thì web hiện banner nhắc đổi.
   - Đăng nhập bằng cookie session (HTTP Basic chỉ dùng cho API).
   - Mật khẩu lưu dạng hash (SHA-256 + salt) trong NVS.
@@ -317,7 +317,7 @@ Mỗi giai đoạn kết thúc bằng một bản chạy được trên loa th�
 - [x] Tên: **MeowBox** (mDNS `meowbox.local`, Wi-Fi AP `MeowBox-XXXX`)
 - [x] Thú ảo: **mèo**
 - [x] PC agent: **chỉ Windows** (giai đoạn này)
-- [x] Trang web: **có mật khẩu mặc định** (`admin` / `meowbox`, nhắc đổi)
+- [x] Trang web: **có mật khẩu mặc định** (`meowbox` / `m3owb0x2026`, nhắc đổi); AP cài đặt có mật khẩu `meowbox2026`
 - [x] Ngôn ngữ: tiếng Việt mặc định, có tiếng Anh; nếu tiếng Việt gây vấn đề thì dùng tiếng Anh
 - [x] YouTube: phát qua relay trong PC agent
 - [ ] Danh sách đài radio mặc định fen hay nghe (thêm sau trên web cũng được)

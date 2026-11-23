@@ -24,7 +24,7 @@ idf.py -p COM10 -b 921600 flash          # first time: bootloader + partitions +
 After that, update the app without a cable from the web UI (Cài đặt → Hệ thống → firmware upload), or:
 
 ```bash
-curl -c c.txt -H "Content-Type: application/json" -d '{"user":"admin","pass":"meowbox"}' http://meowbox.local/api/login
+curl -c c.txt -H "Content-Type: application/json" -d '{"user":"meowbox","pass":"m3owb0x2026"}' http://meowbox.local/api/login
 curl -b c.txt -H "Content-Type: application/octet-stream" --data-binary @build/meowbox.bin http://meowbox.local/api/ota
 ```
 
@@ -40,8 +40,8 @@ Web UI changes: `python web/build.py` (writes `storage/web/*.gz`), then `idf.py 
 | Volume buttons | click ±5, hold to repeat. During an alarm: snooze |
 | Cat corner on the clock | tap to open the Cat tile |
 | System tile | long-press the title to show the safe-area calibration frames |
-| Web | `http://meowbox.local` (or the IP on the System tile), `admin` / `meowbox`; change the password |
-| First setup / new Wi-Fi | with no known network the speaker opens `MeowBox-XXXX` by itself; otherwise System tile → "Wi-Fi". Join it and the setup page opens |
+| Web | `http://meowbox.local` (or the IP on the System tile), `meowbox` / `m3owb0x2026`; change the password |
+| First setup / new Wi-Fi | with no known network the speaker opens the hotspot `MeowBox-XXXX` (WPA2, password `meowbox2026`, also shown on screen) by itself; otherwise System tile → "Wi-Fi". Join it and the setup page opens |
 
 Notifications from anything on the LAN (token on the web page → Thông báo):
 

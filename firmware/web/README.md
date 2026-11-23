@@ -16,7 +16,7 @@ không CDN. Font tự host trong `storage/web/fonts/` (chỉ tải font của th
 ## Chạy thử trên máy tính
 
 ```sh
-python mock_server.py            # http://localhost:8080, đăng nhập admin / meowbox
+python mock_server.py            # http://localhost:8080, đăng nhập meowbox / m3owb0x2026
 python mock_server.py --no-auth  # bỏ qua đăng nhập khi đang sửa giao diện
 python mock_server.py --theme zen --no-screenshot   # bắt đầu với theme Zen, /api/screenshot trả 404
 python test_api.py               # test API, phải ra "ALL PASSED"

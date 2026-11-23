@@ -2,7 +2,7 @@
 """MeowBox mock device: serves web/src/ and implements API.md with in-memory state.
 
 Usage:  python mock_server.py [--port 8080] [--dir src]
-Then open http://localhost:8080  (admin / meowbox)
+Then open http://localhost:8080  (meowbox / m3owb0x2026)
 Stdlib only.
 """
 import argparse, copy, hashlib, json, os, random, secrets, string, struct, sys, threading, time
@@ -16,7 +16,8 @@ THEME_IDS = [t["id"] for t in THEMES]
 DEFAULT_THEME = next((t["id"] for t in THEMES if t.get("default")), "swiss")
 BOOT = time.time()
 MAX_FW = 5505024
-DEFAULT_PW = "meowbox"
+DEFAULT_PW = "m3owb0x2026"
+DEFAULT_USER = "meowbox"
 LOCK = threading.RLock()
 
 
@@ -269,7 +270,7 @@ class H(BaseHTTPRequestHandler):
             if time.time() < FAILS["until"]:
                 raise Err(429, "too_many")
             b = self.body()
-            if b.get("user") == "admin" and pw_hash(S["salt"], str(b.get("pass", ""))) == S["pw"]:
+            if b.get("user") == DEFAULT_USER and pw_hash(S["salt"], str(b.get("pass", ""))) == S["pw"]:
                 FAILS["n"] = 0
                 sid = secrets.token_hex(16)
                 SESS[sid] = time.time()
@@ -299,7 +300,7 @@ class H(BaseHTTPRequestHandler):
             SESS.pop(self.sid(), None)
             return self.send_json({"ok": True}, headers=[("Set-Cookie", "sid=; Path=/; Max-Age=0")])
         if key == ("GET", "/api/session"):
-            return self.send_json({"user": "admin", "def_pw": S["def_pw"]})
+            return self.send_json({"user": DEFAULT_USER, "def_pw": S["def_pw"]})
         if key == ("POST", "/api/password"):
             b = self.body()
             if pw_hash(S["salt"], str(b.get("old", ""))) != S["pw"]:
@@ -563,7 +564,7 @@ def main():
     if a.theme:
         S["display"]["theme"] = a.theme
     H.root = os.path.abspath(a.dir)
-    print(f"MeowBox mock on http://localhost:{a.port}  (admin / meowbox)  token={S['notify']['token']}")
+    print(f"MeowBox mock on http://localhost:{a.port}  (meowbox / m3owb0x2026)  token={S['notify']['token']}")
     ThreadingHTTPServer((a.host, a.port), H).serve_forever()
 
 

@@ -22,6 +22,7 @@ static const char *TAG = "wifi";
 
 #define WIFI_FILE "/data/wifi.json"
 #define MAX_NETS 5
+#define AP_PASS "meowbox2026" /* WPA2 password of the MeowBox-XXXX setup hotspot */
 #define BIT_GOT_IP BIT0
 #define BIT_FAIL BIT1
 #define BIT_RECHECK BIT2
@@ -138,6 +139,7 @@ const char *wifi_mgr_mode_str(void)
 }
 bool wifi_mgr_connected(void) { return s_mode == NET_MODE_STA; }
 const char *wifi_mgr_ap_ssid(void) { return s_ap_ssid; }
+const char *wifi_mgr_ap_pass(void) { return AP_PASS; }
 bool net_time_valid(void) { return s_time_valid || time(NULL) > 1700000000; }
 
 void wifi_mgr_info(char *ssid, size_t ssid_len, char *ip, size_t ip_len, int *rssi)
@@ -203,10 +205,12 @@ static void ap_enable(bool on)
         ap.ap.ssid_len = strlen(s_ap_ssid);
         ap.ap.channel = 1;
         ap.ap.max_connection = 4;
-        ap.ap.authmode = WIFI_AUTH_OPEN;
+        strcpy((char *)ap.ap.password, AP_PASS);
+        ap.ap.authmode = WIFI_AUTH_WPA2_PSK;
+        ap.ap.pairwise_cipher = WIFI_CIPHER_TYPE_CCMP;
         esp_wifi_set_config(WIFI_IF_AP, &ap);
         if (!s_dns_task) xTaskCreate(dns_task, "dns", 3072, NULL, 3, &s_dns_task);
-        ESP_LOGI(TAG, "SoftAP %s up (http://192.168.4.1)", s_ap_ssid);
+        ESP_LOGI(TAG, "SoftAP %s up, WPA2 (http://192.168.4.1)", s_ap_ssid);
     } else {
         esp_wifi_set_mode(WIFI_MODE_STA);
         ESP_LOGI(TAG, "SoftAP off");

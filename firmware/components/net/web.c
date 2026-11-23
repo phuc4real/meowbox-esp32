@@ -20,7 +20,9 @@
 static const char *TAG = "web";
 
 #define AUTH_FILE "/data/auth.json"
-#define DEFAULT_PASS "meowbox"
+#define DEFAULT_USER "meowbox"
+#define DEFAULT_PASS "m3owb0x2026"
+#define LEGACY_DEFAULT_PASS "meowbox" /* default before 2026-11-23; migrated to DEFAULT_PASS on boot */
 #define MAX_SESS 4
 #define SESS_TTL_US (24LL * 3600 * 1000000)
 #define MAX_BODY 8192
@@ -199,8 +201,14 @@ static void auth_init(void)
         strcpy(s_salt, salt);
         strcpy(s_hash, hash);
         char h[65];
-        hash_pw(s_salt, DEFAULT_PASS, h);
-        s_def_pw = strcmp(h, s_hash) == 0;
+        hash_pw(s_salt, LEGACY_DEFAULT_PASS, h);
+        if (strcmp(h, s_hash) == 0) {
+            ESP_LOGW(TAG, "old default password found, switching to the new default");
+            auth_set_password(DEFAULT_PASS);
+        } else {
+            hash_pw(s_salt, DEFAULT_PASS, h);
+            s_def_pw = strcmp(h, s_hash) == 0;
+        }
     } else {
         auth_set_password(DEFAULT_PASS);
     }
@@ -299,7 +307,7 @@ static esp_err_t h_login(httpd_req_t *req)
     if (!j) return ESP_OK;
     const char *user = cJSON_GetStringValue(cJSON_GetObjectItem(j, "user"));
     const char *pass = cJSON_GetStringValue(cJSON_GetObjectItem(j, "pass"));
-    bool ok = user && pass && strcmp(user, "admin") == 0 && auth_check_pw(pass);
+    bool ok = user && pass && strcmp(user, DEFAULT_USER) == 0 && auth_check_pw(pass);
     cJSON_Delete(j);
     if (!ok) {
         if (++s_fail_count >= 5) {
@@ -336,7 +344,7 @@ static esp_err_t h_logout(httpd_req_t *req)
 static esp_err_t h_session(httpd_req_t *req)
 {
     cJSON *r = cJSON_CreateObject();
-    cJSON_AddStringToObject(r, "user", "admin");
+    cJSON_AddStringToObject(r, "user", DEFAULT_USER);
     cJSON_AddBoolToObject(r, "def_pw", s_def_pw);
     return web_send_json(req, r);
 }

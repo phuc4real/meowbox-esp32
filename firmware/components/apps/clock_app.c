@@ -326,7 +326,10 @@ static void clock_tick(lv_timer_t *tmr)
         set_text(l_g1, "--:--");
         set_text(l_g2, "--:--");
         set_text(l_date, wifi_mgr_mode() == NET_MODE_AP ? wifi_mgr_ap_ssid() : ui_tr("Đang chờ giờ mạng", "Waiting for time"));
-        set_text(l_lunar, wifi_mgr_mode() == NET_MODE_AP ? "http://192.168.4.1" : "");
+        if (wifi_mgr_mode() == NET_MODE_AP) {
+            snprintf(buf, sizeof(buf), "%s %s, http://192.168.4.1", ui_tr("Mật khẩu", "Password"), wifi_mgr_ap_pass());
+            set_text(l_lunar, buf);
+        } else set_text(l_lunar, "");
         return;
     }
     bool h24 = settings_get_bool("display", "h24", true);

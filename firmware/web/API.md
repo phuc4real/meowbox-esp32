@@ -44,7 +44,8 @@ so an OTA'd web bundle is picked up. In SoftAP mode any unknown path redirects t
 | `/api/notify`, `/api/notify/audio`, `/api/notify/history` | **Bearer token** (`Authorization: Bearer <token>`), or `?token=<token>` on GET. The session cookie is also accepted so the web UI can use them. |
 | every other `/api/*` | **session cookie** `sid` |
 
-- Default credentials `admin` / `meowbox`. Password is stored as SHA-256(salt + password) in NVS.
+- Default credentials `meowbox` / `m3owb0x2026`. The password is stored as SHA-256(salt + password) in `/data/auth.json`.
+  A device still on the pre-2026-11-23 default (`meowbox`) is moved to the new default on boot.
 - Sessions: random 128-bit id, max 4 at a time (oldest dropped), expire after 24 h without use. Kept in RAM,
   so a reboot logs everyone out.
 - 5 failed logins in a row → `429 too_many` for 30 s.
@@ -56,7 +57,7 @@ so an OTA'd web bundle is picked up. In SoftAP mode any unknown path redirects t
 
 ### `POST /api/login`
 ```json
-{"user":"admin","pass":"meowbox"}
+{"user":"meowbox","pass":"m3owb0x2026"}
 ```
 → `200`, `Set-Cookie: sid=9f2c...e1; Path=/; HttpOnly; SameSite=Strict`
 ```json
@@ -68,11 +69,11 @@ so an OTA'd web bundle is picked up. In SoftAP mode any unknown path redirects t
 Body `{}`. Drops the session, clears the cookie. → `{"ok":true}`
 
 ### `GET /api/session`
-→ `{"user":"admin","def_pw":true}` or `401`. Used by the UI at startup.
+→ `{"user":"meowbox","def_pw":true}` or `401`. Used by the UI at startup.
 
 ### `POST /api/password`
 ```json
-{"old":"meowbox","new":"m30w-secret"}
+{"old":"m3owb0x2026","new":"m30w-secret"}
 ```
 `new` must be 6–32 characters. → `{"ok":true}`. Wrong `old` → `403 {"err":"bad_old"}`; bad length → `400 bad_value`.
 All other sessions are invalidated.
@@ -92,7 +93,7 @@ All other sessions are invalidated.
   "play":{"st":"play","id":2,"name":"Lofi Girl","title":"Snowman - Kudasai"}
 }
 ```
-- `mode`: `sta` (connected), `ap` (SoftAP portal), `conn` (connecting).
+- `mode`: `sta` (connected), `ap` (SoftAP portal `MeowBox-XXXX`, WPA2, password `meowbox2026`), `conn` (connecting).
 - `bat`: 0–100 or `-1` if unknown. `chg`: charging; `usb`: USB power present.
 - `heap`/`heap_min`: free internal heap now/minimum since boot (bytes). `psram`/`psram_tot`: free/total PSRAM.
 - `sleep`: seconds left on the sleep timer, 0 = off. `pc`: PC agent connected.

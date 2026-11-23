@@ -240,6 +240,14 @@ static void radio_tick(lv_timer_t *t)
     }
     static int n;
     if (++n % 20 == 0) save_volume_if_changed();
+    /* Wi-Fi power save off while a network stream plays (4.1) */
+    static bool awake;
+    player_state_t ps = player_state();
+    bool streaming = (ps == PLAYER_BUF || ps == PLAYER_PLAY) && !player_is_mem();
+    if (streaming != awake) {
+        awake = streaming;
+        wifi_mgr_hold_awake(WIFI_HOLD_RADIO, streaming);
+    }
     if (ui_active_tile() != UI_TILE_RADIO || !s_name) return;
 
     char name[64], title[128];
@@ -261,12 +269,17 @@ static void radio_tick(lv_timer_t *t)
                     : st == PLAYER_BUF  ? ui_tr("Đang tải", "Buffering")
                     : st == PLAYER_ERR  ? ui_tr("Lỗi kết nối", "Connection error")
                                         : ui_tr("Đã dừng", "Stopped");
-    char line[80];
+    char line[80], stb[40];
+    player_net_t net;
+    if (st == PLAYER_BUF && player_net(&net)) { /* buffering progress instead of a frozen "Buffering" */
+        snprintf(stb, sizeof(stb), "%s %u%%", sts, net.fill_pct);
+        sts = stb;
+    }
     if (s_sleep_until) {
         int left = (int)((s_sleep_until - esp_timer_get_time()) / 60000000) + 1;
         snprintf(line, sizeof(line), "%s, %s %d %s", sts, ui_tr("tắt sau", "off in"), left, ui_tr("phút", "min"));
     } else snprintf(line, sizeof(line), "%s", sts);
-    lv_label_set_text(s_state, line);
+    if (strcmp(lv_label_get_text(s_state), line)) lv_label_set_text(s_state, line);
     lv_obj_set_style_text_color(s_state, ui_lc(st == PLAYER_ERR ? UI_C_ALERT : st == PLAYER_PLAY ? UI_C_OK : UI_C_DIM), 0);
     lv_bar_set_value(s_bar, st == PLAYER_STOP ? 0 : player_buffer_pct(), LV_ANIM_OFF);
     lv_label_set_text(s_play_lbl, radio_playing() ? LV_SYMBOL_STOP : LV_SYMBOL_PLAY);
@@ -338,6 +351,19 @@ static void add_play(cJSON *o)
     cJSON_AddNumberToObject(p, "id", player_id());
     cJSON_AddStringToObject(p, "name", name);
     cJSON_AddStringToObject(p, "title", title);
+    player_net_t n;
+    if (player_net(&n)) { /* stream numbers (docs/firmware_v0.2.0.md, 4.3; web/API.md) */
+        cJSON *j = cJSON_AddObjectToObject(p, "net");
+        cJSON_AddNumberToObject(j, "kbps", n.kbps);
+        cJSON_AddNumberToObject(j, "br", n.br);
+        cJSON_AddNumberToObject(j, "buf", n.buf_ds / 10.0);
+        cJSON_AddNumberToObject(j, "pre", n.pre_s);
+        cJSON_AddNumberToObject(j, "fill", n.fill_pct);
+        cJSON_AddNumberToObject(j, "under", n.under);
+        cJSON_AddNumberToObject(j, "reconn", n.reconn);
+        cJSON_AddStringToObject(j, "fmt", n.fmt);
+        cJSON_AddStringToObject(j, "err", n.err);
+    }
     if (cJSON_GetObjectItem(o, "play")) cJSON_ReplaceItemInObject(o, "play", p);
     else cJSON_AddItemToObject(o, "play", p);
 }

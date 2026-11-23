@@ -34,6 +34,11 @@ bool wifi_mgr_portal_on(void);
  * -2 = paused because a client is connected */
 int wifi_mgr_portal_left_s(void);
 
+/* Keep Wi-Fi out of power save while something streams (docs/firmware_v0.2.0.md, 4.1). Power save makes throughput
+ * and latency jumpy on many routers. Each holder sets its own bit; power save returns 10 s after the last one lets go. */
+typedef enum { WIFI_HOLD_RADIO = 1 << 0, WIFI_HOLD_OTA = 1 << 1 } wifi_hold_t;
+void wifi_mgr_hold_awake(wifi_hold_t who, bool on);
+
 typedef void (*wifi_mgr_cb_t)(net_mode_t mode, void *arg);
 void wifi_mgr_on_change(wifi_mgr_cb_t cb, void *arg);
 

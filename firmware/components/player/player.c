@@ -10,6 +10,9 @@
 #include "freertos/ringbuf.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
+#include "esp_timer.h"
+#include "esp_event.h"
+#include "esp_netif.h"
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
 #include "esp_audio_simple_dec.h"
@@ -20,7 +23,6 @@
 static const char *TAG = "player";
 
 #define RB_SIZE (256 * 1024)
-#define PREBUF (48 * 1024)
 #define URL_MAX 512
 
 typedef enum { FMT_UNKNOWN, FMT_MP3, FMT_AAC, FMT_TS, FMT_WAV } fmt_t;
@@ -39,6 +41,21 @@ static uint8_t *s_mem;
 static size_t s_mem_len;
 static volatile bool s_is_mem;
 
+/* Stream numbers for /api/status and the System tile (docs/firmware_v0.2.0.md, 4.3). Reset per session. */
+static volatile uint32_t s_rx;           /* bytes fetched */
+static volatile uint16_t s_under;        /* underruns while playing */
+static volatile uint16_t s_reconn;       /* reconnects */
+static volatile int s_icy_br, s_dec_br;  /* kbps from the icy-br header / the decoder, 0 = unknown */
+static volatile bool s_hls;
+static volatile uint16_t s_kbps;         /* download rate, 5 s average (decode task) */
+static char s_err[16];                   /* last error: connect, http_404, read, decode */
+
+/* Adaptive prebuffer (4.2): seconds of audio to collect before playing. One step up after each underrun,
+ * one step down after 5 min without one; kept across stations, reset when Wi-Fi (re)connects. */
+static const uint8_t PRE_S[] = {3, 6, 10};
+static volatile uint8_t s_lvl;
+static int64_t s_clean_since;            /* us; playing without underrun since (decode task) */
+
 /* ---------------- small helpers ---------------- */
 static void set_state(player_state_t st)
 {
@@ -48,11 +65,26 @@ static void set_state(player_state_t st)
 
 static bool alive(uint32_t gen) { return gen == s_gen; }
 
+static void set_err(uint32_t gen, const char *fmt, int v)
+{
+    if (!alive(gen)) return;
+    snprintf(s_err, sizeof(s_err), fmt, v);
+}
+
+static int stream_kbps(void) { return s_icy_br > 0 ? s_icy_br : s_dec_br > 0 ? s_dec_br : 128; }
+
+static size_t pre_bytes(void)
+{
+    size_t b = (size_t)PRE_S[s_lvl] * stream_kbps() * 125; /* kbit/s -> bytes per second */
+    return b > RB_SIZE * 7 / 10 ? RB_SIZE * 7 / 10 : b;
+}
+
 static void rb_put(uint32_t gen, const uint8_t *d, size_t n)
 {
     while (n && alive(gen)) {
         size_t chunk = n > 4096 ? 4096 : n;
         if (xRingbufferSend(s_rb, d, chunk, pdMS_TO_TICKS(200)) == pdTRUE) {
+            s_rx += chunk;
             d += chunk;
             n -= chunk;
         }
@@ -116,6 +148,7 @@ static esp_err_t on_http_evt(esp_http_client_event_t *e)
     if (e->event_id == HTTP_EVENT_ON_HEADER && e->header_key && e->header_value) {
         if (strcasecmp(e->header_key, "Content-Type") == 0) snprintf(s_hdrs.ctype, sizeof(s_hdrs.ctype), "%s", e->header_value);
         else if (strcasecmp(e->header_key, "icy-metaint") == 0) s_hdrs.metaint = atoi(e->header_value);
+        else if (strcasecmp(e->header_key, "icy-br") == 0) s_icy_br = atoi(e->header_value);
     }
     return ESP_OK;
 }
@@ -212,12 +245,28 @@ static void stream_loop(uint32_t gen, esp_http_client_handle_t c, int metaint)
 {
     uint8_t *buf = malloc(4096);
     int until_meta = metaint;
+    /* stall check: while buffering, under a quarter of the bitrate for 10 s -> reconnect (servers that trickle
+     * bytes never hit the read timeout; a fresh connection usually comes back at full speed) */
+    int64_t win_t = esp_timer_get_time();
+    uint32_t win_rx = s_rx;
     while (alive(gen)) {
+        int64_t now = esp_timer_get_time();
+        if (now - win_t >= 10 * 1000000) {
+            uint32_t kbps = (s_rx - win_rx) * 8 / 10 / 1000;
+            if (s_state == PLAYER_BUF && kbps < (uint32_t)stream_kbps() / 4) {
+                ESP_LOGW(TAG, "stalled (%lu kbps while buffering), reconnecting", (unsigned long)kbps);
+                set_err(gen, "stall", 0);
+                break;
+            }
+            win_t = now;
+            win_rx = s_rx;
+        }
         int want = 4096;
         if (metaint && until_meta < want) want = until_meta;
         int r = esp_http_client_read(c, (char *)buf, want);
         if (r <= 0) {
             if (esp_http_client_is_complete_data_received(c)) s_eof = true;
+            else set_err(gen, "read", 0);
             break;
         }
         rb_put(gen, buf, r);
@@ -227,7 +276,9 @@ static void stream_loop(uint32_t gen, esp_http_client_handle_t c, int metaint)
                 uint8_t lenb;
                 if (esp_http_client_read(c, (char *)&lenb, 1) != 1) break;
                 int ml = lenb * 16, got = 0;
-                static char meta[4081]; /* only the fetch task of the live session uses it */
+                static char *meta; /* 4 KB in PSRAM; only the fetch task of the live session uses it */
+                if (!meta) meta = heap_caps_malloc(4081, MALLOC_CAP_SPIRAM);
+                if (!meta) break;
                 while (got < ml) {
                     int k = esp_http_client_read(c, meta + got, ml - got);
                     if (k <= 0) break;
@@ -252,10 +303,12 @@ static void hls_loop(uint32_t gen, const char *playlist_url)
     int target = 6;
     uint8_t *buf = malloc(4096);
     int fails = 0;
+    s_hls = true;
     while (alive(gen) && fails < 5) {
         char final[URL_MAX];
         char *txt = http_get_text(url, final, sizeof(final));
         if (!txt) {
+            set_err(gen, "connect", 0);
             fails++;
             vTaskDelay(pdMS_TO_TICKS(1000));
             continue;
@@ -311,6 +364,8 @@ static void hls_loop(uint32_t gen, const char *playlist_url)
                 fails = 0;
             } else {
                 ESP_LOGW(TAG, "segment %lld http %d", sn, st);
+                if (st) set_err(gen, "http_%d", st);
+                else set_err(gen, "connect", 0);
                 fails++;
             }
             if (c) esp_http_client_cleanup(c);
@@ -374,11 +429,14 @@ static void fetch_task(void *arg)
                 esp_http_client_cleanup(c);
             } else {
                 ESP_LOGW(TAG, "open %s failed (http %d)", url, status);
+                if (status) set_err(gen, "http_%d", status);
+                else set_err(gen, "connect", 0);
                 if (c) esp_http_client_cleanup(c);
             }
         }
         if (s_eof || !alive(gen)) break;
         retries++;
+        if (alive(gen)) s_reconn++;
         int wait = retries < 3 ? 1000 : retries < 5 ? 3000 : 8000;
         for (int i = 0; i < wait / 100 && alive(gen); i++) vTaskDelay(pdMS_TO_TICKS(100));
         ESP_LOGI(TAG, "reconnecting (%d)", retries);
@@ -429,8 +487,34 @@ static void decode_task(void *arg)
     float pos = 0;
     int16_t last = 0;
     esp_audio_simple_dec_info_t info = {0};
+    uint32_t rx_hist[5] = {0}, rx_last = 0;
+    int64_t tick = 0, last_log = 0;
 
     while (1) {
+        int64_t now = esp_timer_get_time();
+        if (now - tick >= 1000000) { /* once a second: download rate, step the prebuffer down, log */
+            tick = now;
+            uint32_t rx = s_rx;
+            memmove(rx_hist, rx_hist + 1, sizeof(rx_hist) - sizeof(rx_hist[0]));
+            rx_hist[4] = rx - rx_last;
+            rx_last = rx;
+            uint32_t sum = 0;
+            for (int i = 0; i < 5; i++) sum += rx_hist[i];
+            s_kbps = sum * 8 / 5 / 1000;
+            if (s_state == PLAYER_PLAY && s_lvl > 0 && now - s_clean_since > 300LL * 1000000) {
+                s_lvl--;
+                s_clean_since = now;
+                ESP_LOGI(TAG, "5 min without underrun, prebuffer %d s", PRE_S[s_lvl]);
+            }
+            if ((s_state == PLAYER_PLAY || s_state == PLAYER_BUF) && !s_is_mem && now - last_log >= 30LL * 1000000) {
+                last_log = now;
+                player_net_t n;
+                if (player_net(&n))
+                    ESP_LOGI(TAG, "net: %u/%u kbps, buffer %u.%u s, prebuffer %u s, underruns %u, reconnects %u%s%s",
+                             n.kbps, n.br, n.buf_ds / 10, n.buf_ds % 10, n.pre_s, n.under, n.reconn,
+                             n.err[0] ? ", last error " : "", n.err);
+            }
+        }
         if (s_state == PLAYER_STOP || s_state == PLAYER_ERR) {
             if (dec) { esp_audio_simple_dec_close(dec); dec = NULL; }
             ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(200));
@@ -439,6 +523,8 @@ static void decode_task(void *arg)
         if (cur_gen != s_gen) { /* new session */
             if (dec) { esp_audio_simple_dec_close(dec); dec = NULL; }
             cur_gen = s_gen;
+            rx_last = s_rx;
+            memset(rx_hist, 0, sizeof(rx_hist));
             in_len = 0;
             pos = 0;
             last = 0;
@@ -448,8 +534,9 @@ static void decode_task(void *arg)
         vRingbufferGetInfo(s_rb, NULL, NULL, NULL, NULL, &avail);
         avail = RB_SIZE - xRingbufferGetCurFreeSize(s_rb);
         if (s_state == PLAYER_BUF) {
-            if (avail < PREBUF && !s_eof) { vTaskDelay(pdMS_TO_TICKS(50)); continue; }
+            if (avail < pre_bytes() && !s_eof) { vTaskDelay(pdMS_TO_TICKS(50)); continue; }
             if (s_fmt == FMT_UNKNOWN) { vTaskDelay(pdMS_TO_TICKS(50)); continue; }
+            s_clean_since = esp_timer_get_time();
             set_state(PLAYER_PLAY);
         }
         if (!dec) {
@@ -461,6 +548,7 @@ static void decode_task(void *arg)
             };
             if (esp_audio_simple_dec_open(&cfg, &dec) != ESP_AUDIO_ERR_OK) {
                 ESP_LOGE(TAG, "decoder open failed (fmt %d)", s_fmt);
+                snprintf(s_err, sizeof(s_err), "decode");
                 set_state(PLAYER_ERR);
                 continue;
             }
@@ -476,7 +564,11 @@ static void decode_task(void *arg)
                 vRingbufferReturnItem(s_rb, p);
             } else if (in_len == 0) {
                 if (s_eof) { s_is_mem = false; set_state(PLAYER_STOP); continue; }
-                ESP_LOGW(TAG, "underrun");
+                if (s_state == PLAYER_PLAY && !s_is_mem) {
+                    s_under++;
+                    if (s_lvl < sizeof(PRE_S) - 1) s_lvl++;
+                    ESP_LOGW(TAG, "underrun %u, prebuffer now %d s", s_under, PRE_S[s_lvl]);
+                } else ESP_LOGW(TAG, "underrun");
                 set_state(PLAYER_BUF);
                 continue;
             }
@@ -500,6 +592,7 @@ static void decode_task(void *arg)
         if (o.decoded_size > 0) {
             if (info.sample_rate == 0) {
                 esp_audio_simple_dec_get_info(dec, &info);
+                if (info.bitrate >= 8000) s_dec_br = info.bitrate / 1000;
                 ESP_LOGI(TAG, "decoding %lu Hz, %u ch, %u bit, %lu kbps", (unsigned long)info.sample_rate, info.channel,
                          info.bits_per_sample, (unsigned long)(info.bitrate / 1000));
             }
@@ -564,10 +657,16 @@ esp_err_t player_play_mem(uint8_t *data, size_t len, const char *name)
 bool player_is_mem(void) { return s_is_mem; }
 
 /* ---------------- API ---------------- */
+static void on_got_ip(void *arg, esp_event_base_t base, int32_t id, void *data)
+{
+    s_lvl = 0; /* new network: start again from the smallest prebuffer */
+}
+
 void player_init(void)
 {
     s_lock = xSemaphoreCreateMutex();
     s_rb = xRingbufferCreateWithCaps(RB_SIZE, RINGBUF_TYPE_BYTEBUF, MALLOC_CAP_SPIRAM);
+    esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_got_ip, NULL);
     /* measured peak use ~1.5 KB (docs/perf/results-0.2.0.md); stays in internal RAM (real-time, high priority) */
     xTaskCreatePinnedToCore(decode_task, "decode", 4096, NULL, 7, &s_dec_task, 1);
 }
@@ -585,6 +684,12 @@ esp_err_t player_play(const char *url, const char *name, int id)
     s_fmt = FMT_UNKNOWN;
     s_eof = false;
     s_is_mem = false;
+    s_rx = 0;
+    s_under = s_reconn = 0;
+    s_icy_br = s_dec_br = 0;
+    s_kbps = 0;
+    s_hls = strstr(url, ".m3u8") != NULL;
+    s_err[0] = 0;
     uint32_t gen = s_gen;
     xSemaphoreGive(s_lock);
     set_state(PLAYER_BUF);
@@ -635,6 +740,35 @@ void player_title(char *buf, size_t len)
     xSemaphoreTake(s_lock, portMAX_DELAY);
     snprintf(buf, len, "%s", s_title);
     xSemaphoreGive(s_lock);
+}
+
+static const char *fmt_str(void)
+{
+    if (s_hls) return "hls";
+    switch (s_fmt) {
+    case FMT_MP3: return "mp3";
+    case FMT_AAC: return "aac";
+    case FMT_TS: return "ts";
+    case FMT_WAV: return "wav";
+    default: return "";
+    }
+}
+
+bool player_net(player_net_t *o)
+{
+    if (s_is_mem || (s_state != PLAYER_PLAY && s_state != PLAYER_BUF && s_state != PLAYER_ERR)) return false;
+    size_t avail = s_rb ? RB_SIZE - xRingbufferGetCurFreeSize(s_rb) : 0;
+    size_t pre = pre_bytes();
+    o->kbps = s_kbps;
+    o->br = s_icy_br > 0 ? s_icy_br : s_dec_br;
+    o->buf_ds = (uint16_t)(avail * 8 / (stream_kbps() * 100)); /* bits / (kbit/s * 100) = 0.1 s units */
+    o->pre_s = PRE_S[s_lvl];
+    o->under = s_under;
+    o->reconn = s_reconn;
+    o->fill_pct = s_state == PLAYER_BUF ? (uint8_t)(avail >= pre ? 100 : avail * 100 / pre) : 100;
+    o->fmt = fmt_str();
+    snprintf(o->err, sizeof(o->err), "%s", s_err);
+    return true;
 }
 
 int player_buffer_pct(void)

@@ -14,6 +14,7 @@
 #include "ui.h"
 #include "board.h"
 #include "net.h"
+#include "player.h"
 #include "settings.h"
 #include "audio_hw.h"
 #include "audio_sfx.h"
@@ -84,9 +85,20 @@ static void sys_tick(lv_timer_t *t)
         lv_label_set_text_fmt(s_bat, "%s %d%%, %s %dh%02d", ui_tr("Pin", "Battery"), battery_pct(),
                               ui_tr("còn khoảng", "about"), eta / 60, eta % 60);
     else lv_label_set_text_fmt(s_bat, "%s %d%%, %d.%02d V", ui_tr("Pin", "Battery"), battery_pct(), mv / 1000, (mv % 1000) / 10);
-    lv_label_set_text_fmt(s_mem, "MeowBox %s, RAM %uk, PSRAM %uk", esp_app_get_description()->version,
-                          (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
-                          (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
+    player_net_t n;
+    if (player_net(&n)) { /* while a stream plays: its numbers instead of the version line (4.3) */
+        bool slow = n.br && n.kbps + 8 < n.br;
+        char br[8] = "?";
+        if (n.br) snprintf(br, sizeof(br), "%u", n.br);
+        lv_label_set_text_fmt(s_mem, "Radio %u/%s kbps, %s %u s, %s %u", n.kbps, br, ui_tr("đệm", "buffer"),
+                              n.buf_ds / 10, ui_tr("ngắt", "drops"), n.under);
+        lv_obj_set_style_text_color(s_mem, ui_lc(slow || n.under ? UI_C_WARN : UI_C_DIM), 0);
+    } else {
+        lv_label_set_text_fmt(s_mem, "MeowBox %s, RAM %uk, PSRAM %uk", esp_app_get_description()->version,
+                              (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
+                              (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
+        lv_obj_set_style_text_color(s_mem, ui_lc(UI_C_DIM), 0);
+    }
     for (int c = 0; c < AUDIO_MIC_CHANNELS; c++)
         lv_bar_set_value(s_bar[c], s_mic_db[c] < 20 ? 0 : (s_mic_db[c] - 20) * 100 / 70, LV_ANIM_OFF);
 }

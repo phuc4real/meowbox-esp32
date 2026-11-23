@@ -321,5 +321,10 @@
  "pwOk": "Đã đổi mật khẩu",
  "batEta": "Còn khoảng {d}",
  "durH": "{n} giờ",
- "durM": "{n} phút"
+ "durM": "{n} phút",
+ "netLine": "{kbps}/{br} kbps · đệm {buf} s · ngắt {under}",
+ "netBuf": "Đang tải {fill}%",
+ "hWeak": "Sóng Wi-Fi yếu: để loa gần router hơn.",
+ "hSlow": "Mạng chậm hơn bitrate của đài: thử đài có bitrate thấp hơn.",
+ "hConn": "Không tới được máy chủ của đài."
 }

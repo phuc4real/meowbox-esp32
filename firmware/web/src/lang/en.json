@@ -321,5 +321,10 @@
  "pwOk": "Password changed",
  "batEta": "About {d} left",
  "durH": "{n} h",
- "durM": "{n} min"
+ "durM": "{n} min",
+ "netLine": "{kbps}/{br} kbps · buffer {buf} s · drops {under}",
+ "netBuf": "Buffering {fill}%",
+ "hWeak": "Weak Wi-Fi signal: move the speaker closer to the router.",
+ "hSlow": "The network is slower than this station's bitrate: try a lower-bitrate station.",
+ "hConn": "Cannot reach the station's server."
 }

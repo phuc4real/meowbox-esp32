@@ -103,6 +103,12 @@ All other sessions are invalidated.
 - `heap`/`heap_min`: free internal heap now/minimum since boot (bytes). `psram`/`psram_tot`: free/total PSRAM.
 - `sleep`: seconds left on the sleep timer, 0 = off. `pc`: PC agent connected.
 - `play.st`: `stop` | `buf` (connecting/buffering) | `play` | `err`. `id` is the station id, or 0 for an ad-hoc URL.
+- `play.net` (only while a network stream is buffering, playing or failed; absent otherwise):
+  `{"kbps":112,"br":128,"buf":9.3,"pre":6,"fill":100,"under":2,"reconn":0,"fmt":"mp3","err":""}`.
+  `kbps` download rate (5 s average); `br` stream bitrate (`icy-br` header or decoder, 0 = unknown); `buf` seconds of
+  audio buffered; `pre` seconds collected before playing (3/6/10: one step up after each underrun, down after 5 min
+  without one, back to 3 when Wi-Fi reconnects); `fill` buffering progress in %; `under` underruns while playing;
+  `reconn` reconnects; `fmt` `mp3`|`aac`|`ts`|`hls`; `err` last error `connect`|`http_<code>`|`read`|`stall` (under a quarter of the bitrate for 10 s while buffering: reconnected)|`decode` or `""`.
   `title` is the ICY StreamTitle (may be empty).
 
 ---

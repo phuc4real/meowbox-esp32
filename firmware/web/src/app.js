@@ -189,9 +189,15 @@ const addSt=async s=>{if(c.st.length>=(c.max||50))return toast(t('full'),1);s.id
 const edit=async s=>{const r=await askForm(s?t('edit'):t('addSt'),[['name',t('name'),{value:s?s.name:'',required:true,maxLength:48}],['url',t('url'),{value:s?s.url:'',required:true,type:'url'}],['type',t('type'),{tag:'select',opts:stTypes,value:s?s.type:'stream'}]]);
 if(!r)return;if(s){Object.assign(s,r);await save();draw()}else await addSt(r);show('list')};
 const isNow=s=>st.play&&st.play.id==s.id&&st.play.st!='stop';
+// stream numbers under the playing station + a hint when something is off (docs/firmware_v0.2.0.md, 4.3)
+const netTxt=()=>{const p=st.play||{},n=p.net;if(!n)return['',''];
+const line=p.st=='buf'?t('netBuf',{fill:n.fill}):t('netLine',{kbps:n.kbps,br:n.br||'?',buf:Math.round(n.buf),under:n.under});
+const hint=st.rssi&&st.rssi<-75?t('hWeak'):n.br&&n.kbps<n.br*0.9&&(n.under>0||p.st=='buf')?t('hSlow'):(p.st!='play'&&n.err&&/^(connect|http)/.test(n.err))?t('hConn'):'';
+return[line,hint]};
+const netUp=()=>{const[l,hn]=netTxt(),a=ul.querySelector('.netl'),b=ul.querySelector('.neth');if(a)a.textContent=l;if(b){b.textContent=hn;b.hidden=!hn}};
 const play=async s=>{st.play=(await radio(isNow(s)?{cmd:'stop'}:{cmd:'play',id:s.id})).play;draw()};
 const draw=()=>{cnt.textContent=c.st.length+' '+t('of')+' '+(c.max||50);ul.replaceChildren(...(c.st.length?c.st.map((s,i)=>{const now=isNow(s);
-return h('li',{class:now?'now':''},h('span',{class:'num'},i+1),h('div',{class:'main'},h('b',0,s.name),h('small',0,s.url.replace(/^https?:\/\/(www\.)?/,''))),
+return h('li',{class:now?'now':''},h('span',{class:'num'},i+1),h('div',{class:'main'},h('b',0,s.name),now&&st.play.net?h('small',{class:'netl'},netTxt()[0]):h('small',0,s.url.replace(/^https?:\/\/(www\.)?/,'')),now?h('small',{class:'neth err',hidden:!netTxt()[1]},netTxt()[1]):null),
 h('span',{class:'tag'},now?t('nowPlay'):TY[s.type]||s.type),btn(ic(now?'stop':'play'),()=>play(s),'ic bd',(now?t('stop'):t('play'))+': '+s.name),
 moreBtn(s.name,()=>[...mvItems(c.st,i,()=>{draw();save()}),[t('edit'),()=>edit(s)],[t('del'),async()=>{if(await ask(t('delSt'),s.name,t('del'),1)){c.st.splice(i,1);draw();save()}},'dg']]))}):[h('li',{class:'muted'},t('none'))]))};
 const listV=[h('div',{class:'lh'},h('h2',0,t('stations')),cnt),ul,h('div',0,btn(t('findRB'),()=>show('find'),'lk'),btn(t('addUrl'),()=>edit(),'lk'))];
@@ -223,6 +229,8 @@ const setS=async m=>{left=(await api('/api/sleep',{b:{min:m}})).left;picked=m;dr
 every(()=>{if(left>0){left--;lt.textContent=t('left')+' '+fMS(left);if(!left)drawS()}},1000);drawS();
 const cu={m:45};
 draw();show('list');
+let lastNow='';every(async()=>{try{st=await api('/api/status',{quiet:1})}catch(e){return}
+const k=(st.play&&st.play.st!='stop'?st.play.id:'')+'/'+!!(st.play&&st.play.net);if(k!=lastNow){lastNow=k;draw()}else netUp()},3000);
 return h('div',{class:'split'},h('div',{class:'side'},h('h1',0,t('nRadio')),h('p',{class:'muted'},t('radioHint')),yt,
 h('div',0,h('label',{class:'vol'},h('b',{style:'width:auto'},t('vol')),vol,vb)),
 h('div',0,h('b',0,t('nSleep')),chips,lt,h('form',{class:'row',onsubmit:e=>{e.preventDefault();setS(cu.m)}},h('div',{class:'grow'},bind(cu,'m',{type:'number',min:1,max:240,'aria-label':t('custom')})),h('button',{class:'ghost'},t('on'))))),right)}

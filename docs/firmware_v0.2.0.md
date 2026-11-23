@@ -555,6 +555,13 @@ Phiên bản 0.2.0 · đã kiểm tra lúc 08:30             [Kiểm tra ngay]
 - Khi vẫn bị lag thì nhìn màn loa hoặc trang web là biết do sóng yếu, mạng chậm hay đài có vấn đề.
 - Pin không bị ảnh hưởng khi không phát nhạc.
 
+> **Trạng thái (2026-11-23):** 4.1–4.3 xong, đã chạy trên loa. Chưa làm: đo pin trước/sau 4.1, đem loa ra chỗ bị lag
+> để đo (4.4). Thêm ngoài plan: phát hiện đứng luồng (đang chờ đệm mà 10 s nhận dưới 1/4 bitrate thì nối lại, lỗi
+> `stall`) vì có máy chủ nhỏ giọt vài byte nên không bao giờ hết thời gian chờ đọc; bộ đệm ICY metadata 4 KB chuyển
+> sang PSRAM. Đo với zeno.fm (MP3 128k) ở nhà, Wi-Fi -49 dBm: máy chủ có lúc gửi 0 kbps trong 20 s rồi tự đóng kết
+> nối, loa nối lại và phát tiếp với đệm 10 s; các đài AAC và HLS khác không hết đệm lần nào.
+> Chưa sửa (ghi lại): lúc khởi động loa thử mạng dùng lần cuối trước (khoảng 12 s) dù mạng đó không có ở đây.
+
 ### 4.1 Tắt tiết kiệm điện Wi-Fi khi đang phát
 - Bắt đầu phát (trạng thái `BUF`/`PLAY`) thì gọi `esp_wifi_set_ps(WIFI_PS_NONE)`. Dừng phát hoặc lỗi thì quay về
   `WIFI_PS_MIN_MODEM`.

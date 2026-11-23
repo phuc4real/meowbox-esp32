@@ -38,6 +38,48 @@ static net_mode_t s_mode = NET_MODE_CONNECTING;
 static bool s_ap_on;
 static volatile int64_t s_ap_idle_since; /* esp_timer us; last moment the hotspot had a client */
 static char s_ap_ssid[20];
+
+/* ---- power save while streaming (4.1) ---- */
+static portMUX_TYPE s_hold_mux = portMUX_INITIALIZER_UNLOCKED;
+static uint32_t s_hold;            /* wifi_hold_t bits */
+static bool s_ps_off;              /* WIFI_PS_NONE is in effect */
+static esp_timer_handle_t s_ps_timer;
+
+static void ps_restore(void *arg)
+{
+    portENTER_CRITICAL(&s_hold_mux);
+    bool idle = s_hold == 0;
+    portEXIT_CRITICAL(&s_hold_mux);
+    if (idle && s_ps_off) {
+        esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+        s_ps_off = false;
+        ESP_LOGI(TAG, "power save back on");
+    }
+}
+
+void wifi_mgr_hold_awake(wifi_hold_t who, bool on)
+{
+    if (!s_ps_timer) {
+        esp_timer_create_args_t a = {.callback = ps_restore, .name = "wifi_ps"};
+        if (esp_timer_create(&a, &s_ps_timer) != ESP_OK) return;
+    }
+    portENTER_CRITICAL(&s_hold_mux);
+    uint32_t before = s_hold;
+    s_hold = on ? s_hold | who : s_hold & ~who;
+    uint32_t after = s_hold;
+    portEXIT_CRITICAL(&s_hold_mux);
+    if (after) {
+        esp_timer_stop(s_ps_timer);
+        if (!s_ps_off) {
+            esp_wifi_set_ps(WIFI_PS_NONE);
+            s_ps_off = true;
+            ESP_LOGI(TAG, "power save off (streaming)");
+        }
+    } else if (before) {
+        esp_timer_stop(s_ps_timer);
+        esp_timer_start_once(s_ps_timer, 10 * 1000000); /* station switches and next/prev don't flap it */
+    }
+}
 static char s_cur_ssid[33];
 static esp_netif_t *s_sta_if, *s_ap_if;
 static EventGroupHandle_t s_ev;

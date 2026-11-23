@@ -89,7 +89,18 @@ def status():
             "bat": 78, "chg": True, "usb": True,
             "heap": random.randint(130000, 150000), "heap_min": 98304, "psram": 6815744, "psram_tot": 8388608,
             "time": int(time.time()), "vol": S["radio"]["vol"], "sleep": left, "pc": True, "def_pw": S["def_pw"],
-            "play": S["play"]}
+            "play": play_out()}
+
+
+def play_out():
+    """S['play'] plus the stream numbers the firmware adds while a network stream plays (API.md, play.net)"""
+    p = dict(S["play"])
+    if p["st"] in ("buf", "play", "err"):
+        br = 128
+        p["net"] = {"kbps": random.randint(110, 135), "br": br, "buf": round(random.uniform(4, 12), 1), "pre": 6,
+                    "fill": 100 if p["st"] == "play" else random.randint(10, 90), "under": 1, "reconn": 0,
+                    "fmt": "mp3", "err": ""}
+    return p
 
 
 def wifi_out():

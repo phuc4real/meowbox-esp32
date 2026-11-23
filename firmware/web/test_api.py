@@ -54,7 +54,7 @@ try:
             time.sleep(0.1)
 
     print("static")
-    for f in ("/", "/app.css", "/app.js", "/themes.css"):
+    for f in ("/", "/app.css", "/app.js", "/themes.css", "/lang/vi.json", "/lang/en.json"):
         with urllib.request.urlopen(BASE + f) as r:
             check(f"GET {f} 200", r.status == 200)
 
@@ -188,6 +188,24 @@ try:
                 break
         check(f"app.js uses {p} -> served ({code})", code != 404)
     print(f"{len(paths)} distinct API paths referenced by app.js")
+
+    print("strings (src/lang/*.json)")
+    langs = {os.path.splitext(f)[0]: json.load(open(os.path.join(HERE, "src", "lang", f), encoding="utf-8"))
+             for f in os.listdir(os.path.join(HERE, "src", "lang")) if f.endswith(".json")}
+    check("vi and en present", {"vi", "en"} <= set(langs))
+    for code, d in langs.items():
+        miss, extra = set(langs["vi"]) - set(d), set(d) - set(langs["vi"])
+        check(f"{code}.json has the same keys as vi.json (missing {sorted(miss)[:5]}, extra {sorted(extra)[:5]})",
+              not miss and not extra)
+        for k, v in d.items():
+            if isinstance(v, dict) and isinstance(langs["vi"].get(k), dict) and set(v) != set(langs["vi"][k]):
+                check(f"{code}.json '{k}' has the same sub-keys as vi.json", False)
+    used = set(re.findall(r"\b(?:t|opt)\('([A-Za-z_][A-Za-z0-9_]*)'", js))
+    missing = sorted(k for k in used if k not in langs["vi"])
+    check(f"every t('...')/opt('...') key used in app.js exists ({len(used)} keys; missing {missing})", not missing)
+    bat = set(re.findall(r"\bB\('([A-Za-z_]+)'", js))
+    check(f"every B('...') key exists in 'bat' (missing {sorted(bat - set(langs['vi'].get('bat', {})))})",
+          bat <= set(langs["vi"].get("bat", {})))
 finally:
     proc.terminate()
 

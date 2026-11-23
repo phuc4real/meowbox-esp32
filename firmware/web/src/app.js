@@ -1,48 +1,12 @@
 'use strict';
 // MeowBox web config. Plain JS, no deps. API contract: ../API.md
-const L={vi:{
-nOv:'Tổng quan',nWifi:'Wi-Fi',nRadio:'Radio',nAlarm:'Báo thức',nSleep:'Hẹn giờ tắt',nWx:'Thời tiết',nLook:'Giao diện',nCat:'Mèo',nNotify:'Thông báo',nPc:'Máy tính',nSys:'Hệ thống',nSet:'Cài đặt',
-loading:'Đang tải…',loadErr:'Không tải được dữ liệu.',netErr:'Không kết nối được tới loa',err:'Lỗi',saved:'Đã lưu',save:'Lưu',cancel:'Huỷ',ok:'OK',del:'Xoá',edit:'Sửa',add:'Thêm',search:'Tìm',none:'Chưa có',refresh:'Làm mới',choose:'Chọn',copy:'Chép',copied:'Đã chép',show:'Hiện',min:'phút',d:' ngày ',off:'Đang tắt',on:'Bật',noRes:'Không có kết quả',extErr:'Không gọi được dịch vụ bên ngoài (cần internet)',of:'trên',more:'Tuỳ chọn',mvUp:'Chuyển lên',mvDn:'Chuyển xuống',
-login:'Đăng nhập',user:'Tên đăng nhập',pass:'Mật khẩu',badLogin:'Sai tên hoặc mật khẩu',tooMany:'Sai quá nhiều lần, thử lại sau 30 giây',logout:'Đăng xuất',
-defPw:'Bạn vẫn đang dùng mật khẩu mặc định.',apT:'Wi-Fi cài đặt',apHelp:'Mạng MeowBox-XXXX để cài lại Wi-Fi khi loa mất mạng. Mật khẩu meowbox2026. Tự tắt 10 giây sau khi loa nối mạng, hoặc 10 phút không có ai vào. Trên loa: giữ cùng lúc VOL+ và VOL− 3 giây để bật.',apOn:'Đang phát',apOff:'Đang tắt',apClient:'có máy đang kết nối',apOffIn:'tự tắt sau',apMin:'phút',apStart:'Bật',apStop:'Tắt',defPwLink:'Đổi mật khẩu',
-ver:'Phiên bản',up:'Thời gian chạy',ip:'Địa chỉ IP',bat:'Pin',chg:'Đang sạc',onBat:'Dùng pin',heap:'RAM trống',psram:'PSRAM trống',minL:'thấp nhất',tot:'tổng',time:'Giờ trên loa',stop_:'Đã dừng',buf:'Đang kết nối…',perr:'Lỗi stream',vol:'Âm lượng',play:'Phát',stop:'Dừng',prev:'Đài trước',next:'Đài sau',sleepLeft:'Tắt sau',pcOn:'Đang kết nối',pcOff:'Chưa kết nối',apMode:'Đang phát Wi-Fi riêng',nowPlay:'Đang phát',good:'sóng mạnh',fair:'sóng khá',weak:'sóng yếu',
-shotAlt:'Màn hình loa',shotHint:'Ảnh là màn hình thật của loa, tự cập nhật mỗi 5 giây.',shotNo:'Chưa xem được màn hình loa.',mood:{happy:'đang vui',sad:'đang buồn',hungry:'đang đói',sick:'đang ốm',sleep:'đang ngủ'},stT:'Trạng thái',recent:'Thông báo gần đây',seeAll:'Xem tất cả',dev:'Thiết bị',low:'thấp',
-savedNets:'Mạng đã lưu',scanT:'Mạng xung quanh',scan:'Quét lại',scanning:'Đang quét…',hidden:'Mạng ẩn…',connect:'Kết nối',connected:'đang dùng',delNet:'Xoá mạng này?',ssid:'Tên mạng (SSID)',keepPw:'Để trống nếu dùng mật khẩu đã lưu',connecting:'Loa đang chuyển mạng. Nếu IP đổi, xem IP mới trên màn loa.',prio:'Thứ tự trên cùng được ưu tiên kết nối trước.',ch:'kênh',secured:'có mật khẩu',
-tab_find:'Tìm đài',stations:'Đài đã lưu',addSt:'Thêm đài',addUrl:'Thêm đài bằng link',findRB:'Tìm đài trên Radio Browser',name:'Tên',url:'Link stream',type:'Loại',delSt:'Xoá đài này?',full:'Danh sách đã đầy',country:'Quốc gia',all:'Tất cả',tag:'Thể loại (tag)',tagPh:'vd: news, pop, lofi',added:'Đã thêm',preview:'Nghe thử',radioHint:'Đài phát theo thứ tự trong danh sách. Nút giữa trên loa phát đài gần nhất.',
-ytAdd:'Thêm từ YouTube',ytSave:'Lưu thành đài',ytHint:'YouTube phát qua PC agent: máy tính phải bật và agent đang chạy.',ytBad:'Link YouTube không hợp lệ',ytName:'Tên hiển thị (tuỳ chọn)',
-addAlarm:'Thêm báo thức',maxAl:'Tối đa 5 báo thức',sound:'Âm thanh',chime:'Chuông',snooze:'Báo lại sau (phút)',once:'Không chọn ngày thì chỉ kêu một lần.',days:['T2','T3','T4','T5','T6','T7','CN'],
-sleepSet:'Sẽ tắt sau',custom:'Số phút khác',left:'Còn',
-curLoc:'Vị trí hiện tại',findCity:'Tìm thành phố',cityPh:'vd: Hà Nội, Đà Lạt…',opts:'Tuỳ chọn',wxOn:'Hiện thời tiết trên đồng hồ',unit:'Đơn vị',wx:{0:'Trời quang',1:'Có mây',45:'Sương mù',51:'Mưa',71:'Tuyết',80:'Mưa rào',95:'Dông'},hilo:'cao/thấp',
-bri:'Độ sáng',idleBri:'Độ sáng khi không dùng',idleS:'Giảm sáng sau (giây, 0 = không)',h24:'Đồng hồ 24 giờ',night:'Chế độ đêm',from:'Từ',to:'Đến',nBri:'Độ sáng ban đêm',devLang:'Ngôn ngữ trên loa',tz:'Múi giờ',tzV:'ICT-7 (UTC+7, Việt Nam), cố định',
-theme:'Theme',defT:'mặc định',themeOk:'Đã đổi sang ',undo:'Hoàn tác',shot:'Chụp màn hình loa',screen:'Màn hình',nm:{auto:'Tự động theo giờ',on:'Luôn bật',off:'Tắt'},fx:'Hiệu ứng',fxs:{full:'Đầy đủ',eco:'Tiết kiệm'},fxHint:'Tiết kiệm: tắt lệch màu, scanline và khối nghiêng, tự bật khi chạy pin.',web:'Trang web',webs:{device:'Theo theme của loa',swiss:'Luôn Swiss'},webHint:'Chỉ lưu trong trình duyệt này.',
-catName:'Tên mèo',fur:'Màu lông',furs:{tabby:'Mướp',orange:'Vàng cam',black:'Đen',white:'Trắng',calico:'Tam thể',gray:'Xám'},diff:'Độ khó',diffs:{easy:'Dễ',normal:'Thường',hard:'Khó'},catSt:'Tình trạng',age:'tuổi',stats:{full:'No',fun:'Vui',clean:'Sạch',energy:'Năng lượng',health:'Sức khoẻ'},stages:{kitten:'Mèo con',junior:'Mèo nhỡ',adult:'Trưởng thành',senior:'Mèo già'},moods:{happy:'Vui vẻ',sad:'Buồn',hungry:'Đói',sick:'Ốm',sleep:'Đang ngủ'},away:'Mèo đã bỏ đi…',reset:'Nuôi lại từ đầu',resetQ:'Mèo hiện tại sẽ mất hết chỉ số và tuổi. Bắt đầu lại với một chú mèo con?',danger:'Vùng nguy hiểm',
-token:'API token',regen:'Tạo token mới',regenQ:'Token cũ sẽ ngừng hoạt động ngay. Các script đang dùng phải cập nhật.',nset:'Cài đặt',dur:'Hiện trong (giây)',quiet:'Tin "thấp" không kêu vào ban đêm',ntfy:'Chủ đề ntfy.sh (tuỳ chọn)',test:'Gửi thử',title:'Tiêu đề',text:'Nội dung',prio_:'Mức ưu tiên',pr:{low:'Thấp',normal:'Thường',high:'Cao'},snd:{chime:'Chuông',alert:'Báo động',none:'Im lặng'},sent:'Đã gửi',hist:'20 tin gần nhất',ex:'Ví dụ dùng',testT:'Xin chào',testX:'Đây là thông báo thử từ trang web',
-pcSt:'Trạng thái',pcHost:'Địa chỉ PC (relay YouTube)',port:'Cổng',auto:'Tự lấy địa chỉ từ agent đang kết nối',seen:'Tin cuối',ago:'giây trước',pcHint:'Chạy pc-agent trên máy Windows. Loa nhận số liệu qua /ws/pc và phát YouTube qua http://<PC>:<cổng>/yt.',
-ota:'Cập nhật firmware',otaHint:'Chọn file .bin (build từ firmware/). Loa sẽ tự khởi động lại.',upload:'Tải lên',otaBad:'File không phải firmware ESP32 (.bin)',otaBig:'File quá lớn',otaOk:'Đã cập nhật, đang khởi động lại…',reboot:'Khởi động lại',rebootQ:'Khởi động lại loa?',waiting:'Đang chờ loa…',back:'Loa đã chạy lại',factory:'Xoá toàn bộ cấu hình',factoryQ:'Xoá Wi-Fi, đài, báo thức, mèo, mật khẩu và token. Loa sẽ về chế độ cài đặt ban đầu (phát Wi-Fi MeowBox-XXXX).',factoryOk:'Đã xoá. Kết nối Wi-Fi MeowBox-XXXX để cài lại.',chpw:'Đổi mật khẩu',oldPw:'Mật khẩu hiện tại',newPw:'Mật khẩu mới (6–32 ký tự)',newPw2:'Nhập lại mật khẩu mới',pwMis:'Hai mật khẩu mới không khớp',pwLen:'Mật khẩu phải 6–32 ký tự',badOld:'Mật khẩu hiện tại không đúng',pwOk:'Đã đổi mật khẩu'
-},en:{
-nOv:'Overview',nWifi:'Wi-Fi',nRadio:'Radio',nAlarm:'Alarms',nSleep:'Sleep timer',nWx:'Weather',nLook:'Appearance',nCat:'Cat',nNotify:'Notifications',nPc:'Computer',nSys:'System',nSet:'Settings',
-loading:'Loading…',loadErr:'Could not load data.',netErr:'Cannot reach the speaker',err:'Error',saved:'Saved',save:'Save',cancel:'Cancel',ok:'OK',del:'Delete',edit:'Edit',add:'Add',search:'Search',none:'None yet',refresh:'Refresh',choose:'Choose',copy:'Copy',copied:'Copied',show:'Show',min:'min',d:'d ',off:'Off',on:'On',noRes:'No results',extErr:'External service unreachable (needs internet)',of:'of',more:'Options',mvUp:'Move up',mvDn:'Move down',
-login:'Log in',user:'Username',pass:'Password',badLogin:'Wrong username or password',tooMany:'Too many attempts, try again in 30 s',logout:'Log out',
-defPw:'You are still using the default password.',apT:'Setup hotspot',apHelp:'The MeowBox-XXXX network for setting up Wi-Fi again when the speaker is offline. Password meowbox2026. Closes 10 s after the speaker gets online, or after 10 min with nobody on it. On the speaker: hold VOL+ and VOL− together for 3 s to open it.',apOn:'On',apOff:'Off',apClient:'a device is connected',apOffIn:'closes in',apMin:'min',apStart:'Open',apStop:'Close',defPwLink:'Change password',
-ver:'Version',up:'Uptime',ip:'IP address',bat:'Battery',chg:'Charging',onBat:'On battery',heap:'Free RAM',psram:'Free PSRAM',minL:'lowest',tot:'total',time:'Device time',stop_:'Stopped',buf:'Connecting…',perr:'Stream error',vol:'Volume',play:'Play',stop:'Stop',prev:'Previous',next:'Next',sleepLeft:'Off in',pcOn:'Connected',pcOff:'Not connected',apMode:'Own hotspot mode',nowPlay:'Now playing',good:'strong signal',fair:'fair signal',weak:'weak signal',
-shotAlt:'Speaker screen',shotHint:'This is the real speaker screen, refreshed every 5 seconds.',shotNo:'Cannot show the speaker screen yet.',mood:{happy:'is happy',sad:'is sad',hungry:'is hungry',sick:'is sick',sleep:'is sleeping'},stT:'Status',recent:'Recent notifications',seeAll:'See all',dev:'Device',low:'low',
-savedNets:'Saved networks',scanT:'Nearby networks',scan:'Rescan',scanning:'Scanning…',hidden:'Hidden network…',connect:'Connect',connected:'in use',delNet:'Delete this network?',ssid:'Network name (SSID)',keepPw:'Leave empty to use the saved password',connecting:'The speaker is switching networks. If its IP changes, read it on the screen.',prio:'Networks at the top are tried first.',ch:'channel',secured:'secured',
-tab_find:'Find stations',stations:'Saved stations',addSt:'Add station',addUrl:'Add station by link',findRB:'Find stations on Radio Browser',name:'Name',url:'Stream URL',type:'Type',delSt:'Delete this station?',full:'Station list is full',country:'Country',all:'All',tag:'Genre (tag)',tagPh:'e.g. news, pop, lofi',added:'Added',preview:'Preview',radioHint:'Stations play in list order. The middle button on the speaker plays the last station.',
-ytAdd:'Add from YouTube',ytSave:'Save as station',ytHint:'YouTube plays through the PC agent: the PC must be on and the agent running.',ytBad:'Not a valid YouTube link',ytName:'Display name (optional)',
-addAlarm:'Add alarm',maxAl:'Up to 5 alarms',sound:'Sound',chime:'Chime',snooze:'Snooze (minutes)',once:'No day selected means it rings once.',days:['Mo','Tu','We','Th','Fr','Sa','Su'],
-sleepSet:'Turning off in',custom:'Other minutes',left:'Left',
-curLoc:'Current location',findCity:'Find a city',cityPh:'e.g. Hanoi, Da Lat…',opts:'Options',wxOn:'Show weather on the clock',unit:'Unit',wx:{0:'Clear',1:'Cloudy',45:'Fog',51:'Rain',71:'Snow',80:'Showers',95:'Thunderstorm'},hilo:'high/low',
-bri:'Brightness',idleBri:'Idle brightness',idleS:'Dim after (seconds, 0 = never)',h24:'24-hour clock',night:'Night mode',from:'From',to:'To',nBri:'Night brightness',devLang:'Speaker language',tz:'Time zone',tzV:'ICT-7 (UTC+7, Vietnam), fixed',
-theme:'Theme',defT:'default',themeOk:'Switched to ',undo:'Undo',shot:'Capture speaker screen',screen:'Screen',nm:{auto:'Automatic by hour',on:'Always on',off:'Off'},fx:'Effects',fxs:{full:'Full',eco:'Saver'},fxHint:'Saver: no RGB split, scanlines or tilted blocks; turns on by itself on battery.',web:'Web page',webs:{device:'Follow the speaker theme',swiss:'Always Swiss'},webHint:'Stored in this browser only.',
-catName:'Cat name',fur:'Fur color',furs:{tabby:'Tabby',orange:'Orange',black:'Black',white:'White',calico:'Calico',gray:'Gray'},diff:'Difficulty',diffs:{easy:'Easy',normal:'Normal',hard:'Hard'},catSt:'Status',age:'age',stats:{full:'Full',fun:'Fun',clean:'Clean',energy:'Energy',health:'Health'},stages:{kitten:'Kitten',junior:'Junior',adult:'Adult',senior:'Senior'},moods:{happy:'Happy',sad:'Sad',hungry:'Hungry',sick:'Sick',sleep:'Sleeping'},away:'The cat ran away…',reset:'Start over',resetQ:'The current cat loses all stats and age. Start again with a kitten?',danger:'Danger zone',
-token:'API token',regen:'New token',regenQ:'The old token stops working immediately. Scripts using it must be updated.',nset:'Settings',dur:'Show for (seconds)',quiet:'"Low" messages are silent at night',ntfy:'ntfy.sh topic (optional)',test:'Send test',title:'Title',text:'Text',prio_:'Priority',pr:{low:'Low',normal:'Normal',high:'High'},snd:{chime:'Chime',alert:'Alert',none:'Silent'},sent:'Sent',hist:'Last 20 messages',ex:'Examples',testT:'Hello',testX:'This is a test notification from the web page',
-pcSt:'Status',pcHost:'PC address (YouTube relay)',port:'Port',auto:'Take address from the connected agent',seen:'Last message',ago:'s ago',pcHint:'Run pc-agent on Windows. The speaker gets stats via /ws/pc and plays YouTube via http://<PC>:<port>/yt.',
-ota:'Firmware update',otaHint:'Pick a .bin file (built from firmware/). The speaker reboots by itself.',upload:'Upload',otaBad:'Not an ESP32 firmware file (.bin)',otaBig:'File too large',otaOk:'Updated, rebooting…',reboot:'Reboot',rebootQ:'Reboot the speaker?',waiting:'Waiting for the speaker…',back:'Speaker is back',factory:'Factory reset',factoryQ:'Erase Wi-Fi, stations, alarms, cat, password and token. The speaker returns to setup mode (Wi-Fi hotspot MeowBox-XXXX).',factoryOk:'Erased. Join Wi-Fi MeowBox-XXXX to set up again.',chpw:'Change password',oldPw:'Current password',newPw:'New password (6–32 chars)',newPw2:'Repeat new password',pwMis:'New passwords do not match',pwLen:'Password must be 6–32 characters',badOld:'Current password is wrong',pwOk:'Password changed'
-}};
+// Strings live in lang/<code>.json (one file per language, same keys). {name} in a string is filled by t(key,{name:...}).
+let L={};
 const RB='https://de1.api.radio-browser.info/json/stations/search',GEO='https://geocoding-api.open-meteo.com/v1/search',MAXFW=5505024,SHOT='/api/screenshot';
 const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
 let lang=ls('lang')||'vi';
-const t=k=>{const v=L[lang][k];return v===undefined?L.vi[k]??k:v};
+const t=(k,v)=>{const x=L[k];if(x===undefined)return k;return v&&typeof x=='string'?x.replace(/\{(\w+)\}/g,(_,n)=>v[n]??''):x};
+const loadLang=async l=>{const r=await fetch('lang/'+l+'.json');if(!r.ok)throw Error(r.status);return r.json()};
 const $=s=>document.querySelector(s),main=$('#main'),nav=$('#nav'),html=document.documentElement;
 function h(tag,a,...c){const e=document.createElement(tag);
 for(const x of c.flat(9))if(x!=null&&x!==false)e.append(x.nodeType?x:''+x);
@@ -173,10 +137,8 @@ let log=null;try{const r=await api('/api/notify/history',{quiet:1});if(r.items.l
 return[h('section',{class:'hero','aria-label':t('shotAlt')},shot,h('div',{class:'txt'},h1,h('p',0,t('shotHint')),np)),h('div',{class:'brush',role:'presentation'}),
 await batSec(s0),sec(t('stT'),kvb),log]}
 // ---------- battery ----------
-const fDur=m=>lang=='vi'?(m>=60?Math.floor(m/60)+' giờ ':'')+m%60+' phút':(m>=60?Math.floor(m/60)+' h ':'')+m%60+' min';
-const BT={vi:{title:'Pin',eta:m=>'Còn khoảng '+fDur(m),ran:'đã chạy pin',rate:'tụt',none:'Chưa có lần dùng pin nào. Rút sạc để bắt đầu đo.',sess:'Các lần dùng pin',cols:['Bắt đầu','Thời gian','%','Kết thúc','Ước tính đầy→cạn'],csv:'Tải log CSV',est:'Đang ước tính thời gian còn lại',chg:'Đang sạc',end:{plugged:'cắm sạc',empty:'hết pin',off:'tắt máy'}},
-en:{title:'Battery',eta:m=>'About '+fDur(m)+' left',ran:'on battery for',rate:'drain',none:'No battery sessions yet. Unplug to start measuring.',sess:'Battery sessions',cols:['Start','Duration','%','End','Full→empty est.'],csv:'Download CSV log',est:'Estimating time left',chg:'Charging',end:{plugged:'plugged in',empty:'ran empty',off:'switched off'}}};
-const B=k=>(BT[lang]||BT.vi)[k];
+const fDur=m=>(m>=60?t('durH',{n:Math.floor(m/60)})+' ':'')+t('durM',{n:m%60});
+const B=k=>t('bat')[k];
 const fHM=m=>Math.floor(m/60)+'h'+pad(m%60);
 // chart: full width, 0/50/100 % guides, time axis (ICT)
 function batChart(pts){if(!pts||pts.length<2)return null;const t0=pts[0][0],dt=Math.max(1,pts[pts.length-1][0]-t0),X=ts=>(ts-t0)/dt*100,Y=p=>100-p,ns='vector-effect="non-scaling-stroke"';
@@ -189,7 +151,7 @@ const head=(pct,l1,l2)=>h('div',{class:'batt'},h('div',{class:'big'},pct<0?'—'
 if(!b)return sec(B('title'),head(s.bat,s.chg?B('chg'):t('onBat')));
 const l2=[b.mv>0?(b.mv/1000).toFixed(2)+' V':'',b.cur&&b.cur.open?B('ran')+' '+fDur(b.cur.min):'',b.rate>0?B('rate')+' '+b.rate+'%/h':''].filter(Boolean).join(', ');
 const ss=b.sessions||[];
-return sec(B('title'),head(b.pct,b.chg?B('chg'):b.eta>0?B('eta')(b.eta):B('est'),l2),batChart(b.pts),h('h3',0,B('sess')),
+return sec(B('title'),head(b.pct,b.chg?B('chg'):b.eta>0?t('batEta',{d:fDur(b.eta)}):B('est'),l2),batChart(b.pts),h('h3',0,B('sess')),
 ss.length?h('div',{class:'tw'},h('table',0,h('thead',0,h('tr',0,B('cols').map(c=>h('th',{scope:'col'},c)))),h('tbody',0,ss.map(x=>h('tr',0,h('td',0,fT(x.start)),h('td',0,fHM(x.min)),h('td',0,x.from+'–'+x.to),h('td',0,B('end')[x.end]||x.end),h('td',0,x.full_h?x.full_h+' h':'—')))))):h('p',{class:'muted'},B('none')),
 h('a',{href:'/api/battery/log.csv',class:'lk'},B('csv')))}
 
@@ -393,15 +355,19 @@ fld(t('user'),bind(o,'user',{autocomplete:'username',required:true})),fld(t('pas
 const p=main.querySelector('[type=password]');p&&p.focus()}
 function enter(defPw){authed=true;loginShown=false;shell(true);banner(defPw);syncTheme();route()}
 async function logout(){try{await fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})}catch(e){}showLogin()}
-function setLang(l){lang=l;ls('lang',l);html.lang=l;$('#lang').textContent=l=='vi'?'EN':'VI';
+async function setLang(l){try{L=await loadLang(l)}catch(e){return toast(t('netErr'),1)}
+lang=l;ls('lang',l);html.lang=l;$('#lang').textContent=l=='vi'?'EN':'VI';$('#logout').title=t('logout');
 if(authed){banner(!$('#banner').hidden);route()}else{loginShown=false;showLogin()}}
 $('#lang').onclick=()=>setLang(lang=='vi'?'en':'vi');
 $('#menu').onclick=()=>menu(!nav.classList.contains('open'));
-$('#logout').onclick=logout;$('#logout').title=t('logout');
+$('#logout').onclick=logout;
 $('#host').textContent=location.hostname;
 addEventListener('hashchange',route);
 addEventListener('keydown',e=>{if(e.key=='Escape')closePop()});
-(async()=>{html.lang=lang;$('#lang').textContent=lang=='vi'?'EN':'VI';setTheme(html.dataset.theme);
+(async()=>{setTheme(html.dataset.theme);
+// strings first: index.html already started fetching them (window.LP) in parallel with app.js
+try{L=await(window.LP||loadLang(lang))}catch(e){try{lang='vi';L=await loadLang('vi')}catch(_){}}
+html.lang=lang;$('#lang').textContent=lang=='vi'?'EN':'VI';$('#logout').title=t('logout');
 // theme before login: unauthenticated GET /api/theme
 fetch('/api/theme').then(r=>r.ok?r.json():{}).then(j=>{if(j.theme)setTheme(j.theme,j.fonts)}).catch(()=>{});
 try{const r=await fetch('/api/session');if(r.ok)enter((await r.json()).def_pw);else showLogin()}catch(e){showLogin()}})();

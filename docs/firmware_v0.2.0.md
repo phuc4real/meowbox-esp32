@@ -62,7 +62,9 @@ Số đo lúc lên plan (`python build.py`):
   dạng template.
 - Trang chỉ tải `lang/<lang>.json` của ngôn ngữ đang chọn, tiết kiệm khoảng 7 KB raw mỗi lần tải. Đổi ngôn ngữ thì
   tải file kia rồi vẽ lại trang hiện tại.
-- Dự phòng: thiếu khoá ở `en` thì dùng `vi` (giống hành vi hiện tại của `t()`), nên khi đó cũng phải tải `vi`.
+- Không dự phòng lúc chạy (không tải thêm `vi` khi đang dùng `en`): `test_api.py` bắt buộc mọi file ngôn ngữ có đủ
+  khoá như `vi.json`. Thiếu khoá thì `t()` trả về tên khoá. **Đã xong** (2026-11-23): 234 khoá, lượt tải đầu gzip
+  28.9 → 26.5 KB.
 - Hằng số (`RB`, `GEO`, `MAXFW`) chỉ vài trăm byte, để nguyên trong code. Icon `IC` chuyển thành `<symbol>` trong
   sprite SVG có sẵn ở `index.html`, dùng bằng `<use href="#i-radio">`.
 - `test_api.py` thêm phần kiểm tra: hai file ngôn ngữ có cùng bộ khoá, mọi khoá `t('…')` trong code đều có trong `vi.json`.

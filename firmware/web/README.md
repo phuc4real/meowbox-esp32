@@ -6,6 +6,7 @@ không CDN. Font tự host trong `storage/web/fonts/` (chỉ tải font của th
 | File | Nội dung |
 |---|---|
 | `src/index.html`, `src/app.css`, `src/app.js` | ứng dụng một trang, route bằng hash (`#/radio`, `#/look`…) |
+| `src/lang/vi.json`, `src/lang/en.json` | mọi chuỗi giao diện, mỗi ngôn ngữ một file, cùng bộ khoá |
 | `src/themes.css` | biến CSS của 4 theme, **sinh bởi** `python tools/gen_themes.py` (chạy trong `firmware/`), không sửa tay |
 | `themes.json` | danh sách theme cho mock (`GET /api/themes`), cũng sinh bởi `gen_themes.py` |
 | `API.md` | hợp đồng REST mà firmware phải làm đúng (endpoint, JSON, quy tắc đăng nhập) |
@@ -29,11 +30,11 @@ Mở trên điện thoại cùng mạng: `http://<IP máy tính>:8080`. Tìm đ�
 ## Build cho firmware
 
 ```sh
-python build.py        # ghi firmware/storage/web/{index.html,themes.css,app.css,app.js}.gz
+python build.py        # ghi firmware/storage/web/{index.html,themes.css,app.css,app.js,lang/*.json}.gz
 ```
 
 Firmware trả các file này với `Content-Encoding: gzip` (xem phần "Static files" trong `API.md`).
-Ngân sách: tổng bản gzip của 4 file ≤ 30 KB (build.py báo lỗi nếu vượt). Font và ảnh xem trước theme là file riêng.
+Ngân sách: bản gzip của lần tải đầu (4 file trên + một file ngôn ngữ) ≤ 30 KB (build.py báo lỗi nếu vượt). Font và ảnh xem trước theme là file riêng.
 
 ## Theme
 
@@ -46,8 +47,10 @@ Ngân sách: tổng bản gzip của 4 file ≤ 30 KB (build.py báo lỗi nếu
 ## Ghi chú
 
 - Ngôn ngữ trang web mặc định tiếng Việt, nút `EN`/`VI` trên thanh trên cùng (lưu trong trình duyệt).
-  Mọi chuỗi nằm trong object `L` đầu `app.js`; thêm ngôn ngữ = thêm một khoá. Ngôn ngữ trên màn loa
-  chỉnh riêng ở trang Hiển thị.
+  Mọi chuỗi nằm trong `src/lang/<mã>.json`; trang chỉ tải file của ngôn ngữ đang chọn (`index.html` bắt đầu tải
+  song song với `app.js`). Chuỗi có biến viết `{n}`, gọi `t('durM',{n:5})`. Thêm ngôn ngữ = thêm một file với đủ
+  khoá như `vi.json` (`test_api.py` kiểm tra hai file cùng bộ khoá và mọi khoá `t('…')` trong code đều có).
+  Ngôn ngữ trên màn loa chỉnh riêng ở trang Hiển thị.
 - Không dùng `alert()`/`confirm()`: mọi hộp thoại là modal trong trang.
 - Còn dùng mật khẩu mặc định `meowbox` thì có banner nhắc đổi.
 - Tên thành phố từ open-meteo đôi khi dùng chữ `Ð` (U+00D0); trang web đổi sang `Đ` (U+0110) cho khớp font trên loa.

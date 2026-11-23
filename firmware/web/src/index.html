@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MeowBox</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M5 3l7 6h8l7-6v15c0 6-5 11-11 11S5 24 5 18z'/%3E%3C/svg%3E">
-<script>try{document.documentElement.dataset.theme=localStorage.getItem('mbT')||'swiss'}catch(e){}</script>
+<script>var l='vi';try{document.documentElement.dataset.theme=localStorage.getItem('mbT')||'swiss';l=localStorage.getItem('lang')||l}catch(e){}window.LP=fetch('lang/'+l+'.json').then(function(r){if(!r.ok)throw r.status;return r.json()})</script>
 <link rel="stylesheet" href="themes.css">
 <link rel="stylesheet" href="app.css">
 <style id="ff"></style>

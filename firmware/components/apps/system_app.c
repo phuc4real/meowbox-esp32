@@ -16,6 +16,7 @@
 #include "net.h"
 #include "settings.h"
 #include "audio_hw.h"
+#include "audio_sfx.h"
 
 static lv_obj_t *s_net, *s_addr, *s_bat, *s_mem, *s_bar[AUDIO_MIC_CHANNELS], *s_frames;
 static volatile int s_mic_db[AUDIO_MIC_CHANNELS];
@@ -59,7 +60,14 @@ static void sys_tick(lv_timer_t *t)
     wifi_mgr_info(ss, sizeof(ss), ip, sizeof(ip), &rssi);
     if (wifi_mgr_mode() == NET_MODE_STA) {
         lv_label_set_text_fmt(s_net, "Wi-Fi %s, %d dBm", ss, rssi);
-        lv_label_set_text_fmt(s_addr, "meowbox.local\nhttp://%s", ip);
+        int left = wifi_mgr_portal_left_s();
+        if (left >= 0)
+            lv_label_set_text_fmt(s_addr, "http://%s\n%s %s, %s %d:%02d", ip, ui_tr("Đang phát", "Hotspot"),
+                                  wifi_mgr_ap_ssid(), ui_tr("tắt sau", "off in"), left / 60, left % 60);
+        else if (left == -2)
+            lv_label_set_text_fmt(s_addr, "http://%s\n%s %s, %s", ip, ui_tr("Đang phát", "Hotspot"),
+                                  wifi_mgr_ap_ssid(), ui_tr("có máy đang kết nối", "a device is connected"));
+        else lv_label_set_text_fmt(s_addr, "meowbox.local\nhttp://%s", ip);
     } else if (wifi_mgr_mode() == NET_MODE_AP) {
         lv_label_set_text_fmt(s_net, "%s %s", ui_tr("Cài đặt: vào Wi-Fi", "Setup: join"), wifi_mgr_ap_ssid());
         lv_label_set_text_fmt(s_addr, "%s %s\nhttp://192.168.4.1", ui_tr("Mật khẩu", "Password"), wifi_mgr_ap_pass());
@@ -83,12 +91,47 @@ static void sys_tick(lv_timer_t *t)
         lv_bar_set_value(s_bar[c], s_mic_db[c] < 20 ? 0 : (s_mic_db[c] - 20) * 100 / 70, LV_ANIM_OFF);
 }
 
-static void portal_clicked(lv_event_t *e)
+void system_wifi_setup(bool in_lvgl)
 {
     wifi_mgr_start_portal();
+    audio_sfx_play(SFX_BEEP_HI);
+    if (!in_lvgl && !board_lvgl_lock(500)) return;
     char txt[96];
     snprintf(txt, sizeof(txt), "%s\n%s %s", wifi_mgr_ap_ssid(), ui_tr("Mật khẩu", "Password"), wifi_mgr_ap_pass());
     ui_overlay_show(LV_SYMBOL_WIFI, ui_tr("Cài đặt Wi-Fi", "Wi-Fi setup"), txt, UI_C_ACCENT, 20, NULL, NULL);
+    if (!in_lvgl) board_lvgl_unlock();
+}
+
+static void portal_clicked(lv_event_t *e) { system_wifi_setup(true); }
+
+/* GET/POST /api/wifi/portal: state of the Wi-Fi setup hotspot; POST {"on":true|false} opens/closes it.
+ * Token auth (or a web session) so the PC agent can reopen it. */
+static esp_err_t portal_state(httpd_req_t *req)
+{
+    cJSON *r = cJSON_CreateObject();
+    cJSON_AddBoolToObject(r, "on", wifi_mgr_portal_on());
+    cJSON_AddStringToObject(r, "ssid", wifi_mgr_ap_ssid());
+    int left = wifi_mgr_portal_left_s();
+    if (left == -2) cJSON_AddStringToObject(r, "off_in", "client");
+    else if (left >= 0) cJSON_AddNumberToObject(r, "off_in", left);
+    else cJSON_AddNullToObject(r, "off_in");
+    return web_send_json(req, r);
+}
+
+static esp_err_t h_portal_post(httpd_req_t *req)
+{
+    cJSON *j = web_read_json(req);
+    if (!j) return ESP_OK;
+    cJSON *on = cJSON_GetObjectItem(j, "on");
+    bool valid = cJSON_IsBool(on), want = cJSON_IsTrue(on);
+    cJSON_Delete(j);
+    if (!valid) return web_send_err(req, 400, "bad_value");
+    if (want) {
+        if (!wifi_mgr_portal_on()) system_wifi_setup(false);
+    } else if (!wifi_mgr_stop_portal()) {
+        return web_send_err(req, 409, "offline"); /* the hotspot is the only way in while offline */
+    }
+    return portal_state(req);
 }
 
 /* Long-press the header to toggle the safe-area calibration frames */
@@ -273,6 +316,8 @@ void system_app_init(void)
 {
     ui_register_builder(UI_TILE_SYSTEM, system_build);
     web_register("/api/screenshot", HTTP_GET, h_shot, WEB_AUTH_SESSION);
+    web_register("/api/wifi/portal", HTTP_GET, portal_state, WEB_AUTH_TOKEN);
+    web_register("/api/wifi/portal", HTTP_POST, h_portal_post, WEB_AUTH_TOKEN);
     web_register("/api/themes", HTTP_GET, h_themes, WEB_AUTH_SESSION);
     web_register("/api/theme", HTTP_GET, h_theme, WEB_AUTH_NONE);
     web_set_put_hook("display", display_put_hook);

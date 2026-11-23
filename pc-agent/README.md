@@ -5,6 +5,7 @@ App nhỏ chạy trên PC Windows, làm mấy việc này cho loa MeowBox:
 - Gửi số liệu máy (CPU, RAM, GPU, nhiệt độ, mạng, ổ đĩa) lên loa mỗi giây, qua WebSocket `ws://<loa>/ws/pc`.
 - Gửi bài đang phát (Spotify, Chrome, Edge...) và nhận lệnh ⏮ ⏯ ⏭ 🔉 🔊 từ loa.
 - Gửi thông báo từ dòng lệnh (`notify`), hoặc đọc thành tiếng bằng TTS Windows (`say`).
+- Bật lại Wi-Fi cài đặt `MeowBox-XXXX` trên loa (`wifi-setup`).
 - Làm **YouTube relay**: loa xin `http://<pc>:8765/yt/stream?url=...` thì agent dùng yt-dlp + ffmpeg đổi
   sang MP3 128 kbps rồi stream về như một đài radio.
 
@@ -56,6 +57,16 @@ python agent.py notify "Build xong" "esp32-playground OK" --sound chime --priori
 python agent.py say "Build xong rồi nha"            # TTS → WAV → /api/notify/audio
 python agent.py say "test" --save test.wav           # chỉ lưu file, không gửi
 ```
+
+### Wi-Fi cài đặt
+
+```powershell
+python agent.py wifi-setup          # bật mạng MeowBox-XXXX (mật khẩu meowbox2026) để cài lại Wi-Fi
+python agent.py wifi-setup status   # đang bật không, còn bao lâu tự tắt
+python agent.py wifi-setup off      # tắt ngay
+```
+
+Dùng token thông báo như `notify`. Mạng tự tắt sau 10 phút không có ai vào, hoặc 10 giây sau khi loa nối được Wi-Fi.
 
 `say` ưu tiên giọng tiếng Việt (Microsoft An) nếu máy có. Chưa có thì vào *Settings → Time & language →
 Speech → Add voices* cài gói tiếng Việt. Không có thì nó dùng giọng mặc định.

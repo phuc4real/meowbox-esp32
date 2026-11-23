@@ -7,6 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "esp_app_desc.h"
 #include "esp_ota_ops.h"
 #include "nvs_flash.h"
@@ -22,9 +23,39 @@ static const char *TAG = "meowbox";
 
 #define SAMPLE_RATE 44100
 
+/* Holding VOL+ and VOL- together for 3 s opens the Wi-Fi setup hotspot (the middle button can't be
+ * held: that powers the speaker off in hardware). Volume is frozen while both are down. */
+#define COMBO_HOLD_US (3 * 1000000LL)
+static bool s_vol_down[2];
+static bool s_combo;          /* both were down at some point; stays set until both are released */
+static int64_t s_combo_since;
+static bool s_combo_fired;
+
+static bool vol_combo(board_btn_t b, board_btn_ev_t ev)
+{
+    if (b == BOARD_BTN_MAIN) return false;
+    int i = b == BOARD_BTN_VOL_UP ? 0 : 1;
+    if (ev == BOARD_BTN_EV_DOWN || ev == BOARD_BTN_EV_UP) {
+        s_vol_down[i] = ev == BOARD_BTN_EV_DOWN;
+        bool both = s_vol_down[0] && s_vol_down[1];
+        if (both && !s_combo) { s_combo = true; s_combo_since = esp_timer_get_time(); s_combo_fired = false; }
+        bool swallow = s_combo;
+        if (!s_vol_down[0] && !s_vol_down[1]) s_combo = false;
+        return swallow;
+    }
+    if (!s_combo) return false;
+    if (s_vol_down[0] && s_vol_down[1] && !s_combo_fired && esp_timer_get_time() - s_combo_since >= COMBO_HOLD_US) {
+        s_combo_fired = true;
+        ESP_LOGI(TAG, "VOL+ and VOL- held: opening the Wi-Fi setup hotspot");
+        system_wifi_setup(false);
+    }
+    return true;
+}
+
 static void on_button(board_btn_t b, board_btn_ev_t ev, void *arg)
 {
     if (ev == BOARD_BTN_EV_DOWN) ui_wake();
+    if (vol_combo(b, ev)) return;
     if (ev == BOARD_BTN_EV_DOWN || ev == BOARD_BTN_EV_UP) return;
 
     if (b == BOARD_BTN_MAIN) {

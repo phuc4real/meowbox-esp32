@@ -27,7 +27,12 @@ cJSON *wifi_mgr_get_config(void);           /* API.md GET /api/config/wifi */
 esp_err_t wifi_mgr_set_config(const cJSON *body);
 cJSON *wifi_mgr_scan(void);                 /* NULL if busy */
 esp_err_t wifi_mgr_connect(const char *ssid, const char *pass /* NULL = saved */);
-void wifi_mgr_start_portal(void);           /* force SoftAP (e.g. BOOT long press) */
+void wifi_mgr_start_portal(void);           /* open the setup hotspot by hand */
+bool wifi_mgr_stop_portal(void);            /* close it; refused (false) while offline */
+bool wifi_mgr_portal_on(void);
+/* Seconds until a hand-opened hotspot closes on its own: -1 = not applicable (closed, or offline),
+ * -2 = paused because a client is connected */
+int wifi_mgr_portal_left_s(void);
 
 typedef void (*wifi_mgr_cb_t)(net_mode_t mode, void *arg);
 void wifi_mgr_on_change(wifi_mgr_cb_t cb, void *arg);

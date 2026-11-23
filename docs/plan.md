@@ -123,7 +123,7 @@ Firmware hiện khoảng 2.8 MB (kèm font của 4 theme), còn trống gần m�
 | Nút giữa (GPIO1) bấm | tắt báo thức · đóng thông báo · phát/dừng radio |
 | Nút giữa bấm 2 lần | về màn Đồng hồ |
 | Nút giữa giữ lâu | **tắt nguồn** (phần cứng, firmware không chặn được) |
-| Cài Wi-Fi | nút "Wi-Fi" trên màn Hệ thống mở SoftAP `MeowBox-XXXX` (mật khẩu `meowbox2026`) |
+| Cài Wi-Fi | nút "Wi-Fi" trên màn Hệ thống, giữ cùng lúc VOL+ và VOL− 3 giây, trang Wi-Fi trên web, hoặc `agent.py wifi-setup` mở SoftAP `MeowBox-XXXX` (mật khẩu `meowbox2026`). Tự tắt 10 giây sau khi nối mạng, hoặc 10 phút không ai vào |
 | Báo thức kêu | chạm màn hình = báo lại 5 phút, nút âm lượng = báo lại, nút giữa = tắt |
 
 Sau 60 s không thao tác: giảm độ sáng. Ban đêm (giờ cấu hình): chế độ đêm theo theme đang dùng.
@@ -245,6 +245,7 @@ Mỗi giai đoạn kết thúc bằng một bản chạy được trên loa th�
 
 ### P1 Mạng + trang web
 - [x] Wi-Fi STA, SoftAP + captive portal, lưu nhiều mạng
+- [x] SoftAP tự tắt (10 giây sau khi nối mạng; 10 phút không ai vào nếu mở tay), bật lại bằng nút, web, PC agent
 - [x] mDNS `meowbox.local`, SNTP
 - [x] HTTP server, LittleFS, trang web khung + REST `/api/config/*`
 - [x] OTA upload qua web (ghi vào slot OTA còn lại, có rollback)

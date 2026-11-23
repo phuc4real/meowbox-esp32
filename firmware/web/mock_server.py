@@ -343,6 +343,14 @@ class H(BaseHTTPRequestHandler):
                     out.append({"ssid": ssid, "pass": old[ssid]})
             S["wifi"]["nets"] = out
             return self.send_json(wifi_out())
+        if key in (("GET", "/api/wifi/portal"), ("POST", "/api/wifi/portal")):
+            ap = S.setdefault("portal", {"on": False, "since": 0.0})
+            if key[0] == "POST":
+                b = self.body()
+                need(isinstance(b.get("on"), bool))
+                ap["on"], ap["since"] = b["on"], time.time()
+            left = max(0, int(600 - (time.time() - ap["since"]))) if ap["on"] else None
+            return self.send_json({"on": ap["on"], "ssid": "MeowBox-A1B2", "off_in": left})
         if key == ("GET", "/api/wifi/scan"):
             time.sleep(0.8)
             aps = [{"ssid": "NhaMeo", "rssi": -52, "ch": 6, "sec": True},

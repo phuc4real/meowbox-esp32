@@ -131,6 +131,19 @@ Blocking scan (~2–3 s). → sorted by RSSI, deduplicated by SSID:
 Saves the network at the top of the list and switches to it. → `{"ok":true}` is sent **before** switching;
 the device may get a new IP (shown on its screen). Omit `pass` to reuse a saved password.
 
+### `GET /api/wifi/portal` · `POST /api/wifi/portal`
+State of the setup hotspot `MeowBox-XXXX` (WPA2, password `meowbox2026`). **Token auth** (`Authorization:
+Bearer <notify token>`), a web session also works, so the PC agent can reopen it.
+```json
+{"on":true}
+```
+→ `{"on":true,"ssid":"MeowBox-A1B2","off_in":587}`
+- `off_in`: seconds until a hotspot opened while online closes by itself (10 min without clients),
+  `"client"` while a device is connected (timer paused), `null` when off or while offline.
+- The hotspot also closes 10 s after the speaker joins Wi-Fi. While offline it stays on: `{"on":false}`
+  then returns `409 offline`. `on` must be a bool, otherwise `400 bad_value`.
+- On the speaker: hold VOL+ and VOL− together for 3 s, or System tile → "Wi-Fi".
+
 ---
 
 ## Radio

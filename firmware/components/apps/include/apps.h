@@ -45,6 +45,8 @@ int battery_session_min(void);  /* minutes on battery so far, -1 if charging */
 
 /* System/diagnostics tile */
 void system_app_init(void);
+/* Open the Wi-Fi setup hotspot and show its name + password; in_lvgl = caller already holds the LVGL lock */
+void system_wifi_setup(bool in_lvgl);
 
 #ifdef __cplusplus
 }

@@ -520,6 +520,8 @@ def main() -> None:
     s.add_argument("text")
     s.add_argument("--voice", help="một phần tên/ngôn ngữ giọng, vd 'An' hoặc 'vi-VN'")
     s.add_argument("--save", type=Path, help="chỉ lưu WAV ra file, không gửi")
+    w = sub.add_parser("wifi-setup", help="bật/tắt Wi-Fi cài đặt MeowBox-XXXX trên loa (tự tắt sau 10 phút không ai vào)")
+    w.add_argument("action", nargs="?", choices=["on", "off", "status"], default="on")
     c = sub.add_parser("config", help="xem/sửa cấu hình")
     c.add_argument("--set-host", dest="set_host", metavar="HOST", help="IP[:port] loa, '' = tự tìm mDNS")
     c.add_argument("--token")
@@ -555,6 +557,19 @@ def main() -> None:
         body = {"title": args.title, "text": args.text, "sound": args.sound,
                 "priority": args.priority, "duration": args.duration}
         post(cfg, "/api/notify", json.dumps(body).encode(), "application/json")
+    elif args.cmd == "wifi-setup":
+        if args.action == "status":
+            req = urllib.request.Request(f"http://{resolve_host(cfg)}/api/wifi/portal",
+                                         headers={"Authorization": f"Bearer {cfg['token']}"})
+            try:
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    print(r.status, r.read().decode(errors="replace"))
+            except urllib.error.HTTPError as e:
+                raise SystemExit(f"HTTP {e.code}: {e.read().decode(errors='replace')}")
+            except OSError as e:
+                raise SystemExit(f"Lỗi kết nối: {e}")
+        else:
+            post(cfg, "/api/wifi/portal", json.dumps({"on": args.action == "on"}).encode(), "application/json")
     elif args.cmd == "say":
         wav = asyncio.run(tts_wav(args.text, args.voice))
         if args.save:

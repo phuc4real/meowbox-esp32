@@ -16,6 +16,7 @@
 #include "mdns.h"
 #include "lwip/sockets.h"
 #include "nvs.h"
+#include "esp_timer.h"
 #include "settings.h"
 
 static const char *TAG = "wifi";
@@ -23,6 +24,8 @@ static const char *TAG = "wifi";
 #define WIFI_FILE "/data/wifi.json"
 #define MAX_NETS 5
 #define AP_PASS "meowbox2026" /* WPA2 password of the MeowBox-XXXX setup hotspot */
+#define AP_OFF_AFTER_CONNECT_MS 10000          /* hotspot stays 10 s after joining Wi-Fi, so the setup page can show the new IP */
+#define AP_IDLE_OFF_US (10LL * 60 * 1000000)   /* a hotspot opened by hand while online closes after 10 min with no clients */
 #define BIT_GOT_IP BIT0
 #define BIT_FAIL BIT1
 #define BIT_RECHECK BIT2
@@ -33,6 +36,7 @@ static net_t s_nets[MAX_NETS];
 static int s_nnets;
 static net_mode_t s_mode = NET_MODE_CONNECTING;
 static bool s_ap_on;
+static volatile int64_t s_ap_idle_since; /* esp_timer us; last moment the hotspot had a client */
 static char s_ap_ssid[20];
 static char s_cur_ssid[33];
 static esp_netif_t *s_sta_if, *s_ap_if;
@@ -194,8 +198,15 @@ static void dns_task(void *arg)
     vTaskDelete(NULL);
 }
 
+static int ap_clients(void)
+{
+    wifi_sta_list_t l = {0};
+    return (s_ap_on && esp_wifi_ap_get_sta_list(&l) == ESP_OK) ? l.num : 0;
+}
+
 static void ap_enable(bool on)
 {
+    if (on) s_ap_idle_since = esp_timer_get_time();
     if (on == s_ap_on) return;
     s_ap_on = on;
     if (on) {
@@ -271,7 +282,18 @@ static void conn_task(void *arg)
     int fails = 0;
     while (1) {
         if (s_mode == NET_MODE_STA) {
-            xEventGroupWaitBits(s_ev, BIT_FAIL | BIT_RECHECK, pdFALSE, pdFALSE, portMAX_DELAY);
+            EventBits_t b = xEventGroupWaitBits(s_ev, BIT_FAIL | BIT_RECHECK, pdFALSE, pdFALSE, pdMS_TO_TICKS(5000));
+            if (!(b & (BIT_FAIL | BIT_RECHECK))) {
+                /* online with the hotspot open (opened by hand): close it after 10 min without clients */
+                if (s_ap_on) {
+                    if (ap_clients() > 0) s_ap_idle_since = esp_timer_get_time();
+                    else if (esp_timer_get_time() - s_ap_idle_since > AP_IDLE_OFF_US) {
+                        ESP_LOGI(TAG, "setup hotspot idle for 10 min, closing it");
+                        ap_enable(false);
+                    }
+                }
+                continue;
+            }
             if (s_force_idx < 0 && s_mode == NET_MODE_STA) {
                 xEventGroupClearBits(s_ev, BIT_RECHECK);
                 continue;
@@ -298,8 +320,9 @@ static void conn_task(void *arg)
             fails = 0;
             set_mode(NET_MODE_STA);
             if (s_ap_on) {
-                vTaskDelay(pdMS_TO_TICKS(5000)); /* let the portal page show the new IP */
-                ap_enable(false);
+                ESP_LOGI(TAG, "online, closing the setup hotspot in %d s", AP_OFF_AFTER_CONNECT_MS / 1000);
+                vTaskDelay(pdMS_TO_TICKS(AP_OFF_AFTER_CONNECT_MS)); /* let the setup page show the new IP */
+                if (s_mode == NET_MODE_STA) ap_enable(false);
             }
             continue;
         }
@@ -381,7 +404,29 @@ esp_err_t wifi_mgr_connect(const char *ssid, const char *pass)
     return ESP_OK;
 }
 
-void wifi_mgr_start_portal(void) { ap_enable(true); if (s_mode != NET_MODE_STA) set_mode(NET_MODE_AP); }
+void wifi_mgr_start_portal(void)
+{
+    ap_enable(true);
+    if (s_mode != NET_MODE_STA) set_mode(NET_MODE_AP);
+    ESP_LOGI(TAG, "setup hotspot opened by hand");
+}
+
+bool wifi_mgr_stop_portal(void)
+{
+    if (s_mode != NET_MODE_STA) return false; /* offline: the hotspot is the only way in, keep it */
+    ap_enable(false);
+    return true;
+}
+
+bool wifi_mgr_portal_on(void) { return s_ap_on; }
+
+int wifi_mgr_portal_left_s(void)
+{
+    if (!s_ap_on || s_mode != NET_MODE_STA) return -1; /* closes on its own once online */
+    if (ap_clients() > 0) return -2;                   /* paused while someone is connected */
+    int64_t left = AP_IDLE_OFF_US - (esp_timer_get_time() - s_ap_idle_since);
+    return left > 0 ? (int)(left / 1000000) : 0;
+}
 
 cJSON *wifi_mgr_scan(void)
 {

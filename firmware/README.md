@@ -41,7 +41,7 @@ Web UI changes: `python web/build.py` (writes `storage/web/*.gz`), then `idf.py 
 | Cat corner on the clock | tap to open the Cat tile |
 | System tile | long-press the title to show the safe-area calibration frames |
 | Web | `http://meowbox.local` (or the IP on the System tile), `meowbox` / `m3owb0x2026`; change the password |
-| First setup / new Wi-Fi | with no known network the speaker opens the hotspot `MeowBox-XXXX` (WPA2, password `meowbox2026`, also shown on screen) by itself; otherwise System tile → "Wi-Fi". Join it and the setup page opens |
+| First setup / new Wi-Fi | with no known network the speaker opens the hotspot `MeowBox-XXXX` (WPA2, password `meowbox2026`, also shown on screen) by itself; otherwise System tile → "Wi-Fi", hold VOL+ and VOL− together for 3 s, the web Wi-Fi page or `agent.py wifi-setup`. Join it and the setup page opens. It closes 10 s after the speaker gets online, or after 10 min with nobody on it |
 
 Notifications from anything on the LAN (token on the web page → Thông báo):
 

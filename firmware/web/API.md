@@ -255,12 +255,14 @@ Session auth. Theme list for **Settings → Appearance**; the web builds its car
 ```json
 {"themes":[
   {"id":"swiss","name":{"vi":"Swiss","en":"Swiss"},"desc":{"vi":"Tối giản kiểu Thuỵ Sĩ, dễ đọc","en":"Minimal Swiss style, easy to read"},
-   "default":true,"preview":"/themes/swiss.png","fonts":["archivo-vi.woff2"]},
+   "default":true,"fx":false,"preview":"/themes/swiss.png","fonts":["archivo-vi.woff2"]},
   {"id":"brutal","name":{"vi":"Brutalism","en":"Brutalism"},"desc":{"vi":"…","en":"…"},
-   "default":false,"preview":"/themes/brutal.png","fonts":[]}
+   "default":false,"fx":true,"preview":"/themes/brutal.png","fonts":[]}
  ],"current":"swiss"}
 ```
-Order = display order. `fonts` = web font files in `/fonts/` used by that theme. The same data is in `web/themes.json`
+Order = display order. `fonts` = web font files in `/fonts/` used by that theme. `fx` = the `display.fx` setting
+(full/saver) changes something for this theme (RGB split, scanlines, grid, HUD, tilt, segments, hard shadows); the web
+UI hides that setting for themes with `fx:false`. The same data is in `web/themes.json`
 (written by `tools/gen_themes.py`).
 
 ### `GET /api/theme`

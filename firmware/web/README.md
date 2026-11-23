@@ -26,6 +26,7 @@ python mock_server.py --no-auth  # bỏ qua đăng nhập khi đang sửa giao d
 python mock_server.py --theme zen --no-screenshot   # bắt đầu với theme Zen, /api/screenshot trả 404
 python mock_server.py --dist     # phục vụ bản đã build (web.pack) y như firmware: tên có hash, ETag/304, cache
 python test_api.py               # test API, phải ra "ALL PASSED"
+node audit.mjs                   # sau build.py: 4 theme × 2 cỡ × mọi trang, so chức năng giữa các theme, ảnh vào screens/
 node --check src/app.js          # kiểm tra cú pháp JS
 ```
 

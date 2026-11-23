@@ -1,7 +1,7 @@
 /* MeowBox web UI: zen theme flourishes. Loaded only while this theme is active (index.html, setTheme in app.js).
    Colours/fonts come from themes.css; layout is shared in app.css. */
 /* ---------- Zen: serif display, pill buttons, generous whitespace, tapered brush divider, faint paper grain */
-[data-theme=zen]{--soft:var(--line);--fw-head:300;--h1:60px;--h2:28px;--big:72px;--stn:30px;--btn-bg:transparent;--btn-fg:var(--text);--btn-bd:var(--text);--gh-bd:transparent;--chart:var(--text);--gap:88px;--t:.3s}
+[data-theme=zen]{--soft:var(--line);--fw-head:300;--h1:60px;--h2:28px;--big:72px;--stn:30px;--btn-bg:transparent;--btn-fg:var(--text);--btn-bd:var(--text);--gh-bd:color-mix(in srgb,var(--text) 28%,transparent);--chart:var(--text);--gap:88px;--t:.3s}
 [data-theme=zen] body{font-weight:300;background-image:radial-gradient(color-mix(in srgb,var(--dim) 9%,transparent) .7px,transparent 1px),radial-gradient(color-mix(in srgb,var(--dim) 6%,transparent) .7px,transparent 1px);background-size:7px 7px,13px 11px;background-position:0 0,4px 6px}
 [data-theme=zen] h1,[data-theme=zen] .big,[data-theme=zen] .stn,[data-theme=zen] .brand{letter-spacing:0;font-stretch:100%}
 [data-theme=zen] .brand{font-weight:500;font-size:28px}

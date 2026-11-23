@@ -121,7 +121,9 @@ try:
     c, j = req("GET", "/api/themes")
     ids = [x["id"] for x in j.get("themes", [])]
     check("themes list", c == 200 and j.get("current") == "swiss" and {"swiss", "cyberpunk", "zen", "brutal"} <= set(ids)
-          and all(keys(x, "id", "name", "desc", "default", "preview", "fonts") and keys(x["name"], "vi", "en") for x in j["themes"]))
+          and all(keys(x, "id", "name", "desc", "default", "fx", "preview", "fonts") and keys(x["name"], "vi", "en") for x in j["themes"]))
+    check("fx flag: effects only in cyberpunk and brutal",
+          {x["id"]: x["fx"] for x in j["themes"]} == {"swiss": False, "cyberpunk": True, "zen": False, "brutal": True})
     check("exactly one default theme (swiss)", [x["id"] for x in j["themes"] if x["default"]] == ["swiss"])
     c, j = req("PUT", "/api/config/display", {"theme": "zen"}); check("set theme", c == 200 and j["theme"] == "zen")
     c, j = req("GET", "/api/theme", opener=urllib.request.build_opener()); check("/api/theme follows display.theme", j.get("theme") == "zen")
@@ -208,6 +210,23 @@ try:
           bat <= set(langs["vi"].get("bat", {})))
 finally:
     proc.terminate()
+
+# ---- every theme ships the same pieces (docs/firmware_v0.2.0.md, 1.3)
+print("theme files")
+THEMES_META = json.load(open(os.path.join(HERE, "themes.json"), encoding="utf-8"))
+font_files = set(os.listdir(os.path.join(HERE, "assets", "fonts")))
+for th in THEMES_META:
+    tid = th["id"]
+    css_p = os.path.join(HERE, "src", "theme", tid + ".css")
+    check(f"{tid}: src/theme/{tid}.css exists", os.path.isfile(css_p))
+    check(f"{tid}: assets/themes/{tid}.png exists", os.path.isfile(os.path.join(HERE, "assets", "themes", tid + ".png")))
+    missing = [f for f in th["fonts"] if f not in font_files
+               and not any(x.startswith(f[:-len("-vi.woff2")] + "-") for x in font_files)]
+    check(f"{tid}: web fonts present (missing {missing})", not missing)
+    if th["fx"] and os.path.isfile(css_p):
+        check(f"{tid}: has effects, so theme/{tid}.css has a [data-fx=eco] saver variant",
+              "data-fx=eco" in open(css_p, encoding="utf-8").read())
+
 
 # ---- built pack (web/build.py -> components/webui/web.pack), served by the mock exactly like the firmware
 print("built pack (mock --dist)")

@@ -102,7 +102,10 @@ def main():
     (ROOT / "web" / "src" / "themes.css").write_text("\n".join(css) + "\n", encoding="utf-8")
 
     # theme list for the web (GET /api/themes is built from the same data in firmware; this is for the mock)
+    # "fx": the Effects full/saver setting changes something for this theme (same rule as /api/themes in firmware)
+    fx_keys = ("aberration", "scanline", "grid", "hud", "tilt", "segments")
     meta = [{"id": t["id"], "name": t["name"], "desc": t["desc"], "default": bool(t.get("default")),
+             "fx": any(t.get("fx", {}).get(k) for k in fx_keys) or t["shape"].get("btn", "fill") == "raw",
              "preview": f"/themes/{t['id']}.png", "fonts": t.get("web", {}).get("fonts", [])} for t in themes]
     (ROOT / "web" / "themes.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"{len(themes)} themes: {', '.join(t['id'] for t in themes)} (default {defaults[0]})")

@@ -96,6 +96,12 @@ Số đo lúc lên plan (`python build.py`):
   tải lần đầu: `index.html` + `app.js` + `app.css` + 1 file ngôn ngữ + 1 file theme.
 
 ### 1.3 Đồng bộ chức năng giữa các theme
+> **Trạng thái (2026-11-23):** xong. `web/audit.mjs` (Chrome headless qua CDP, chạy mock `--dist`) duyệt 4 theme × 390/1280
+> px × 10 trang, so các nút/ô nhập/link nhìn thấy được, tìm tràn ngang và lỗi console, chụp ảnh vào `web/screens/`.
+> Kết quả: cùng số control ở mọi theme, không tràn, không lỗi. Đã sửa: mục Hiệu ứng chỉ hiện với theme có hiệu ứng
+> (`fx` trong `/api/themes`: Cyberpunk, Brutal), nút ghost của Zen có viền nhạt (trước đó trông như chữ thường).
+> Giữ nguyên có chủ đích (chỉ là kiểu, không đổi chức năng): Brutal ẩn icon menu, dấu đầu banner khác nhau, `.brush` của
+> Zen. `test_api.py` kiểm tra mỗi theme có `theme/<id>.css`, ảnh xem trước, font, và theme có `fx` thì có khối `[data-fx=eco]`.
 Hiện 4 theme dùng chung bố cục và code, chỉ khác CSS. Những chỗ lệch đã tìm thấy:
 
 | Chỗ lệch | Swiss | Cyberpunk | Zen | Brutal | Hướng sửa |

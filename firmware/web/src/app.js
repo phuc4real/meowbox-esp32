@@ -260,10 +260,12 @@ THS=l.themes||[];c.theme=c.theme||l.current||'swiss';c.night_mode=c.night_mode||
 const grid=h('div',{class:'themes',role:'radiogroup','aria-label':t('theme')}),bad=new Set(),nm=x=>x.name[lang]||x.name.vi;
 const ph=id=>{const e=h('div',{class:'pv ph','aria-hidden':'true'},h('b',0,'07:30'),h('i'),h('s')),st=tvars(id);
 if(st)for(const k of['--bg','--surface','--text','--dim','--line','--accent','--accent2','--font-display','--display-stretch'])e.style.setProperty(k,st.getPropertyValue(k));return e};
-const draw=()=>grid.replaceChildren(...THS.map(x=>{const on=x.id==c.theme;let pv;
+const fxSec=h('div',{'data-audit':'theme'}); // shown only for themes with effects (audit.mjs skips it)
+const draw=()=>{const cur=THS.find(x=>x.id==c.theme);fxSec.hidden=!!cur&&cur.fx===false;
+grid.replaceChildren(...THS.map(x=>{const on=x.id==c.theme;let pv;
 if(bad.has(x.id))pv=ph(x.id);else{pv=h('img',{class:'pv',src:x.preview,alt:'',loading:'lazy'});pv.onerror=()=>{bad.add(x.id);pv.replaceWith(ph(x.id))}}
 return h('label',{class:'tc'+(on?' on':'')},h('input',{type:'radio',name:'th',value:x.id,checked:on,class:'vh',onchange:()=>pick(x.id)}),pv,
-h('span',{class:'nm'},nm(x),x.default?h('em',0,t('defT')):null),h('small',0,x.desc[lang]||x.desc.vi))}));
+h('span',{class:'nm'},nm(x),x.default?h('em',0,t('defT')):null),h('small',0,x.desc[lang]||x.desc.vi))}))};
 const pick=async(id,undo)=>{const prev=c.theme;if(id==prev)return;
 try{Object.assign(c,await put('/api/config/display',{theme:id}))}catch(e){draw();return}
 setTheme(c.theme,(THS.find(x=>x.id==c.theme)||{}).fonts);draw();
@@ -271,13 +273,14 @@ const x=THS.find(y=>y.id==c.theme);if(!undo)toast(t('themeOk')+(x?nm(x):c.theme)
 const save=async()=>{const{tz,night,...b}=c;Object.assign(c,await put('/api/config/display',b));html.dataset.fx=c.fx;toast(t('saved'))};
 const fx=bind(c,'fx',{tag:'select',opts:opt('fxs')});fx.addEventListener('change',save);
 const w={v:ls('webT')=='swiss'?'swiss':'device'},ws=bind(w,'v',{tag:'select',opts:opt('webs')});ws.addEventListener('change',()=>{ls('webT',w.v);setTheme()});
+fxSec.append(fld(t('fx'),fx,t('fxHint')));
 draw();
 return[sec(t('theme'),grid,h('a',{class:'btn ghost',href:SHOT,target:'_blank',rel:'noopener'},t('shot'))),
 sec(t('screen'),h('div',{class:'lim'},rng(c,'bri',t('bri')),rng(c,'idle_bri',t('idleBri')),fld(t('idleS'),bind(c,'idle_s',{type:'number',min:0,max:3600})),sw(c,'h24',t('h24')),
 fld(t('devLang'),bind(c,'lang',{tag:'select',opts:[['vi','Tiếng Việt'],['en','English']]})),fld(t('tz'),h('input',{value:t('tzV'),readOnly:true})),btn(t('save'),save))),
 sec(t('night'),h('div',{class:'lim'},fld(t('night'),bind(c,'night_mode',{tag:'select',opts:opt('nm')})),h('div',{class:'two'},fld(t('from'),bind(c,'n_from',{tag:'select',opts:hours()})),fld(t('to'),bind(c,'n_to',{tag:'select',opts:hours()}))),
 rng(c,'n_bri',t('nBri')),btn(t('save'),save))),
-sec(t('fx'),h('div',{class:'lim'},fld(t('fx'),fx,t('fxHint')),fld(t('web'),ws,t('webHint'))))]}
+sec(t('fx'),h('div',{class:'lim'},fxSec,fld(t('web'),ws,t('webHint'))))]}
 
 const FUR={tabby:'repeating-linear-gradient(135deg,#8a8070 0 5px,#4e463c 5px 9px)',orange:'repeating-linear-gradient(135deg,#f0a04b 0 5px,#c8742a 5px 9px)',black:'#222',white:'#f7f4ee',calico:'conic-gradient(#f7f4ee 0 35%,#e08a3c 0 68%,#2a2a2a 0)',gray:'#8e9198'};
 async function pCat(){let c=await api('/api/config/cat');const sbox=h('div'),fb=h('div',{class:'furs'});

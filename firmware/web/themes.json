@@ -10,6 +10,7 @@
       "en": "Minimal Swiss style, easy to read"
     },
     "default": true,
+    "fx": false,
     "preview": "/themes/swiss.png",
     "fonts": [
       "archivo-vi.woff2"
@@ -26,6 +27,7 @@
       "en": "Neon, HUD, RGB split"
     },
     "default": false,
+    "fx": true,
     "preview": "/themes/cyberpunk.png",
     "fonts": [
       "chakra-petch-400-vi.woff2",
@@ -46,6 +48,7 @@
       "en": "Rice paper, ink, ensō"
     },
     "default": false,
+    "fx": false,
     "preview": "/themes/zen.png",
     "fonts": [
       "cormorant-garamond-300-vi.woff2",
@@ -65,6 +68,7 @@
       "en": "Raw, heavy borders, primary colours"
     },
     "default": false,
+    "fx": true,
     "preview": "/themes/brutal.png",
     "fonts": []
   }

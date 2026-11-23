@@ -1,0 +1,5 @@
+FontAwesome5-Solid+Brands+Regular.woff
+
+Font Awesome Free 5, as shipped in LVGL (scripts/built_in_font/).
+Font files: SIL Open Font License 1.1 (https://scripts.sil.org/OFL).
+Icons: CC BY 4.0. Code: MIT. See https://fontawesome.com/license/free

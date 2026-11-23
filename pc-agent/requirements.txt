@@ -1,0 +1,12 @@
+aiohttp>=3.9
+psutil>=5.9
+zeroconf>=0.130
+pycaw>=20240316
+comtypes>=1.4
+winrt-runtime>=2.0
+winrt-Windows.Foundation>=2.0
+winrt-Windows.Foundation.Collections>=2.0
+winrt-Windows.Media.Control>=2.0
+winrt-Windows.Media.SpeechSynthesis>=2.0
+winrt-Windows.Storage.Streams>=2.0
+# Ngoài pip: ffmpeg và yt-dlp phải có trong PATH (cho YouTube relay)

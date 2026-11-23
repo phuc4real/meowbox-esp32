@@ -1,0 +1,15 @@
+{
+  "id": "brutal", "order": 3,
+  "name": {"vi": "Brutalism", "en": "Brutalism"},
+  "desc": {"vi": "Thô, viền đậm, màu cơ bản", "en": "Raw, heavy borders, primary colours"},
+  "color": {"bg": "#FFFFFF", "surface": "#FFFFFF", "text": "#000000", "dim": "#333333", "line": "#000000",
+            "accent": "#FFFF00", "accent2": "#0000FF", "on_accent": "#000000", "ok": "#00FF00", "warn": "#FFFF00", "alert": "#FF0000"},
+  "night": {"bg": "#000000", "surface": "#000000", "text": "#BFBFBF", "dim": "#8A8A8A", "line": "#BFBFBF", "accent": "#BFBF00", "on_accent": "#000000"},
+  "font": {"small": "mb_br_14", "body": "mb_br_20", "title": "mb_br_20b", "clock": "mb_br_clock"},
+  "web": {"ui": "'Times New Roman', Times, serif", "display": "'Times New Roman', Times, serif", "data": "'Courier New', Courier, monospace",
+          "fonts": [], "light": true},
+  "shape": {"radius": 0, "border": 3, "btn": "raw", "shadow": [5, 5], "hover_shadow": [5, 5]},
+  "fx": {"aberration": false, "scanline": false, "grid": true, "hud": false, "enso": false, "tilt": true, "segments": false},
+  "clock": {"layout": "block"},
+  "cat": {"palette": "fur"}
+}

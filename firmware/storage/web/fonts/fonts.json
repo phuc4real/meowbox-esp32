@@ -1,0 +1,53 @@
+{
+  "archivo-vi.woff2": {
+    "family": "Archivo",
+    "weight": "400 800",
+    "style": "normal",
+    "stretch": "62% 100%"
+  },
+  "chakra-petch-400-vi.woff2": {
+    "family": "Chakra Petch",
+    "weight": "400",
+    "style": "normal"
+  },
+  "chakra-petch-600-vi.woff2": {
+    "family": "Chakra Petch",
+    "weight": "600",
+    "style": "normal"
+  },
+  "chakra-petch-700-vi.woff2": {
+    "family": "Chakra Petch",
+    "weight": "700",
+    "style": "normal"
+  },
+  "jetbrains-mono-vi.woff2": {
+    "family": "JetBrains Mono",
+    "weight": "400 700",
+    "style": "normal"
+  },
+  "vt323-digits.woff2": {
+    "family": "VT323",
+    "weight": "400",
+    "style": "normal"
+  },
+  "cormorant-garamond-300-vi.woff2": {
+    "family": "Cormorant Garamond",
+    "weight": "300",
+    "style": "normal"
+  },
+  "cormorant-garamond-500-vi.woff2": {
+    "family": "Cormorant Garamond",
+    "weight": "500",
+    "style": "normal"
+  },
+  "cormorant-garamond-600-italic-vi.woff2": {
+    "family": "Cormorant Garamond",
+    "weight": "600",
+    "style": "italic"
+  },
+  "be-vietnam-pro-light-vi.woff2": {
+    "family": "Be Vietnam Pro",
+    "weight": "300",
+    "style": "normal"
+  }
+}

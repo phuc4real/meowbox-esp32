@@ -1,0 +1,1 @@
+{"name":"meowbox-fonts","private":true,"version":"1.0.0","description":"Font generation for MeowBox (lv_font_conv)","devDependencies":{"lv_font_conv":"^1.5.3"}}

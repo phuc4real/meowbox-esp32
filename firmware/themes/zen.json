@@ -1,0 +1,15 @@
+{
+  "id": "zen", "order": 2,
+  "name": {"vi": "Zen", "en": "Zen"},
+  "desc": {"vi": "Giấy dó, mực tàu, vòng ensō", "en": "Rice paper, ink, ensō"},
+  "color": {"bg": "#F3EDE1", "surface": "#E7DFD0", "text": "#24211D", "dim": "#74664F", "line": "#B9AE9C",
+            "accent": "#A8322A", "accent2": "#3E4A6B", "on_accent": "#F3EDE1", "ok": "#4A653C", "warn": "#A8322A", "alert": "#A8322A"},
+  "night": {"bg": "#24211D", "surface": "#2E2A25", "text": "#A89878", "dim": "#7D705A", "line": "#3A352E", "accent": "#C2564C", "on_accent": "#24211D"},
+  "font": {"small": "mb_zen_14", "body": "mb_zen_20", "title": "mb_zen_20b", "clock": "mb_zen_clock"},
+  "web": {"ui": "'Be Vietnam Pro', system-ui, sans-serif", "display": "'Cormorant Garamond', Georgia, serif", "data": "'Be Vietnam Pro', system-ui, sans-serif",
+          "fonts": ["cormorant-garamond-300-vi.woff2", "cormorant-garamond-500-vi.woff2", "cormorant-garamond-600-italic-vi.woff2", "be-vietnam-pro-light-vi.woff2"], "light": true},
+  "shape": {"radius": 20, "border": 1, "btn": "text", "shadow": [0, 0], "hover_shadow": [0, 0]},
+  "fx": {"aberration": false, "scanline": false, "grid": false, "hud": false, "enso": true, "tilt": false, "segments": false},
+  "clock": {"layout": "enso"},
+  "cat": {"palette": "sumi"}
+}

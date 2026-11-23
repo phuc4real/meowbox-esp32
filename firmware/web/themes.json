@@ -1,0 +1,71 @@
+[
+  {
+    "id": "swiss",
+    "name": {
+      "vi": "Swiss",
+      "en": "Swiss"
+    },
+    "desc": {
+      "vi": "Tối giản kiểu Thuỵ Sĩ, dễ đọc",
+      "en": "Minimal Swiss style, easy to read"
+    },
+    "default": true,
+    "preview": "/themes/swiss.png",
+    "fonts": [
+      "archivo-vi.woff2"
+    ]
+  },
+  {
+    "id": "cyberpunk",
+    "name": {
+      "vi": "Cyberpunk",
+      "en": "Cyberpunk"
+    },
+    "desc": {
+      "vi": "Neon, HUD, lệch màu RGB",
+      "en": "Neon, HUD, RGB split"
+    },
+    "default": false,
+    "preview": "/themes/cyberpunk.png",
+    "fonts": [
+      "chakra-petch-400-vi.woff2",
+      "chakra-petch-600-vi.woff2",
+      "chakra-petch-700-vi.woff2",
+      "jetbrains-mono-vi.woff2",
+      "vt323-digits.woff2"
+    ]
+  },
+  {
+    "id": "zen",
+    "name": {
+      "vi": "Zen",
+      "en": "Zen"
+    },
+    "desc": {
+      "vi": "Giấy dó, mực tàu, vòng ensō",
+      "en": "Rice paper, ink, ensō"
+    },
+    "default": false,
+    "preview": "/themes/zen.png",
+    "fonts": [
+      "cormorant-garamond-300-vi.woff2",
+      "cormorant-garamond-500-vi.woff2",
+      "cormorant-garamond-600-italic-vi.woff2",
+      "be-vietnam-pro-light-vi.woff2"
+    ]
+  },
+  {
+    "id": "brutal",
+    "name": {
+      "vi": "Brutalism",
+      "en": "Brutalism"
+    },
+    "desc": {
+      "vi": "Thô, viền đậm, màu cơ bản",
+      "en": "Raw, heavy borders, primary colours"
+    },
+    "default": false,
+    "preview": "/themes/brutal.png",
+    "fonts": []
+  }
+]

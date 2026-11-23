@@ -1,0 +1,644 @@
+#include "player.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
+#include "freertos/ringbuf.h"
+#include "esp_log.h"
+#include "esp_heap_caps.h"
+#include "esp_http_client.h"
+#include "esp_crt_bundle.h"
+#include "esp_audio_simple_dec.h"
+#include "esp_audio_simple_dec_default.h"
+#include "esp_audio_dec_default.h"
+#include "audio_hw.h"
+
+static const char *TAG = "player";
+
+#define RB_SIZE (256 * 1024)
+#define PREBUF (48 * 1024)
+#define URL_MAX 512
+
+typedef enum { FMT_UNKNOWN, FMT_MP3, FMT_AAC, FMT_TS, FMT_WAV } fmt_t;
+
+static SemaphoreHandle_t s_lock;
+static RingbufHandle_t s_rb;
+static volatile uint32_t s_gen;          /* session generation; bump to stop */
+static volatile player_state_t s_state = PLAYER_STOP;
+static volatile fmt_t s_fmt;
+static volatile bool s_hold;
+static volatile bool s_eof;              /* fetcher finished (non-live file) */
+static TaskHandle_t s_dec_task;
+static char s_url[URL_MAX], s_name[64], s_title[128];
+static int s_id;
+static uint8_t *s_mem;
+static size_t s_mem_len;
+static volatile bool s_is_mem;
+
+/* ---------------- small helpers ---------------- */
+static void set_state(player_state_t st)
+{
+    if (s_state != st) ESP_LOGI(TAG, "state %s -> %d", player_state_str(), st);
+    s_state = st;
+}
+
+static bool alive(uint32_t gen) { return gen == s_gen; }
+
+static void rb_put(uint32_t gen, const uint8_t *d, size_t n)
+{
+    while (n && alive(gen)) {
+        size_t chunk = n > 4096 ? 4096 : n;
+        if (xRingbufferSend(s_rb, d, chunk, pdMS_TO_TICKS(200)) == pdTRUE) {
+            d += chunk;
+            n -= chunk;
+        }
+    }
+}
+
+static void rb_flush(void)
+{
+    size_t n;
+    void *p;
+    while ((p = xRingbufferReceiveUpTo(s_rb, &n, 0, RB_SIZE)) != NULL) vRingbufferReturnItem(s_rb, p);
+}
+
+static fmt_t fmt_from(const char *ctype, const char *url)
+{
+    char c[64] = "";
+    for (int i = 0; ctype && ctype[i] && i < 63; i++) c[i] = (char)tolower((int)ctype[i]);
+    if (strstr(c, "mpeg") && !strstr(c, "mpegurl")) return FMT_MP3;
+    if (strstr(c, "aac") || strstr(c, "mp4a")) return FMT_AAC;
+    if (strstr(c, "mp2t")) return FMT_TS;
+    if (strstr(url, ".mp3")) return FMT_MP3;
+    if (strstr(url, ".aac")) return FMT_AAC;
+    if (strstr(url, ".ts")) return FMT_TS;
+    return FMT_UNKNOWN;
+}
+
+static bool is_playlist(const char *ctype, const char *url)
+{
+    char c[64] = "";
+    for (int i = 0; ctype && ctype[i] && i < 63; i++) c[i] = (char)tolower((int)ctype[i]);
+    return strstr(c, "mpegurl") || strstr(c, "scpls") || strstr(url, ".m3u") || strstr(url, ".pls");
+}
+
+/* Resolve `ref` relative to `base` into out. */
+static void resolve_url(const char *base, const char *ref, char *out, size_t len)
+{
+    if (strstr(ref, "://")) {
+        snprintf(out, len, "%s", ref);
+        return;
+    }
+    if (ref[0] == '/') {
+        const char *p = strstr(base, "://");
+        p = p ? strchr(p + 3, '/') : NULL;
+        int hostlen = p ? (int)(p - base) : (int)strlen(base);
+        snprintf(out, len, "%.*s%s", hostlen, base, ref);
+        return;
+    }
+    const char *q = strchr(base, '?');
+    int blen = q ? (int)(q - base) : (int)strlen(base);
+    const char *slash = base + blen;
+    while (slash > base && *slash != '/') slash--;
+    snprintf(out, len, "%.*s/%s", (int)(slash - base), base, ref);
+}
+
+/* ---------------- HTTP ---------------- */
+typedef struct { char ctype[64]; int metaint; } resp_hdrs_t;
+static resp_hdrs_t s_hdrs; /* response headers of the last http_open() (fetch task only) */
+
+static esp_err_t on_http_evt(esp_http_client_event_t *e)
+{
+    if (e->event_id == HTTP_EVENT_ON_HEADER && e->header_key && e->header_value) {
+        if (strcasecmp(e->header_key, "Content-Type") == 0) snprintf(s_hdrs.ctype, sizeof(s_hdrs.ctype), "%s", e->header_value);
+        else if (strcasecmp(e->header_key, "icy-metaint") == 0) s_hdrs.metaint = atoi(e->header_value);
+    }
+    return ESP_OK;
+}
+
+static esp_http_client_handle_t http_open(const char *url, bool icy, int *status, int64_t *clen)
+{
+    memset(&s_hdrs, 0, sizeof(s_hdrs));
+    esp_http_client_config_t cfg = {
+        .url = url,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+        .timeout_ms = 8000,
+        .buffer_size = 4096,
+        .buffer_size_tx = 1024,
+        .user_agent = "MeowBox/0.1",
+        .keep_alive_enable = true,
+        .event_handler = on_http_evt,
+    };
+    esp_http_client_handle_t c = esp_http_client_init(&cfg);
+    if (!c) return NULL;
+    if (icy) esp_http_client_set_header(c, "Icy-MetaData", "1");
+    for (int redirects = 0; redirects < 5; redirects++) {
+        if (esp_http_client_open(c, 0) != ESP_OK) break;
+        *clen = esp_http_client_fetch_headers(c);
+        *status = esp_http_client_get_status_code(c);
+        if (*status >= 300 && *status < 400) {
+            memset(&s_hdrs, 0, sizeof(s_hdrs));
+            esp_http_client_set_redirection(c);
+            esp_http_client_close(c);
+            continue;
+        }
+        return c;
+    }
+    esp_http_client_cleanup(c);
+    return NULL;
+}
+
+/* Read a whole small text body (playlists). */
+static char *http_get_text(const char *url, char *final_url, size_t fu_len)
+{
+    int st = 0;
+    int64_t cl = 0;
+    esp_http_client_handle_t c = http_open(url, false, &st, &cl);
+    if (!c) return NULL;
+    char *buf = NULL;
+    if (st == 200) {
+        int cap = 16384, n = 0, r;
+        buf = heap_caps_malloc(cap + 1, MALLOC_CAP_SPIRAM);
+        while (buf && n < cap && (r = esp_http_client_read(c, buf + n, cap - n)) > 0) n += r;
+        if (buf) buf[n] = 0;
+        if (final_url) esp_http_client_get_url(c, final_url, fu_len);
+    }
+    esp_http_client_cleanup(c);
+    return buf;
+}
+
+/* First stream URL in a .pls/.m3u (non-HLS) playlist. */
+static bool first_entry(const char *text, char *out, size_t len)
+{
+    const char *p = text;
+    while (p && *p) {
+        const char *e = strpbrk(p, "\r\n");
+        int l = e ? (int)(e - p) : (int)strlen(p);
+        const char *line = p;
+        if (strncasecmp(line, "File", 4) == 0 && memchr(line, '=', l)) {
+            const char *eq = memchr(line, '=', l);
+            snprintf(out, len, "%.*s", (int)(l - (eq + 1 - line)), eq + 1);
+            return true;
+        }
+        if (l > 4 && line[0] != '#' && (strncmp(line, "http", 4) == 0)) {
+            snprintf(out, len, "%.*s", l, line);
+            return true;
+        }
+        p = e ? e + 1 : NULL;
+        while (p && (*p == '\r' || *p == '\n')) p++;
+    }
+    return false;
+}
+
+/* ---------------- ICY stream ---------------- */
+static void parse_icy_meta(const char *m)
+{
+    const char *t = strstr(m, "StreamTitle='");
+    if (!t) return;
+    t += 13;
+    const char *e = strstr(t, "';");
+    int n = e ? (int)(e - t) : (int)strlen(t);
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    snprintf(s_title, sizeof(s_title), "%.*s", n, t);
+    xSemaphoreGive(s_lock);
+    ESP_LOGI(TAG, "title: %s", s_title);
+}
+
+static void stream_loop(uint32_t gen, esp_http_client_handle_t c, int metaint)
+{
+    uint8_t *buf = malloc(4096);
+    int until_meta = metaint;
+    while (alive(gen)) {
+        int want = 4096;
+        if (metaint && until_meta < want) want = until_meta;
+        int r = esp_http_client_read(c, (char *)buf, want);
+        if (r <= 0) {
+            if (esp_http_client_is_complete_data_received(c)) s_eof = true;
+            break;
+        }
+        rb_put(gen, buf, r);
+        if (metaint) {
+            until_meta -= r;
+            if (until_meta == 0) {
+                uint8_t lenb;
+                if (esp_http_client_read(c, (char *)&lenb, 1) != 1) break;
+                int ml = lenb * 16, got = 0;
+                static char meta[4081]; /* only the fetch task of the live session uses it */
+                while (got < ml) {
+                    int k = esp_http_client_read(c, meta + got, ml - got);
+                    if (k <= 0) break;
+                    got += k;
+                }
+                meta[got] = 0;
+                if (got) parse_icy_meta(meta);
+                until_meta = metaint;
+            }
+        }
+    }
+    free(buf);
+}
+
+/* ---------------- HLS ---------------- */
+static void hls_loop(uint32_t gen, const char *playlist_url)
+{
+    char *url = heap_caps_malloc(URL_MAX, MALLOC_CAP_SPIRAM);
+    char *seg = heap_caps_malloc(URL_MAX, MALLOC_CAP_SPIRAM);
+    snprintf(url, URL_MAX, "%s", playlist_url);
+    long long last_seq = -1;
+    int target = 6;
+    uint8_t *buf = malloc(4096);
+    int fails = 0;
+    while (alive(gen) && fails < 5) {
+        char final[URL_MAX];
+        char *txt = http_get_text(url, final, sizeof(final));
+        if (!txt) {
+            fails++;
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+        /* master playlist: take the first variant */
+        if (strstr(txt, "#EXT-X-STREAM-INF")) {
+            const char *p = strstr(txt, "#EXT-X-STREAM-INF");
+            p = strchr(p, '\n');
+            while (p && (*p == '\n' || *p == '\r')) p++;
+            if (p) {
+                int l = (int)strcspn(p, "\r\n");
+                char ref[URL_MAX];
+                snprintf(ref, sizeof(ref), "%.*s", l, p);
+                resolve_url(final, ref, url, URL_MAX);
+                ESP_LOGI(TAG, "hls variant %s", url);
+            }
+            free(txt);
+            continue;
+        }
+        const char *ms = strstr(txt, "#EXT-X-MEDIA-SEQUENCE:");
+        long long seq = ms ? atoll(ms + 22) : 0;
+        const char *td = strstr(txt, "#EXT-X-TARGETDURATION:");
+        if (td) target = atoi(td + 22);
+        if (target < 1 || target > 30) target = 6;
+        bool endlist = strstr(txt, "#EXT-X-ENDLIST") != NULL;
+        /* on first load of a live list, start 3 segments from the end */
+        int total = 0;
+        for (const char *p = txt; (p = strstr(p, "#EXTINF")); p++) total++;
+        if (last_seq < 0 && !endlist && total > 3) last_seq = seq + total - 4;
+        const char *p = txt;
+        int idx = 0;
+        while (alive(gen) && (p = strstr(p, "#EXTINF"))) {
+            p = strchr(p, '\n');
+            while (p && (*p == '\n' || *p == '\r' || *p == '#')) {
+                if (*p == '#') p = strchr(p, '\n'); /* skip other tags */
+                else p++;
+            }
+            if (!p) break;
+            int l = (int)strcspn(p, "\r\n");
+            long long sn = seq + idx++;
+            if (sn <= last_seq) { p += l; continue; }
+            char ref[URL_MAX];
+            snprintf(ref, sizeof(ref), "%.*s", l, p);
+            p += l;
+            resolve_url(final, ref, seg, URL_MAX);
+            if (s_fmt == FMT_UNKNOWN) s_fmt = strstr(seg, ".aac") ? FMT_AAC : FMT_TS;
+            int st = 0;
+            int64_t cl = 0;
+            esp_http_client_handle_t c = http_open(seg, false, &st, &cl);
+            if (c && st == 200) {
+                int r;
+                while (alive(gen) && (r = esp_http_client_read(c, (char *)buf, 4096)) > 0) rb_put(gen, buf, r);
+                fails = 0;
+            } else {
+                ESP_LOGW(TAG, "segment %lld http %d", sn, st);
+                fails++;
+            }
+            if (c) esp_http_client_cleanup(c);
+            last_seq = sn;
+        }
+        free(txt);
+        if (endlist) { s_eof = true; break; }
+        for (int i = 0; i < target * 5 && alive(gen); i++) vTaskDelay(pdMS_TO_TICKS(100)); /* ~half target */
+    }
+    free(buf);
+    free(url);
+    free(seg);
+}
+
+/* ---------------- fetch task (one per session) ---------------- */
+static void fetch_task(void *arg)
+{
+    uint32_t gen = (uint32_t)(uintptr_t)arg;
+    char *url = heap_caps_malloc(URL_MAX, MALLOC_CAP_SPIRAM);
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    snprintf(url, URL_MAX, "%s", s_url);
+    xSemaphoreGive(s_lock);
+
+    int retries = 0;
+    while (alive(gen) && retries < 8) {
+        int status = 0;
+        int64_t clen = 0;
+        bool hls = strstr(url, ".m3u8") != NULL;
+        if (hls) {
+            hls_loop(gen, url);
+        } else {
+            esp_http_client_handle_t c = http_open(url, true, &status, &clen);
+            if (c && status == 200) {
+                const char *ctype = s_hdrs.ctype[0] ? s_hdrs.ctype : NULL;
+                int metaint = s_hdrs.metaint;
+                if (is_playlist(ctype, url) && !(ctype && strstr(ctype, "audio/mpeg"))) {
+                    char *txt = calloc(1, 8193);
+                    int n = 0, r;
+                    while (n < 8192 && (r = esp_http_client_read(c, txt + n, 8192 - n)) > 0) n += r;
+                    esp_http_client_cleanup(c);
+                    char next[URL_MAX];
+                    bool is_hls = strstr(txt, "#EXTM3U") && (strstr(txt, "#EXT-X-") != NULL);
+                    if (is_hls) {
+                        free(txt);
+                        snprintf(url + strlen(url), URL_MAX - strlen(url), "%s", strchr(url, '?') ? "&.m3u8" : "?.m3u8");
+                        continue;
+                    }
+                    bool ok = first_entry(txt, next, sizeof(next));
+                    free(txt);
+                    if (!ok) break;
+                    char abs[URL_MAX];
+                    resolve_url(url, next, abs, sizeof(abs));
+                    snprintf(url, URL_MAX, "%s", abs);
+                    ESP_LOGI(TAG, "playlist -> %s", url);
+                    continue;
+                }
+                fmt_t f = fmt_from(ctype, url);
+                s_fmt = f == FMT_UNKNOWN ? FMT_MP3 : f;
+                ESP_LOGI(TAG, "stream %s type=%s fmt=%d metaint=%d", url, ctype ? ctype : "?", s_fmt, metaint);
+                stream_loop(gen, c, metaint);
+                esp_http_client_cleanup(c);
+            } else {
+                ESP_LOGW(TAG, "open %s failed (http %d)", url, status);
+                if (c) esp_http_client_cleanup(c);
+            }
+        }
+        if (s_eof || !alive(gen)) break;
+        retries++;
+        int wait = retries < 3 ? 1000 : retries < 5 ? 3000 : 8000;
+        for (int i = 0; i < wait / 100 && alive(gen); i++) vTaskDelay(pdMS_TO_TICKS(100));
+        ESP_LOGI(TAG, "reconnecting (%d)", retries);
+    }
+    if (alive(gen) && !s_eof) set_state(PLAYER_ERR);
+    free(url);
+    vTaskDelete(NULL);
+}
+
+/* ---------------- decode task (persistent) ---------------- */
+static void write_pcm(const int16_t *in, int frames, int ch, int rate, float *pos, int16_t *last)
+{
+    /* downmix to mono and resample (linear) to the output rate */
+    static int16_t out[1024];
+    const int orate = audio_hw_sample_rate();
+    float step = (float)rate / orate;
+    int n = 0;
+    float p = *pos;
+    while (p < frames) {
+        int i = (int)p;
+        float fr = p - i;
+        int a, b;
+        if (ch == 1) { a = i ? in[i - 1] : *last; b = in[i]; }
+        else { a = i ? (in[(i - 1) * ch] + in[(i - 1) * ch + 1]) / 2 : *last; b = (in[i * ch] + in[i * ch + 1]) / 2; }
+        out[n++] = (int16_t)(a + (b - a) * fr);
+        if (n == 1024) {
+            audio_hw_write(out, n);
+            n = 0;
+        }
+        p += step;
+    }
+    if (n) audio_hw_write(out, n);
+    *pos = p - frames;
+    *last = ch == 1 ? in[frames - 1] : (in[(frames - 1) * ch] + in[(frames - 1) * ch + 1]) / 2;
+}
+
+static void decode_task(void *arg)
+{
+    esp_audio_dec_register_default();
+    esp_audio_simple_dec_register_default();
+    const int IN_CAP = 8192;
+    uint8_t *in = heap_caps_malloc(IN_CAP, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    uint32_t out_cap = 16384;
+    uint8_t *out = heap_caps_malloc(out_cap, MALLOC_CAP_SPIRAM);
+    uint32_t cur_gen = 0;
+    esp_audio_simple_dec_handle_t dec = NULL;
+    int in_len = 0;
+    float pos = 0;
+    int16_t last = 0;
+    esp_audio_simple_dec_info_t info = {0};
+
+    while (1) {
+        if (s_state == PLAYER_STOP || s_state == PLAYER_ERR) {
+            if (dec) { esp_audio_simple_dec_close(dec); dec = NULL; }
+            ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(200));
+            continue;
+        }
+        if (cur_gen != s_gen) { /* new session */
+            if (dec) { esp_audio_simple_dec_close(dec); dec = NULL; }
+            cur_gen = s_gen;
+            in_len = 0;
+            pos = 0;
+            last = 0;
+            memset(&info, 0, sizeof(info));
+        }
+        size_t avail = 0;
+        vRingbufferGetInfo(s_rb, NULL, NULL, NULL, NULL, &avail);
+        avail = RB_SIZE - xRingbufferGetCurFreeSize(s_rb);
+        if (s_state == PLAYER_BUF) {
+            if (avail < PREBUF && !s_eof) { vTaskDelay(pdMS_TO_TICKS(50)); continue; }
+            if (s_fmt == FMT_UNKNOWN) { vTaskDelay(pdMS_TO_TICKS(50)); continue; }
+            set_state(PLAYER_PLAY);
+        }
+        if (!dec) {
+            esp_audio_simple_dec_cfg_t cfg = {
+                .dec_type = s_fmt == FMT_WAV ? ESP_AUDIO_SIMPLE_DEC_TYPE_WAV
+                          : s_fmt == FMT_AAC ? ESP_AUDIO_SIMPLE_DEC_TYPE_AAC
+                          : s_fmt == FMT_TS  ? ESP_AUDIO_SIMPLE_DEC_TYPE_TS
+                                             : ESP_AUDIO_SIMPLE_DEC_TYPE_MP3,
+            };
+            if (esp_audio_simple_dec_open(&cfg, &dec) != ESP_AUDIO_ERR_OK) {
+                ESP_LOGE(TAG, "decoder open failed (fmt %d)", s_fmt);
+                set_state(PLAYER_ERR);
+                continue;
+            }
+        }
+        if (s_hold) { vTaskDelay(pdMS_TO_TICKS(20)); continue; }
+        /* top up input */
+        if (in_len < IN_CAP / 2) {
+            size_t n = 0;
+            uint8_t *p = xRingbufferReceiveUpTo(s_rb, &n, pdMS_TO_TICKS(100), IN_CAP - in_len);
+            if (p) {
+                memcpy(in + in_len, p, n);
+                in_len += n;
+                vRingbufferReturnItem(s_rb, p);
+            } else if (in_len == 0) {
+                if (s_eof) { s_is_mem = false; set_state(PLAYER_STOP); continue; }
+                ESP_LOGW(TAG, "underrun");
+                set_state(PLAYER_BUF);
+                continue;
+            }
+        }
+        esp_audio_simple_dec_raw_t raw = {.buffer = in, .len = in_len, .eos = false};
+        esp_audio_simple_dec_out_t o = {.buffer = out, .len = out_cap};
+        esp_audio_err_t r = esp_audio_simple_dec_process(dec, &raw, &o);
+        if (r == ESP_AUDIO_ERR_BUFF_NOT_ENOUGH) {
+            out_cap = o.needed_size + 1024;
+            free(out);
+            out = heap_caps_malloc(out_cap, MALLOC_CAP_SPIRAM);
+            continue;
+        }
+        if (raw.consumed > 0) {
+            memmove(in, in + raw.consumed, in_len - raw.consumed);
+            in_len -= raw.consumed;
+        } else if (r != ESP_AUDIO_ERR_OK && r != ESP_AUDIO_ERR_DATA_LACK) {
+            in_len = in_len > 1 ? in_len - 1 : 0; /* skip a byte to resync */
+            if (in_len) memmove(in, in + 1, in_len);
+        }
+        if (o.decoded_size > 0) {
+            if (info.sample_rate == 0) {
+                esp_audio_simple_dec_get_info(dec, &info);
+                ESP_LOGI(TAG, "decoding %lu Hz, %u ch, %u bit, %lu kbps", (unsigned long)info.sample_rate, info.channel,
+                         info.bits_per_sample, (unsigned long)(info.bitrate / 1000));
+            }
+            if (info.bits_per_sample == 16 && info.channel >= 1 && info.sample_rate) {
+                int frames = o.decoded_size / (2 * info.channel);
+                write_pcm((int16_t *)out, frames, info.channel, info.sample_rate, &pos, &last);
+            }
+        } else if (r == ESP_AUDIO_ERR_DATA_LACK && in_len >= IN_CAP - 16) {
+            in_len = 0; /* garbage that never decodes */
+        }
+    }
+}
+
+/* ---------------- in-memory files ---------------- */
+static void mem_task(void *arg)
+{
+    uint32_t gen = (uint32_t)(uintptr_t)arg;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    uint8_t *d = s_mem;
+    size_t n = s_mem_len;
+    s_mem = NULL;
+    xSemaphoreGive(s_lock);
+    if (d) {
+        rb_put(gen, d, n);
+        free(d);
+    }
+    if (alive(gen)) s_eof = true;
+    vTaskDelete(NULL);
+}
+
+esp_err_t player_play_mem(uint8_t *data, size_t len, const char *name)
+{
+    if (!data || len < 16) { free(data); return ESP_ERR_INVALID_ARG; }
+    fmt_t f = memcmp(data, "RIFF", 4) == 0 ? FMT_WAV
+            : (memcmp(data, "ID3", 3) == 0 || (data[0] == 0xFF && (data[1] & 0xE0) == 0xE0 && (data[1] & 0x06) != 0)) ? FMT_MP3
+            : (data[0] == 0xFF && (data[1] & 0xF6) == 0xF0) ? FMT_AAC : FMT_UNKNOWN;
+    if (f == FMT_UNKNOWN) { free(data); return ESP_ERR_NOT_SUPPORTED; }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_gen++;
+    rb_flush();
+    free(s_mem);
+    s_mem = data;
+    s_mem_len = len;
+    snprintf(s_name, sizeof(s_name), "%s", name ? name : "");
+    s_title[0] = 0;
+    s_url[0] = 0;
+    s_id = 0;
+    s_fmt = f;
+    s_eof = false;
+    s_is_mem = true;
+    uint32_t gen = s_gen;
+    xSemaphoreGive(s_lock);
+    set_state(PLAYER_BUF);
+    if (xTaskCreatePinnedToCore(mem_task, "memplay", 3072, (void *)(uintptr_t)gen, 5, NULL, 0) != pdPASS) {
+        set_state(PLAYER_ERR);
+        return ESP_ERR_NO_MEM;
+    }
+    xTaskNotifyGive(s_dec_task);
+    return ESP_OK;
+}
+
+bool player_is_mem(void) { return s_is_mem; }
+
+/* ---------------- API ---------------- */
+void player_init(void)
+{
+    s_lock = xSemaphoreCreateMutex();
+    s_rb = xRingbufferCreateWithCaps(RB_SIZE, RINGBUF_TYPE_BYTEBUF, MALLOC_CAP_SPIRAM);
+    xTaskCreatePinnedToCore(decode_task, "decode", 8192, NULL, 7, &s_dec_task, 1);
+}
+
+esp_err_t player_play(const char *url, const char *name, int id)
+{
+    if (!url || !*url || strlen(url) >= URL_MAX) return ESP_ERR_INVALID_ARG;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_gen++;
+    rb_flush();
+    snprintf(s_url, sizeof(s_url), "%s", url);
+    snprintf(s_name, sizeof(s_name), "%s", name ? name : "");
+    s_title[0] = 0;
+    s_id = id;
+    s_fmt = FMT_UNKNOWN;
+    s_eof = false;
+    s_is_mem = false;
+    uint32_t gen = s_gen;
+    xSemaphoreGive(s_lock);
+    set_state(PLAYER_BUF);
+    ESP_LOGI(TAG, "play %s (%s)", url, name ? name : "");
+    if (xTaskCreatePinnedToCore(fetch_task, "fetch", 8192, (void *)(uintptr_t)gen, 5, NULL, 0) != pdPASS) {
+        set_state(PLAYER_ERR);
+        return ESP_ERR_NO_MEM;
+    }
+    xTaskNotifyGive(s_dec_task);
+    return ESP_OK;
+}
+
+void player_stop(void)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_gen++;
+    rb_flush();
+    s_title[0] = 0;
+    s_is_mem = false;
+    xSemaphoreGive(s_lock);
+    set_state(PLAYER_STOP);
+}
+
+player_state_t player_state(void) { return s_state; }
+
+const char *player_state_str(void)
+{
+    switch (s_state) {
+    case PLAYER_BUF: return "buf";
+    case PLAYER_PLAY: return "play";
+    case PLAYER_ERR: return "err";
+    default: return "stop";
+    }
+}
+
+int player_id(void) { return s_id; }
+
+void player_name(char *buf, size_t len)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    snprintf(buf, len, "%s", s_name);
+    xSemaphoreGive(s_lock);
+}
+
+void player_title(char *buf, size_t len)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    snprintf(buf, len, "%s", s_title);
+    xSemaphoreGive(s_lock);
+}
+
+int player_buffer_pct(void)
+{
+    if (!s_rb) return 0;
+    return (int)((RB_SIZE - xRingbufferGetCurFreeSize(s_rb)) * 100 / RB_SIZE);
+}
+
+void player_hold(bool hold) { s_hold = hold; }

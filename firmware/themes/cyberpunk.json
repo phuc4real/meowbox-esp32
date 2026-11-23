@@ -1,0 +1,15 @@
+{
+  "id": "cyberpunk", "order": 1,
+  "name": {"vi": "Cyberpunk", "en": "Cyberpunk"},
+  "desc": {"vi": "Neon, HUD, lệch màu RGB", "en": "Neon, HUD, RGB split"},
+  "color": {"bg": "#05060A", "surface": "#1A1E30", "text": "#E8F6FF", "dim": "#7A86A8", "line": "#2A2F45",
+            "accent": "#00F0FF", "accent2": "#FF2BD6", "on_accent": "#05060A", "ok": "#39FF88", "warn": "#F5F032", "alert": "#FF3B4E"},
+  "night": {"bg": "#000000", "surface": "#0A0A12", "text": "#8C1A6E", "dim": "#5A1248", "line": "#1A0A16", "accent": "#B0156E", "on_accent": "#000000"},
+  "font": {"small": "mb_cy_14", "body": "mb_cy_20", "title": "mb_cy_20b", "clock": "mb_cy_clock"},
+  "web": {"ui": "'Chakra Petch', system-ui, sans-serif", "display": "'VT323', monospace", "data": "'JetBrains Mono', monospace",
+          "fonts": ["chakra-petch-400-vi.woff2", "chakra-petch-600-vi.woff2", "chakra-petch-700-vi.woff2", "jetbrains-mono-vi.woff2", "vt323-digits.woff2"], "light": false},
+  "shape": {"radius": 0, "border": 0, "btn": "cut", "shadow": [0, 0], "hover_shadow": [0, 0]},
+  "fx": {"aberration": true, "scanline": true, "grid": false, "hud": true, "enso": false, "tilt": false, "segments": true},
+  "clock": {"layout": "center"},
+  "cat": {"palette": "neon"}
+}

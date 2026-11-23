@@ -385,7 +385,7 @@ catch(e){if(my==seq&&authed)main.replaceChildren(...head(),h('p',{class:'err'},t
 function banner(on){const b=$('#banner');b.hidden=!on;if(on)b.replaceChildren(h('span',0,t('defPw')),h('a',{href:'#/sys'},t('defPwLink')))}
 function shell(on){nav.hidden=!on;$('#logout').hidden=!on;$('#menu').hidden=!on;if(!on){$('#banner').hidden=true;menu(0)}}
 function showLogin(){authed=false;timers.forEach(clearInterval);timers=[];onVis=null;shell(false);if(loginShown)return;loginShown=true;
-const o={user:'admin',pass:''},msg=h('p',{class:'err',role:'alert'});
+const o={user:'meowbox',pass:''},msg=h('p',{class:'err',role:'alert'});
 main.replaceChildren(h('div',{class:'login'},h('div',{class:'panel'},logo(56),h('h1',0,'MeowBox'),h('form',{onsubmit:async e=>{e.preventDefault();msg.textContent='';
 try{const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});const j=await r.json().catch(()=>({}));
 if(r.ok)enter(j.def_pw);else msg.textContent=t(r.status==429?'tooMany':'badLogin')}catch(x){msg.textContent=t('netErr')}}},

@@ -159,6 +159,21 @@ kể cả khi máy không có Python. Lần đầu chạy có cửa sổ dẫn t
 file json. Mạng có mDNS thì agent tự tìm ra loa. Mạng chặn mDNS thì nhập IP hiện trên màn hình loa vào ô trong
 cửa sổ là xong. Relay chỉ phục vụ loa đang nối. Agent và loa lệch giao thức thì cả hai bên đều báo rõ.
 
+> **Trạng thái (2026-11-23):** T1, T1b, T2 xong và đã chạy với loa thật; T3 đã build được bộ cài (18.9 MB, chưa kèm
+> ffmpeg/yt-dlp), chưa cài thử. Khác plan / thêm:
+> - **Loa rơi phần lớn gói broadcast/multicast gửi tới nó khi bật tiết kiệm điện Wi-Fi** (đo: truy vấn UDP 0–2/5 được
+>   trả lời, mDNS cũng hụt; tắt tiết kiệm điện thì 5/5). Gói loa gửi đi thì không sao, nên loa phát gói thông báo
+>   `{name,ip,ver,proto}` mỗi 2 s tới UDP 8767 và agent nghe cổng đó: 5/5 lần tìm thấy trong 0.1–1.6 s. Có lẽ đây cũng
+>   là lý do agent cũ hay không thấy loa qua mDNS.
+> - Trả lời UDP dùng một task nhỏ (stack 3 KB ở PSRAM, socket chặn) thay cho callback lwIP.
+> - `MB_PROTO_MIN` = 0: agent cũ (chưa gửi `proto`) vẫn được nhận, web ghi "bản cũ, nên cập nhật".
+> - Cùng một tên PC nối lại trước khi kết nối cũ hết hạn thì được nhận luôn (không báo bận chính nó).
+> - Tên Wi-Fi của PC: `netsh` cần quyền Location trên Windows 11, nên lấy tên network profile thay thế.
+> - Tray: tkinter giữ thread chính (cửa sổ), pystray chạy detached, core asyncio một thread; mọi kết quả từ thread
+>   khác đưa về qua hàng đợi.
+> - Bộ cài mở tường lửa theo chương trình (MeowBoxAgent.exe, meowbox.exe) cho mạng Private: bản exe chưa có rule thì
+>   không nhận được mDNS/UDP của loa.
+
 ### 2.1 Tray app (`pystray` + Pillow)
 - `pystray` chạy ở main thread, còn vòng asyncio hiện tại chạy ở một thread riêng. Hai bên dùng chung một
   object `AgentState` gồm: connected, host, tên loa, đang tìm loa bằng cách nào, tìm được bằng cách nào, lỗi cuối,

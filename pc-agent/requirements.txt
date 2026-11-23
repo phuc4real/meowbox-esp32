@@ -9,4 +9,6 @@ winrt-Windows.Foundation.Collections>=2.0
 winrt-Windows.Media.Control>=2.0
 winrt-Windows.Media.SpeechSynthesis>=2.0
 winrt-Windows.Storage.Streams>=2.0
-# Ngoài pip: ffmpeg và yt-dlp phải có trong PATH (cho YouTube relay)
+# Ngoài pip: ffmpeg và yt-dlp trong PATH hoặc %LOCALAPPDATA%/MeowBox/bin (cho YouTube relay)
+pystray>=0.19
+Pillow>=10

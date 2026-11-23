@@ -53,6 +53,9 @@ def fresh_state():
                           "energy": 55, "health": 100, "mood": "happy", "away": False}},
         "notify": {"token": tok(), "dur": 10, "vol": 70, "quiet_low": True, "ntfy": ""},
         "pc": {"host": "192.168.1.10", "port": 8765, "auto": True},
+        "update": {"auto": False},
+        # firmware update simulation (API.md "Update"): the mock "finds" 0.2.1 on the first check
+        "upd": {"state": "idle", "pct": 0, "err": "", "checked": 0, "t0": 0, "new": None},
         "play": {"st": "stop", "id": 0, "name": "", "title": ""},
         "sleep_end": 0, "hist": [], "nid": 0,
     }
@@ -89,7 +92,7 @@ def status():
             "bat": 78, "chg": True, "usb": True,
             "heap": random.randint(130000, 150000), "heap_min": 98304, "psram": 6815744, "psram_tot": 8388608,
             "time": int(time.time()), "vol": S["radio"]["vol"], "sleep": left, "pc": True, "def_pw": S["def_pw"],
-            "play": play_out()}
+            "play": play_out(), **({"upd": S["upd"]["new"]["ver"]} if S["upd"]["new"] else {})}
 
 
 def play_out():
@@ -101,6 +104,32 @@ def play_out():
                     "fill": 100 if p["st"] == "play" else random.randint(10, 90), "under": 1, "reconn": 0,
                     "fmt": "mp3", "err": ""}
     return p
+
+
+MOCK_RELEASE = {"ver": "0.2.1", "date": "2026-12-01", "size": 3155424, "proto": 1, "usb_only": False,
+                "notes": {"vi": ["Giao diện web nhẹ hơn", "Radio ổn định hơn trên Wi-Fi lạ"],
+                          "en": ["Lighter web UI", "Steadier radio on unfamiliar Wi-Fi"]},
+                "page": "https://github.com/phuc4real/meowbox-esp32/releases/tag/v0.2.1"}
+
+
+def upd_out():
+    """GET /api/update, advancing the simulated check (2 s) / download (8 s) / verify (1 s)"""
+    u, now = S["upd"], time.time()
+    if u["state"] == "check" and now - u["t0"] > 2:
+        u.update(state="idle", checked=int(now), new=dict(MOCK_RELEASE))
+    if u["state"] == "download":
+        u["pct"] = min(99, int((now - u["t0"]) / 8 * 100))
+        if now - u["t0"] > 8:
+            u.update(state="verify", t0=now)
+    if u["state"] == "verify" and now - u["t0"] > 1:
+        u.update(state="reboot", pct=100)
+    r = {"cur": "0.1.0-mock", "state": u["state"], "pct": u["pct"], "err": u["err"], "auto": S["update"]["auto"],
+         "checked": u["checked"]}
+    if u["new"]:
+        r["latest"] = u["new"]["ver"]
+        r["new"] = u["new"]["ver"]
+        r.update({k: v for k, v in u["new"].items() if k != "ver"})
+    return r
 
 
 def wifi_out():
@@ -506,6 +535,7 @@ class H(BaseHTTPRequestHandler):
             "display": ("bri", "idle_bri", "idle_s", "h24", "night", "n_from", "n_to", "n_bri", "lang", "theme", "night_mode", "fx"),
             "cat": ("name", "fur", "diff"),
             "pc": ("host", "port", "auto"),
+            "update": ("auto",),
             "notify": ("dur", "vol", "quiet_low", "ntfy"),
         }
         if p.startswith("/api/config/") and p[12:] in simple:
@@ -560,6 +590,21 @@ class H(BaseHTTPRequestHandler):
             need(data[:1] == b"\xe9", err="bad_image")
             print(f"  [OTA] received {len(data)} bytes, would reboot")
             return self.send_json({"ok": True})
+        if p == "/api/update" and m == "GET":
+            return self.send_json(upd_out())
+        if key == ("POST", "/api/update/check"):
+            self.body()
+            u = S["upd"]
+            need(u["state"] not in ("download", "verify", "reboot"), code=409, err="busy")
+            u.update(state="check", t0=time.time(), err="")
+            return self.send_json(upd_out())
+        if key == ("POST", "/api/update"):
+            b = self.body()
+            u = S["upd"]
+            need(u["state"] not in ("check", "download", "verify", "reboot"), code=409, err="busy")
+            need(u["new"] and b.get("ver") == u["new"]["ver"], code=409, err="stale")
+            u.update(state="download", t0=time.time(), pct=0, err="")
+            return self.send_json(upd_out())
         if key == ("POST", "/api/reboot"):
             self.body()
             SESS.clear()

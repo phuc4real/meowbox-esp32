@@ -433,6 +433,15 @@ DESKTOP-X kết nối?". Bấm OK trên loa thì loa trả token về cho agent.
   thay vì `storage/web/*.gz`). Ngân sách gzip vẫn áp dụng vì nó cũng là dung lượng app.
 - `POST /api/ota` thủ công không phải đổi gì: một file `.bin` giờ đã có cả web.
 
+> **Trạng thái 3.2–3.5 (2026-11-23):** xong (`components/apps/update_app.c`, `tools/release.py`, khối "Cập nhật firmware"
+> ở trang Hệ thống). Khác plan: `app.url` trong manifest là link đầy đủ (dùng được với server thử); endpoint kiểm tra là
+> `POST /api/update/check` (chạy nền, web hỏi `GET /api/update`); lỗi thêm `no_release` (GitHub trả 404) và
+> `usb_only`; `/api/status` có thêm `elf` (8 ký tự đầu SHA-256 của ELF) để nhận ra bản build vì giờ build trong
+> `esp_app_desc` không đổi nếu không build sạch. Đã thử trên loa với server trên PC (`CONFIG_MEOWBOX_UPDATE_MANIFEST_URL`
+> + `CONFIG_ESP_HTTPS_OTA_ALLOW_HTTP` tạm thời): 0.1.0 → 0.1.1 (3.1 MB tải ~28 s, kiểm tra ~1 s, khởi động lại ~13 s,
+> `last` báo thành công); SHA-256 sai → `bad_hash`, giữ bản cũ; GitHub thật (chưa có Release) → `no_release`.
+> Chưa thử: rollback thật, pin yếu, mất Wi-Fi giữa lúc tải; nút "kiểm tra relay"/`proto` agent (phụ thuộc mục 2).
+
 ### 3.2 File trong mỗi Release
 `tools/release.py` (chạy trong `firmware/`) build và tạo Release bằng `gh release create`:
 

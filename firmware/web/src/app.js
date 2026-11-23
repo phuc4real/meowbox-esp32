@@ -326,6 +326,32 @@ btn(t('save'),async()=>{Object.assign(c,await put('/api/config/pc',{host:c.host.
 async function waitBack(msg){const p=h('p',0,msg+' '+t('waiting'));main.replaceChildren(p);const t0=Date.now();await new Promise(r=>setTimeout(r,4000));
 while(Date.now()-t0<120000){try{const r=await fetch('/api/session',{cache:'no-store'});if(r.status<500){toast(t('back'));return location.reload()}}catch(e){}await new Promise(r=>setTimeout(r,2000))}
 p.textContent=t('netErr')}
+// ---------- firmware update from GitHub Releases (docs/firmware_v0.2.0.md, 3.5; API.md "Update") ----------
+let updAvail=null;
+const updErr=e=>t('updE')[e]||e;
+async function updSec(){let u=await api('/api/update');const cfg={auto:!!u.auto};
+const box=h('div'),stat=h('p',{class:'muted'}),pr=h('progress',{max:100,value:0,hidden:true}),pt=h('small',{class:'muted'});
+const chk=btn(t('updCheck'),async()=>{chk.disabled=true;try{u=await api('/api/update/check',{b:{},quiet:1});draw();poll()}catch(e){chk.disabled=false;if(e.message!='auth')toast(updErr(e.message),1)}},'ghost sm');
+const go=async()=>{if(!await ask(t('updGo'),t('updQ',{v:u.new}),t('updGo')))return;
+try{u=await api('/api/update',{b:{ver:u.new},quiet:1});poll()}catch(e){toast(updErr(e.message),1);if(e.message=='stale')chk.click()}};
+let pt_=null;const poll=()=>{if(pt_)return;pt_=setInterval(async()=>{try{u=await api('/api/update',{quiet:1})}catch(e){return}
+draw();if(u.state=='reboot'){clearInterval(pt_);pt_=null;waitBack(t('updReboot'))}else if(!['check','download','verify'].includes(u.state)){clearInterval(pt_);pt_=null}},1000);timers.push(pt_)};
+const draw=()=>{const busy=['check','download','verify','reboot'].includes(u.state);chk.disabled=busy;
+stat.textContent=t('updCur',{v:u.cur})+' · '+(u.state=='check'?t('updChecking'):u.checked?t('updChecked',{t:fT(u.checked)}):t('updNever'));
+pr.hidden=!['download','verify'].includes(u.state);pr.value=u.pct||0;
+pt.textContent=u.state=='download'?t('updDl',{p:u.pct||0}):u.state=='verify'?t('updVerify'):u.state=='reboot'?t('updReboot'):'';
+const k=[];
+if(u.last&&u.last.ver)k.push(h('p',{class:u.last.err?'err':'okc'},u.last.err?t('updRb',{v:u.last.ver,c:u.cur}):t('updOk',{v:u.last.ver})));
+if(u.state=='error'&&u.err)k.push(h('p',{class:'err'},updErr(u.err)));
+if(u.new){updAvail=u.new;const n=(u.notes&&(u.notes[lang]||u.notes.vi))||[];
+k.push(h('div',{class:'upd'},h('b',0,t('updNew',{v:u.new})+(u.date?' ('+u.date+')':'')),n.length?h('ul',0,n.map(x=>h('li',0,x))):null,
+u.page?h('a',{href:u.page,target:'_blank',rel:'noopener',class:'lk'},t('updMore')+' ↗'):null,
+u.usb_only?h('p',{class:'err'},t('updUsb')):busy?null:h('p',0,btn(t('updGo'),go,'',t('updGo')))))}
+else if(u.checked&&u.state!='check'){updAvail=null;k.push(h('p',{class:'muted'},t('updNone')))}
+box.replaceChildren(...k);drawNav()};
+const au=sw(cfg,'auto',t('updAuto'));au.querySelector('input').addEventListener('change',async()=>{try{await put('/api/config/update',{auto:cfg.auto});toast(t('saved'))}catch(e){}});
+draw();if(['check','download','verify'].includes(u.state))poll();
+return[h('div',{class:'row'},stat,chk),pr,pt,box,fld('',au,t('updAutoHint'))]}
 async function pSys(){const s=await api('/api/status'),pw={old:'',new:'',n2:''},fi=h('input',{type:'file',accept:'.bin,application/octet-stream'}),pr=h('progress',{max:100,value:0,hidden:true}),pt=h('small',{class:'muted'});
 const up=btn(t('upload'),async()=>{const f=fi.files[0];if(!f)return;
 if(f.size>MAXFW)return toast(t('otaBig'),1);if(new Uint8Array(await f.slice(0,1).arrayBuffer())[0]!=0xE9)return toast(t('otaBad'),1);
@@ -334,7 +360,7 @@ x.upload.onprogress=e=>{if(e.lengthComputable){pr.value=e.loaded/e.total*100;pt.
 x.onload=()=>{up.disabled=false;if(x.status==200){toast(t('otaOk'));waitBack(t('otaOk'))}else{let e;try{e=JSON.parse(x.responseText).err}catch(_){e=x.status}if(x.status==401)return showLogin();toast(t('err')+': '+e,1)}};
 x.onerror=()=>{up.disabled=false;toast(t('netErr'),1)};x.send(f)});
 return[sec(t('dev'),kv([[t('ver'),s.ver,s.build],[t('up'),fUp(s.up)],[t('ip'),s.ip,s.mode=='ap'?t('apMode'):s.ssid],[t('heap'),fB(s.heap),t('minL')+' '+fB(s.heap_min)],[t('psram'),fB(s.psram),t('tot')+' '+fB(s.psram_tot)],[t('time'),fT(s.time),'ICT (UTC+7)']])),
-sec(t('ota'),h('div',{class:'lim'},h('p',0,t('otaHint')),fld(t('ota'),fi),pr,pt,h('p',{style:'margin-top:12px'},up))),
+sec(t('ota'),h('div',{class:'lim'},...await updSec(),h('details',{class:'ota'},h('summary',0,t('updFile')),h('p',0,t('otaHint')),fld(t('ota'),fi),pr,pt,h('p',{style:'margin-top:12px'},up)))),
 sec(t('chpw'),h('form',{class:'lim',onsubmit:async e=>{e.preventDefault();if(pw.new!=pw.n2)return toast(t('pwMis'),1);if(pw.new.length<6||pw.new.length>32)return toast(t('pwLen'),1);
 try{await api('/api/password',{b:{old:pw.old,new:pw.new},quiet:1});toast(t('pwOk'));banner(false);e.target.reset();pw.old=pw.new=pw.n2=''}catch(x){toast(x.status==403?t('badOld'):t('err')+': '+x.message,1)}}},
 fld(t('oldPw'),bind(pw,'old',{type:'password',autocomplete:'current-password',required:true})),fld(t('newPw'),bind(pw,'new',{type:'password',autocomplete:'new-password',required:true,minLength:6,maxLength:32})),
@@ -350,7 +376,7 @@ const ALIAS={disp:'look',sleep:'radio'},OWNH1={ov:1,radio:1};
 const cur=()=>{let k=location.hash.slice(2);k=ALIAS[k]||k;return R[k]?k:'ov'};
 const menu=o=>{nav.classList.toggle('open',!!o);$('#menu').setAttribute('aria-expanded',!!o)};
 function drawNav(){const k=cur(),g=R[k][3];nav.replaceChildren(...Object.entries(R).filter(([,r])=>r[0]).map(([x,[i,n,,s]])=>{const on=x==k||s&&g;
-return h('a',{href:'#/'+x,class:on?'on':'','aria-current':on?'page':null,onclick:()=>menu(0)},ic(i),t(s?'nSet':n))}))}
+return h('a',{href:'#/'+x,class:on?'on':'','aria-current':on?'page':null,onclick:()=>menu(0)},ic(i),t(s?'nSet':n),s&&updAvail?h('span',{class:'dot',title:t('updNew',{v:updAvail})}):null)}))}
 let seq=0;
 async function route(){if(!authed)return;timers.forEach(clearInterval);timers=[];onVis=null;closePop();const k=cur(),my=++seq,r=R[k];drawNav();menu(0);
 main.replaceChildren(h('p',{class:'muted'},t('loading')));
@@ -366,7 +392,8 @@ try{const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'app
 if(r.ok)enter(j.def_pw);else msg.textContent=t(r.status==429?'tooMany':'badLogin')}catch(x){msg.textContent=t('netErr')}}},
 fld(t('user'),bind(o,'user',{autocomplete:'username',required:true})),fld(t('pass'),bind(o,'pass',{type:'password',autocomplete:'current-password',required:true})),msg,h('button',{type:'submit'},t('login'))))));
 const p=main.querySelector('[type=password]');p&&p.focus()}
-function enter(defPw){authed=true;loginShown=false;shell(true);banner(defPw);syncTheme();route()}
+function enter(defPw){authed=true;loginShown=false;shell(true);banner(defPw);syncTheme();route();
+api('/api/status',{quiet:1}).then(s=>{if(s.upd){updAvail=s.upd;drawNav()}}).catch(()=>{})}
 async function logout(){try{await fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})}catch(e){}showLogin()}
 async function setLang(l){try{L=await loadLang(l)}catch(e){return toast(t('netErr'),1)}
 lang=l;ls('lang',l);html.lang=l;$('#lang').textContent=l=='vi'?'EN':'VI';$('#logout').title=t('logout');

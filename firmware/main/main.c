@@ -96,6 +96,7 @@ static void status_hook(cJSON *r)
     cJSON_ReplaceItemInObject(r, "vol", cJSON_CreateNumber(audio_hw_get_volume()));
     battery_status_hook(r);
     radio_status_hook(r);
+    update_status_hook(r);
     cJSON_ReplaceItemInObject(r, "pc", cJSON_CreateBool(pc_online()));
 }
 
@@ -135,6 +136,7 @@ void app_main(void)
     cat_app_init();
     battery_app_init();
     system_app_init();
+    update_app_init();
     ui_build_all();
     board_lvgl_unlock();
     board_set_button_cb(on_button, NULL);

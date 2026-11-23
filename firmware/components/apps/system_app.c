@@ -94,10 +94,13 @@ static void sys_tick(lv_timer_t *t)
                               n.buf_ds / 10, ui_tr("ngắt", "drops"), n.under);
         lv_obj_set_style_text_color(s_mem, ui_lc(slow || n.under ? UI_C_WARN : UI_C_DIM), 0);
     } else {
-        lv_label_set_text_fmt(s_mem, "MeowBox %s, RAM %uk, PSRAM %uk", esp_app_get_description()->version,
-                              (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
-                              (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
-        lv_obj_set_style_text_color(s_mem, ui_lc(UI_C_DIM), 0);
+        const char *upd = update_available();
+        if (upd) lv_label_set_text_fmt(s_mem, "MeowBox %s, %s %s", esp_app_get_description()->version,
+                                       ui_tr("có bản", "new"), upd);
+        else lv_label_set_text_fmt(s_mem, "MeowBox %s, RAM %uk, PSRAM %uk", esp_app_get_description()->version,
+                                   (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
+                                   (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
+        lv_obj_set_style_text_color(s_mem, ui_lc(upd ? UI_C_ACCENT : UI_C_DIM), 0);
     }
     for (int c = 0; c < AUDIO_MIC_CHANNELS; c++)
         lv_bar_set_value(s_bar[c], s_mic_db[c] < 20 ? 0 : (s_mic_db[c] - 20) * 100 / 70, LV_ANIM_OFF);

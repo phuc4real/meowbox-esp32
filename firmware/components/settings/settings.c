@@ -35,6 +35,7 @@ static group_t s_groups[] = {
     {"cat", "{\"name\":\"Mướp\",\"fur\":\"tabby\",\"diff\":\"normal\"}", NULL},
     {"notify", "{\"token\":\"\",\"dur\":10,\"vol\":70,\"quiet_low\":true,\"ntfy\":\"\"}", NULL},
     {"pc", "{\"host\":\"\",\"port\":8765,\"auto\":true}", NULL},
+    {"update", "{\"auto\":false}", NULL}, /* auto = check GitHub for a new release every day (off: only when asked) */
 };
 #define NGROUPS (sizeof(s_groups) / sizeof(s_groups[0]))
 

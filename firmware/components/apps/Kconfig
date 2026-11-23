@@ -1,0 +1,10 @@
+menu "MeowBox"
+
+    config MEOWBOX_UPDATE_MANIFEST_URL
+        string "Firmware update manifest URL"
+        default "https://github.com/phuc4real/meowbox-esp32/releases/latest/download/manifest.json"
+        help
+            manifest.json of the latest release (written by tools/release.py). Point it at a local test server
+            to try updates without publishing a release.
+
+endmenu

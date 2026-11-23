@@ -43,6 +43,11 @@ int battery_mv(void);           /* -1 unknown */
 int battery_eta_min(void);      /* estimated minutes left, -1 unknown/charging */
 int battery_session_min(void);  /* minutes on battery so far, -1 if charging */
 
+/* Firmware updates from GitHub Releases (update_app.c) */
+void update_app_init(void);
+void update_status_hook(cJSON *status);   /* adds "upd":"x.y.z" when a newer release was found */
+const char *update_available(void);       /* newer version found by the last check, or NULL */
+
 /* System/diagnostics tile */
 void system_app_init(void);
 /* Open the Wi-Fi setup hotspot and show its name + password; in_lvgl = caller already holds the LVGL lock */

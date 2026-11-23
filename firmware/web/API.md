@@ -368,6 +368,41 @@ the image, sets it as boot partition, replies, then reboots after ~1 s. The new 
 `esp_ota_mark_app_valid_cancel_rollback()` after a healthy start, otherwise the bootloader rolls back.
 → `{"ok":true}`. Errors: `400 bad_image` (wrong magic `0xE9`/validation failed), `413 too_large`.
 
+### Update (GitHub Releases)
+The speaker reads `manifest.json` of the latest release (`CONFIG_MEOWBOX_UPDATE_MANIFEST_URL`, default
+`https://github.com/phuc4real/meowbox-esp32/releases/latest/download/manifest.json`, written by `tools/release.py`):
+
+```json
+{"ver":"0.2.1","proto":1,"date":"2026-12-01","notes":{"vi":["…"],"en":["…"]},
+ "app":{"file":"meowbox-0.2.1.bin","url":"https://github.com/…/releases/download/v0.2.1/meowbox-0.2.1.bin",
+        "size":3155424,"sha256":"…64 hex…"},
+ "min_ver":"0.1.0","page":"https://github.com/…/releases/tag/v0.2.1","commit":"3ac11f9"}
+```
+
+By default it only checks when asked (`POST /api/update/check`). `PUT /api/config/update {"auto":true}` adds a check
+2 min after Wi-Fi comes up and then every 24 h. Versions compare as numbers (`0.10.0` > `0.9.0`).
+
+`GET /api/update` →
+`{"cur":"0.2.0","state":"idle","pct":0,"err":"","auto":false,"checked":1764460800,"latest":"0.2.1","new":"0.2.1",
+"date":"2026-12-01","size":3155424,"proto":1,"usb_only":false,"notes":{"vi":[…],"en":[…]},"page":"…",
+"last":{"ver":"0.2.1","err":""}}`
+- `state`: `idle` | `check` | `download` | `verify` | `reboot` | `error` (`err` says why: `offline`,
+  `no_release` (GitHub answered 404: nothing published yet), `manifest_unreachable`, `bad_manifest`, `download`, `bad_hash`, `bad_image`, `no_mem`). `pct` while downloading.
+- `new`, `date`, `size`, `proto`, `usb_only`, `notes` only when the latest release is newer than `cur`. `usb_only`:
+  `cur` is older than the manifest's `min_ver`, so installing over the air is refused.
+- `last`: outcome of the install started before this boot: `err` `""` (now running `ver`) or `rollback` (the new image
+  did not start properly and the bootloader went back).
+- `GET /api/status` gains `"upd":"0.2.1"` while a newer release is known.
+
+`POST /api/update/check` body `{}` → same as `GET /api/update` with `state` `check`; poll `GET` until it leaves
+`check`. `409 offline` without Wi-Fi, `409 busy` while installing.
+
+`POST /api/update` body `{"ver":"0.2.1"}` → starts installing, same body as `GET` with `state` `download`. Errors
+(`409`): `stale` (`ver` is not the newer release from the last check), `usb_only`, `low_battery` (under 30% and not
+charging), `busy`. The speaker stops playback, keeps Wi-Fi out of power save, downloads into the free OTA slot, checks
+size and SHA-256 of what was written against the manifest, sets the boot slot and restarts (`state` `reboot`).
+Any failure before that leaves the running version untouched.
+
 ### `POST /api/reboot`
 Body `{}` → `{"ok":true}`, reboots after ~1 s.
 

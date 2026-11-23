@@ -10,6 +10,7 @@ firmware/managed_components/
 firmware/sdkconfig
 firmware/sdkconfig.old
 firmware/web/screens/
+firmware/dist/
 firmware/tools/cat_sprites/preview/
 firmware/tools/fonts/node_modules/
 

@@ -382,6 +382,9 @@ static esp_err_t h_status(httpd_req_t *req)
     cJSON *r = cJSON_CreateObject();
     cJSON_AddStringToObject(r, "ver", app->version);
     cJSON_AddStringToObject(r, "build", build);
+    char elf[10];
+    esp_app_get_elf_sha256(elf, sizeof(elf)); /* changes with every build, unlike the compile time above */
+    cJSON_AddStringToObject(r, "elf", elf);
     cJSON_AddNumberToObject(r, "up", (double)(esp_timer_get_time() / 1000000));
     cJSON_AddStringToObject(r, "mode", wifi_mgr_mode_str());
     cJSON_AddStringToObject(r, "ssid", ssid);

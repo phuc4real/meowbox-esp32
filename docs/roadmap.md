@@ -7,6 +7,7 @@ Các ý tưởng để dành, chưa xếp vào bản nào. Khi quyết định l
 |---|---|---|
 | MeowBox Cloud (Cloudflare Worker) | khi số liệu ở mục 4 của v0.2.0 cho thấy vẫn thiếu băng thông, hoặc cần thông báo khi loa ở ngoài | để dành |
 | Tối ưu lại các theme về UI/UX | sau v0.2.0 | để dành |
+| PC agent UI/UX | after v0.2.0 (v0.2.0 ships the agent functionally complete) | parked |
 
 ---
 
@@ -77,3 +78,21 @@ chủ chuyển mã luồng nhạc như trên.
   tiết kiệm (mục 1.3 của v0.2.0) cho cả màn loa.
 - Có một vùng 1 px ở `x=0` (`0,0-0,26` đến `0,0-0,36`) bị vẽ lại liên tục trên mọi theme: tìm ra object nào.
 - Đồng bộ với giao diện web (mục 1.3 của v0.2.0) để cùng một theme trông và hoạt động giống nhau trên loa và trên web.
+
+---
+
+## PC agent UI/UX
+
+### Why
+v0.2.0 focuses on what the agent does (discovery, relay, installer, updates). Its windows and menus are plain
+tkinter/pystray and were only checked for function, not for looks or wording.
+
+### To do
+- Tray menu: order and wording of the items, which ones belong in Settings instead, status line length.
+- Connect and Settings windows: layout, spacing, fonts and DPI scaling, a style closer to the MeowBox themes
+  (or a small web view instead of tkinter), progress bars for downloads instead of text.
+- Language: the windows are Vietnamese only; add English (follow the Windows display language or a setting).
+- Icon: the cat drawn in code; make proper 16/32/48 px artwork so the status dot stays readable.
+- Toasts: which events deserve one (connected, lost the speaker, downloading tools, new version) and how often.
+- Installer pages: wording, a finish page that opens the Connect window, Vietnamese installer language.
+

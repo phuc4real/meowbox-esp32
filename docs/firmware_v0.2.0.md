@@ -159,6 +159,13 @@ kể cả khi máy không có Python. Lần đầu chạy có cửa sổ dẫn t
 file json. Mạng có mDNS thì agent tự tìm ra loa. Mạng chặn mDNS thì nhập IP hiện trên màn hình loa vào ô trong
 cửa sổ là xong. Relay chỉ phục vụ loa đang nối. Agent và loa lệch giao thức thì cả hai bên đều báo rõ.
 
+> **Status (2026-11-24):** functionally done and run against the real speaker (from source and as the built exe):
+> discovery, name-based choice, busy + take-over, relay limited to the speaker, relay_test, a pre-0.2.0 agent still
+> connecting (proto 0, the web page asks to update it), YouTube relay (video: AAC from m4a, no ffmpeg; live: ffmpeg
+> downloaded on first use, AAC copied into MPEG-TS), Settings window. Installer built (20.1 MB, nothing third-party
+> bundled; it downloads yt-dlp); install / uninstall / reinstall on the user's PC not yet checked. UI/UX moved to
+> docs/roadmap.md.
+>
 > **Trạng thái (2026-11-23):** T1, T1b, T2 xong và đã chạy với loa thật; T3 đã build được bộ cài (18.9 MB, chưa kèm
 > ffmpeg/yt-dlp), chưa cài thử. Khác plan / thêm:
 > - **Loa rơi phần lớn gói broadcast/multicast gửi tới nó khi bật tiết kiệm điện Wi-Fi** (đo: truy vấn UDP 0–2/5 được

@@ -66,7 +66,7 @@ Phần cứng, pin map: xem [hardware.md](hardware.md), [pinmap.md](pinmap.md), 
 
 | Phần | Chọn | Ghi chú |
 |---|---|---|
-| SDK | ESP-IDF **6.1** (đã cài ở `D:\esp\esp-idf`) | đã build được xiaozhi bằng bản này |
+| SDK | ESP-IDF **6.1** (`release/v6.1`) | |
 | UI | LVGL 9 + `esp_lvgl_port` | double buffer trong PSRAM, 296×240 RGB565 |
 | LCD | `78/esp_lcd_nv3023` + `hw/nv3023_init_cmds.h` | thông số lấy từ board xiaozhi đã chạy |
 | Touch | `esp_lcd_touch_cst816s`, polling 20 ms | đã xác minh: toạ độ khớp màn hình |

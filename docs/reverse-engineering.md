@@ -33,7 +33,7 @@ python -m esptool --chip esp32s3 image-info backup/ota0_app.bin                 
 ## 3. Boot log
 
 Open the USB COM port, pulse RTS to reset, and keep reading. Re-open the port if it drops.
-`logs/vendor_boot.txt` shows the codec chips, LCD driver, touch IC id, board SKU and the
+The vendor boot log (not included in this repo) shows the codec chips, LCD driver, touch IC id, board SKU and the
 `OSTB_XIAOZHI_3ST:` log tag. That tells you *what* parts are on the board, but not the pins.
 
 ## 4. Pins from the code

@@ -21,9 +21,7 @@ other projects.
 | [`hw/`](hw/) | reusable C headers: every pin/address ([`ostb_xiaozhi_3st.h`](hw/ostb_xiaozhi_3st.h)), LCD init table |
 | [`docs/`](docs/) | hardware, pin map, reverse engineering, plans |
 | [`tools/`](tools/) | firmware analysis scripts used to reverse-engineer the vendor binary |
-| [`legacy/xiaozhi/`](legacy/xiaozhi/README.md) | board port for upstream xiaozhi-esp32 (AI assistant), not in use |
-| `logs/` | vendor firmware boot log (evidence for the reverse engineering) |
-| `backup/` | full flash dump of the vendor firmware (**local only**, not in git) |
+| `backup/` | your own flash dump of the vendor firmware (**local only**, gitignored) |
 
 ## Docs
 
@@ -88,7 +86,6 @@ MeowBox code, docs, tools and the cat sprites (original pixel art) are released 
 |---|---|
 | Fonts in `firmware/tools/fonts/src/` and the fonts generated from them (`firmware/components/fonts/`, `firmware/storage/web/fonts/`): Be Vietnam Pro, Archivo, Chakra Petch, VT323, Cormorant Garamond, Noto Serif JP (one glyph), IBM Plex Mono, Tinos, JetBrains Mono | SIL Open Font License 1.1 (each font folder has its `OFL.txt`) |
 | Font Awesome symbols merged into the UI fonts (from LVGL) | SIL OFL 1.1 (Font Awesome Free) |
-| `legacy/xiaozhi/` patch against [xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) | MIT (upstream) |
 | ESP-IDF and the managed components (LVGL, esp_codec_dev, esp_audio_codec, ...) | fetched at build time under their own licences, not included here |
 
 This project is not affiliated with the speaker's vendor. No vendor firmware is included; the reverse

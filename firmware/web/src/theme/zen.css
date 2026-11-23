@@ -1,0 +1,37 @@
+/* MeowBox web UI: zen theme flourishes. Loaded only while this theme is active (index.html, setTheme in app.js).
+   Colours/fonts come from themes.css; layout is shared in app.css. */
+/* ---------- Zen: serif display, pill buttons, generous whitespace, tapered brush divider, faint paper grain */
+[data-theme=zen]{--soft:var(--line);--fw-head:300;--h1:60px;--h2:28px;--big:72px;--stn:30px;--btn-bg:transparent;--btn-fg:var(--text);--btn-bd:var(--text);--gh-bd:transparent;--chart:var(--text);--gap:88px;--t:.3s}
+[data-theme=zen] body{font-weight:300;background-image:radial-gradient(color-mix(in srgb,var(--dim) 9%,transparent) .7px,transparent 1px),radial-gradient(color-mix(in srgb,var(--dim) 6%,transparent) .7px,transparent 1px);background-size:7px 7px,13px 11px;background-position:0 0,4px 6px}
+[data-theme=zen] h1,[data-theme=zen] .big,[data-theme=zen] .stn,[data-theme=zen] .brand{letter-spacing:0;font-stretch:100%}
+[data-theme=zen] .brand{font-weight:500;font-size:28px}
+[data-theme=zen] .stn{font-style:italic}
+[data-theme=zen] .sec{border-top:0;padding-top:0;grid-template-columns:220px minmax(0,1fr);gap:16px 40px}
+[data-theme=zen] .sec>h2,[data-theme=zen] .modal h3{font-family:var(--font-display);font-weight:400;line-height:1.1}
+[data-theme=zen] .top{border-bottom:0;padding-top:36px}
+[data-theme=zen] nav a.on,[data-theme=zen] .subnav a.on{border-bottom-color:transparent;font-weight:500}
+[data-theme=zen] nav a:hover,[data-theme=zen] .subnav a:hover{border-bottom-color:transparent}
+[data-theme=zen] .subnav{border-bottom:0}
+[data-theme=zen] .side>form,[data-theme=zen] .side>div{border-top:0;padding-top:0}
+[data-theme=zen] button,[data-theme=zen] .btn,[data-theme=zen] .tc,[data-theme=zen] .pop,[data-theme=zen] #toast div{border-radius:24px}
+[data-theme=zen] button,[data-theme=zen] .btn{font-weight:400}
+[data-theme=zen] button:not(:disabled):hover,[data-theme=zen] .btn:hover{background:var(--text);color:var(--bg);border-color:var(--text)}
+[data-theme=zen] button.danger{background:transparent;color:var(--alert);border-color:var(--alert)}
+[data-theme=zen] .np{border-top:0;padding-top:0}
+[data-theme=zen] input,[data-theme=zen] select,[data-theme=zen] textarea{border:0;border-bottom:1px solid var(--text);border-radius:0;background:transparent;padding:0 4px}
+[data-theme=zen] .list li{border-bottom:0}
+[data-theme=zen] .list li.now{box-shadow:none;padding-left:0}
+[data-theme=zen] .list li.now .num{color:var(--accent)}
+[data-theme=zen] .lh,[data-theme=zen] th{border-bottom-width:1px}
+[data-theme=zen] .lk{font-weight:400}
+[data-theme=zen] #banner{border-bottom:0;color:var(--accent);padding-top:24px}
+[data-theme=zen] #banner::before{display:none}
+[data-theme=zen] #banner a{color:var(--accent)}
+[data-theme=zen] .brush{display:block;height:5px;width:min(480px,70%);margin:0 0 var(--gap);border-radius:50%;opacity:.7;background:linear-gradient(90deg,transparent,var(--text) 4%,var(--text) 35%,color-mix(in srgb,var(--text) 55%,transparent) 75%,transparent)}
+[data-theme=zen] .okc{color:var(--accent2)}
+[data-theme=zen] .tc.on{border-color:var(--accent);box-shadow:none}
+@media (max-width:860px){
+[data-theme=zen] .top{padding-top:16px}
+[data-theme=zen] .sec{grid-template-columns:minmax(0,1fr);gap:12px}
+[data-theme=zen] .tc{border-radius:16px}
+}

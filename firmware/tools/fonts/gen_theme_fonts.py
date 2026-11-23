@@ -6,7 +6,7 @@
     python -m pip install --user fonttools brotli
     python gen_theme_fonts.py             # everything
     python gen_theme_fonts.py --lvgl      # only components/fonts/mb_<theme>_*.c
-    python gen_theme_fonts.py --web       # only storage/web/fonts/*.woff2 + fonts.json
+    python gen_theme_fonts.py --web       # only web/assets/fonts/*.woff2 + fonts.json
 
 Called from gen_fonts.ps1 as well. Sources are downloaded from the google/fonts
 GitHub repo into ./src/<family>/ (with their OFL.txt) if they are missing.
@@ -32,7 +32,7 @@ from fontTools import subset
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_C = os.path.normpath(os.path.join(HERE, '..', '..', 'components', 'fonts'))
-OUT_WEB = os.path.normpath(os.path.join(HERE, '..', '..', 'storage', 'web', 'fonts'))
+OUT_WEB = os.path.normpath(os.path.join(HERE, '..', '..', 'web', 'assets', 'fonts'))
 GF = 'https://raw.githubusercontent.com/google/fonts/main/'
 
 # local path (relative to HERE) -> download URL

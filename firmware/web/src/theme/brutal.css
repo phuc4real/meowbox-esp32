@@ -1,0 +1,69 @@
+/* MeowBox web UI: brutal theme flourishes. Loaded only while this theme is active (index.html, setTheme in app.js).
+   Colours/fonts come from themes.css; layout is shared in app.css. */
+/* ---------- Brutalism: system fonts, visible grid, 3px borders, hard shadows, blue underlined links, no transitions, tilted h1 */
+[data-theme=brutal]{--soft:var(--line);--fw-head:700;--h2:28px;--big:64px;--stn:24px;--btn-bg:var(--surface);--btn-fg:var(--text);--btn-bd:var(--line);--gh-bd:var(--line);
+--sel-bg:var(--accent);--sel-fg:var(--on-accent);--focus:var(--alert);--chart:var(--text);--dot:var(--alert);--link:var(--accent2);--t:0s;--gap:40px}
+[data-theme=brutal] *{transition:none!important}
+[data-theme=brutal] body{font-size:18px;background-image:linear-gradient(color-mix(in srgb,var(--line) 11%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--line) 11%,transparent) 1px,transparent 1px);background-size:24px 24px}
+[data-theme=brutal] :focus-visible{outline:4px solid var(--focus);outline-offset:0}
+[data-theme=brutal] a{text-decoration:underline}
+[data-theme=brutal] a:hover{color:var(--link);background:var(--accent)}
+[data-theme=brutal] h1{display:block;width:fit-content;max-width:100%;text-transform:uppercase;letter-spacing:-.02em;font-stretch:100%;background:var(--accent);color:var(--on-accent);border:3px solid var(--line);padding:8px 12px}
+[data-theme=brutal]:not([data-fx=eco]) h1{transform:rotate(-1deg)}
+[data-theme=brutal] .sec>h2{display:inline-block;align-self:start;justify-self:start;background:var(--accent2);color:var(--bg);padding:2px 10px;text-transform:uppercase}
+[data-theme=brutal] .sec{border-top-width:3px}
+[data-theme=brutal] .sec>.b{background:var(--surface)}
+[data-theme=brutal] .top{max-width:none;padding:0;gap:0;border-bottom:3px solid var(--line);background:var(--surface)}
+[data-theme=brutal] .top>.brand,[data-theme=brutal] .top>.sp,[data-theme=brutal] .top>.act{background:var(--text);color:var(--bg);margin:0;align-self:stretch}
+[data-theme=brutal] .brand{text-decoration:none;padding:0 24px;font:700 20px var(--font-data);text-transform:uppercase}
+[data-theme=brutal] .brand:hover{background:var(--text);color:var(--bg)}
+[data-theme=brutal] .host{color:var(--bg)}
+[data-theme=brutal] .logo{color:var(--accent)}
+[data-theme=brutal] .top>.act{padding:4px 16px 4px 0;align-items:center}
+[data-theme=brutal] .top>.act button{background:var(--text);color:var(--bg);border-color:var(--bg);box-shadow:none}
+[data-theme=brutal] nav{order:9;flex-basis:100%;padding:4px 24px;gap:0 18px;font-size:18px;border-top:3px solid var(--line)}
+[data-theme=brutal] nav a,[data-theme=brutal] .subnav a{color:var(--link);text-decoration:underline;border-bottom:0}
+[data-theme=brutal] nav a.on,[data-theme=brutal] .subnav a.on{color:var(--text);font-weight:700;text-decoration:none}
+[data-theme=brutal] nav a.on::before,[data-theme=brutal] .subnav a.on::before{content:"["}
+[data-theme=brutal] nav a.on::after,[data-theme=brutal] .subnav a.on::after{content:"]"}
+[data-theme=brutal] .subnav{border-bottom:3px solid var(--line)}
+[data-theme=brutal] .side>form{background:var(--accent);border:3px solid var(--line);padding:14px;box-shadow:8px 8px 0 var(--line)}
+[data-theme=brutal] .side>form small{color:var(--text)}
+[data-theme=brutal] nav a .i{display:none}
+[data-theme=brutal] button,[data-theme=brutal] .btn{border-width:3px;box-shadow:var(--shadow);min-height:48px}
+[data-theme=brutal] button.ic{box-shadow:none}
+[data-theme=brutal] button.ic.bd,[data-theme=brutal] .days button,[data-theme=brutal] .chips button{box-shadow:var(--shadow)}
+[data-theme=brutal] button:not(:disabled):active,[data-theme=brutal] .btn:active{transform:translate(3px,3px);box-shadow:none}
+[data-theme=brutal] button.on,[data-theme=brutal] .days button.on{background:var(--accent);color:var(--on-accent);border-color:var(--line)}
+[data-theme=brutal] button.danger{background:var(--alert);color:var(--text);border-color:var(--line)}
+[data-theme=brutal] .lk{color:var(--link);box-shadow:none;min-height:44px}
+[data-theme=brutal] .err{color:var(--text);background:var(--alert);padding:0 4px}
+[data-theme=brutal] .okc{color:var(--text);background:var(--ok);padding:0 4px}
+[data-theme=brutal] .now .tag{color:var(--text)}
+[data-theme=brutal] .list li{border-bottom-width:2px}
+[data-theme=brutal] .list li.now{background:var(--accent);box-shadow:none}
+[data-theme=brutal] .list li.now .num{color:var(--text)}
+[data-theme=brutal] .log time,[data-theme=brutal] .log .hi time{color:var(--text)}
+[data-theme=brutal] .log .hi span{background:var(--alert)}
+[data-theme=brutal] th,[data-theme=brutal] td{border:2px solid var(--line);padding:6px 8px;color:var(--text)}
+[data-theme=brutal] .kv>div{border:2px solid var(--line);padding:8px 10px;background:var(--surface)}
+[data-theme=brutal] input,[data-theme=brutal] select,[data-theme=brutal] textarea{border-width:3px;font-family:var(--font-data)}
+[data-theme=brutal] input[type=range]{accent-color:var(--accent2)}
+[data-theme=brutal] .shot{border:3px solid var(--line);box-shadow:10px 10px 0 var(--line)}
+[data-theme=brutal] .np{border-top-width:3px}
+[data-theme=brutal] #banner{max-width:none;background:var(--alert);color:var(--text);font-weight:700;border-bottom:3px solid var(--line);padding-left:24px}
+[data-theme=brutal] #banner::before{display:none}
+[data-theme=brutal] #banner a{color:var(--text)}
+[data-theme=brutal] .tc{border:3px solid var(--line);background:var(--surface)}
+[data-theme=brutal] .tc.on{background:var(--accent);box-shadow:var(--shadow)}
+[data-theme=brutal] .tc small{color:var(--text)}
+[data-theme=brutal] .bar{height:12px;border:2px solid var(--line);background:var(--surface)}
+[data-theme=brutal] .bar>div{background:var(--text)}
+[data-theme=brutal] .pop,[data-theme=brutal] .modal{border-width:3px;box-shadow:var(--shadow)}
+[data-theme=brutal] #toast div{border:3px solid var(--line)}
+@media (max-width:860px){
+[data-theme=brutal] .top>.brand{padding:0 12px}
+[data-theme=brutal] nav{display:none;padding:4px 12px}
+[data-theme=brutal] nav.open{display:flex}
+[data-theme=brutal] nav a.on{border-left-color:transparent}
+}

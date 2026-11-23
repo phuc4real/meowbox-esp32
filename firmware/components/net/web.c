@@ -17,6 +17,7 @@
 #include "esp_ota_ops.h"
 #include "psa/crypto.h"
 #include "settings.h"
+#include "webui.h"
 
 static const char *TAG = "web";
 
@@ -627,39 +628,37 @@ static esp_err_t h_static(httpd_req_t *req)
     }
     if (strncmp(req->uri, "/api/", 5) == 0) return web_send_err(req, 404, "not_found");
 
-    char path[128];
+    /* files come from the pack embedded in the app (components/webui, built by web/build.py) */
     size_t ul = strcspn(req->uri, "?#");
-    if (ul > 96 || strstr(req->uri, "..")) return web_send_err(req, 404, "not_found");
-    if (ul == 1) snprintf(path, sizeof(path), "/storage/web/index.html");
-    else snprintf(path, sizeof(path), "/storage/web%.*s", (int)ul, req->uri);
-
-    char gz[136];
-    snprintf(gz, sizeof(gz), "%s.gz", path);
-    struct stat st;
-    const char *file = path;
-    bool gzip = false;
-    if (stat(gz, &st) == 0) { file = gz; gzip = true; }
-    else if (stat(path, &st) != 0) {
-        if (ul == 1) {
+    const char *path = ul <= 1 ? "index.html" : req->uri + 1;
+    size_t pl = ul <= 1 ? strlen("index.html") : ul - 1;
+    webui_file_t f;
+    if (strstr(req->uri, "..") || !webui_find(path, pl, &f)) {
+        if (ul <= 1) {
             httpd_resp_set_type(req, "text/html; charset=utf-8");
-            return httpd_resp_sendstr(req, "<h1>MeowBox</h1><p>Web UI is not flashed yet (storage partition). "
-                                           "API is up at /api/status.</p>");
+            return httpd_resp_sendstr(req, "<h1>MeowBox</h1><p>This firmware was built without the web UI "
+                                           "(run web/build.py). API is up at /api/status.</p>");
         }
         return web_send_err(req, 404, "not_found");
     }
-    FILE *f = fopen(file, "rb");
-    if (!f) return web_send_err(req, 404, "not_found");
-    httpd_resp_set_type(req, mime(path));
-    httpd_resp_set_hdr(req, "Cache-Control", strstr(path, "/fonts/") ? "max-age=604800" : "no-cache");
-    if (gzip) httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-    char *buf = malloc(4096);
-    size_t n;
-    while ((n = fread(buf, 1, 4096, f)) > 0) {
-        if (httpd_resp_send_chunk(req, buf, n) != ESP_OK) break;
+    char mpath[64];
+    snprintf(mpath, sizeof(mpath), "%.*s", (int)pl, path);
+    char etag[16], inm[24] = "";
+    snprintf(etag, sizeof(etag), "\"%s\"", f.etag);
+    httpd_resp_set_hdr(req, "ETag", etag);
+    /* hashed names never change; fonts and theme previews rarely; index.html must be revalidated (ETag -> 304) */
+    httpd_resp_set_hdr(req, "Cache-Control", f.immutable                      ? "public, max-age=31536000, immutable"
+                                             : strncmp(mpath, "fonts/", 6) == 0 ||
+                                                       strncmp(mpath, "themes/", 7) == 0
+                                                 ? "max-age=604800"
+                                                 : "no-cache");
+    if (httpd_req_get_hdr_value_str(req, "If-None-Match", inm, sizeof(inm)) == ESP_OK && strcmp(inm, etag) == 0) {
+        httpd_resp_set_status(req, "304 Not Modified");
+        return httpd_resp_send(req, NULL, 0);
     }
-    free(buf);
-    fclose(f);
-    return httpd_resp_send_chunk(req, NULL, 0);
+    httpd_resp_set_type(req, mime(mpath));
+    if (f.gzip) httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    return httpd_resp_send(req, (const char *)f.data, f.len);
 }
 
 void web_ready(void)

@@ -33,9 +33,13 @@ The UI loads only the files listed in the active theme's `fonts` (a listed name 
 is not in `fonts.json` also matches its variants `chakra-petch-400-vi.woff2`, ...). No `fonts.json` or files → the
 system font stacks from `themes.css`. Nothing is ever loaded from a CDN (SoftAP mode has no internet).
 
-Static files need no auth (the login screen is part of the app). UI strings are static too: `/lang/vi.json`, `/lang/en.json`
-(one JSON object per language, same keys); the page loads only the active one. `Cache-Control: no-cache` is recommended
-so an OTA'd web bundle is picked up. In SoftAP mode any unknown path redirects to `/` (captive portal).
+Static files need no auth (the login screen is part of the app). They are embedded in the app image
+(`components/webui/web.pack`, built by `web/build.py`), so the UI always matches the firmware. UI strings are static too:
+`/lang/<code>.<hash>.json` (one JSON object per language, same keys); the page loads only the active one.
+Caching: files whose name carries a content hash (`app.<hash>.js`, `lang/…`, `theme/…`, `themes.<hash>.css`) are sent
+with `Cache-Control: public, max-age=31536000, immutable`; `fonts/*` and `themes/*.png` with `max-age=604800`;
+`index.html` with `no-cache`. Every file has an `ETag`; a matching `If-None-Match` gets `304 Not Modified` with no body.
+In SoftAP mode any unknown host redirects to `/` (captive portal).
 
 ### Authentication
 

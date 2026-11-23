@@ -1,0 +1,31 @@
+/* MeowBox web UI: cyberpunk theme flourishes. Loaded only while this theme is active (index.html, setTheme in app.js).
+   Colours/fonts come from themes.css; layout is shared in app.css. */
+/* ---------- Cyberpunk: cut corners, RGB split on logo/h1, scanlines, HUD corners */
+[data-theme=cyberpunk]{--bw:1px;--soft:var(--line);--font-head:var(--font-ui);--fw-head:700;--h1:40px;--big:56px;--stn:22px;
+--btn-bg:var(--accent2);--btn-fg:var(--on-accent);--btn-bd:var(--accent2);--gh-bd:var(--line);--sel-bg:var(--accent);--sel-fg:var(--on-accent);
+--focus:var(--warn);--chart:var(--accent);--link:var(--accent);--gap:40px}
+[data-theme=cyberpunk] h1,[data-theme=cyberpunk] .brand{letter-spacing:.02em;font-stretch:100%}
+[data-theme=cyberpunk] .brand{text-transform:uppercase;letter-spacing:.12em}
+[data-theme=cyberpunk]:not([data-fx=eco]) h1,[data-theme=cyberpunk]:not([data-fx=eco]) .brand span{text-shadow:-2px 0 color-mix(in srgb,var(--accent2) 80%,transparent),2px 0 color-mix(in srgb,var(--accent) 80%,transparent)}
+[data-theme=cyberpunk] button:not(.ic),[data-theme=cyberpunk] .btn{clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+[data-theme=cyberpunk] button.ghost,[data-theme=cyberpunk] .btn.ghost,[data-theme=cyberpunk] .days button,[data-theme=cyberpunk] button.ic.bd{background:var(--surface);border-color:var(--surface);color:var(--text)}
+[data-theme=cyberpunk] button.ic{color:var(--accent)}
+[data-theme=cyberpunk] :focus-visible{outline-offset:-3px}
+[data-theme=cyberpunk] a:hover{color:var(--accent2)}
+[data-theme=cyberpunk] nav a.on{color:var(--accent)}
+[data-theme=cyberpunk] .sec>h2,[data-theme=cyberpunk] .lbl,[data-theme=cyberpunk] th,[data-theme=cyberpunk] .tag{font-family:var(--font-data);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+[data-theme=cyberpunk] .sec>h2{color:var(--accent);font-weight:400}
+[data-theme=cyberpunk] .np{border-top:0;padding:16px 20px;background:var(--surface);clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)}
+[data-theme=cyberpunk] .big{font-weight:400;letter-spacing:0;color:var(--accent);font-stretch:100%}
+[data-theme=cyberpunk] .list li.now{background:color-mix(in srgb,var(--accent) 7%,transparent);box-shadow:inset 2px 0 0 var(--accent)}
+[data-theme=cyberpunk] .now .tag{color:var(--ok)}
+[data-theme=cyberpunk] input,[data-theme=cyberpunk] select,[data-theme=cyberpunk] textarea{background:color-mix(in srgb,var(--surface) 45%,var(--bg));font-family:var(--font-data);font-size:14px}
+[data-theme=cyberpunk] .bar{height:6px}
+[data-theme=cyberpunk] .bar>div{background:repeating-linear-gradient(90deg,var(--accent) 0 6px,transparent 6px 9px)}
+[data-theme=cyberpunk] .bar.low>div{background:repeating-linear-gradient(90deg,var(--alert) 0 6px,transparent 6px 9px)}
+[data-theme=cyberpunk] #banner{color:var(--warn);font-family:var(--font-data);font-size:13px}
+[data-theme=cyberpunk] #banner::before{content:"!!";width:auto;height:auto;background:none}
+[data-theme=cyberpunk] #banner a{color:var(--warn)}
+[data-theme=cyberpunk] .shot{padding:8px;background:linear-gradient(var(--accent),var(--accent)) 0 0/16px 2px,linear-gradient(var(--accent),var(--accent)) 0 0/2px 16px,linear-gradient(var(--accent),var(--accent)) 100% 0/16px 2px,linear-gradient(var(--accent),var(--accent)) 100% 0/2px 16px,linear-gradient(var(--accent2),var(--accent2)) 0 100%/16px 2px,linear-gradient(var(--accent2),var(--accent2)) 0 100%/2px 16px,linear-gradient(var(--accent2),var(--accent2)) 100% 100%/16px 2px,linear-gradient(var(--accent2),var(--accent2)) 100% 100%/2px 16px;background-repeat:no-repeat}
+[data-theme=cyberpunk] .tc.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+[data-theme=cyberpunk]:not([data-fx=eco]) body::after{content:"";position:fixed;inset:0;z-index:100;pointer-events:none;background:repeating-linear-gradient(0deg,color-mix(in srgb,var(--text) 3%,transparent) 0 1px,transparent 1px 3px)}

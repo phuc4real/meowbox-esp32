@@ -54,7 +54,7 @@ try:
             time.sleep(0.1)
 
     print("static")
-    for f in ("/", "/app.css", "/app.js", "/themes.css", "/lang/vi.json", "/lang/en.json"):
+    for f in ("/", "/app.css", "/app.js", "/themes.css", "/lang/vi.json", "/lang/en.json", "/theme/zen.css"):
         with urllib.request.urlopen(BASE + f) as r:
             check(f"GET {f} 200", r.status == 200)
 
@@ -206,6 +206,57 @@ try:
     bat = set(re.findall(r"\bB\('([A-Za-z_]+)'", js))
     check(f"every B('...') key exists in 'bat' (missing {sorted(bat - set(langs['vi'].get('bat', {})))})",
           bat <= set(langs["vi"].get("bat", {})))
+finally:
+    proc.terminate()
+
+# ---- built pack (web/build.py -> components/webui/web.pack), served by the mock exactly like the firmware
+print("built pack (mock --dist)")
+s2 = socket.socket(); s2.bind(("127.0.0.1", 0)); PORT2 = s2.getsockname()[1]; s2.close()
+proc = subprocess.Popen([sys.executable, os.path.join(HERE, "mock_server.py"), "--port", str(PORT2), "--host", "127.0.0.1",
+                         "--dist"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+B2 = f"http://127.0.0.1:{PORT2}"
+
+
+def raw_get(path, hdr=None):
+    r = urllib.request.Request(B2 + path, headers=hdr or {})
+    try:
+        with urllib.request.urlopen(r) as x:
+            return x.status, dict(x.headers), x.read()
+    except urllib.error.HTTPError as e:
+        return e.code, dict(e.headers), e.read()
+
+
+try:
+    import gzip as _gz
+    for _ in range(50):
+        try:
+            urllib.request.urlopen(B2 + "/api/theme", timeout=1); break
+        except Exception:
+            time.sleep(0.1)
+    c, h, body = raw_get("/")
+    html = _gz.decompress(body).decode() if h.get("Content-Encoding") == "gzip" else body.decode()
+    check("GET / -> index.html, no-cache + ETag", c == 200 and h.get("Cache-Control") == "no-cache" and bool(h.get("ETag")))
+    c304, _, b304 = raw_get("/", {"If-None-Match": h.get("ETag", "")})
+    check("If-None-Match on index.html -> 304, empty body", c304 == 304 and not b304)
+    refs = re.findall(r'(?:href|src)="([^"]+\.(?:css|js))"', html)
+    mbm = re.search(r"window\.MB=(\{.*?\});", html)
+    mb = json.loads(mbm.group(1)) if mbm else {}
+    check("index.html has window.MB with vi/en and the 4 themes",
+          {"vi", "en"} <= set(mb.get("l", {})) and {"swiss", "cyberpunk", "zen", "brutal"} <= set(mb.get("t", {})))
+    hashed = refs + list(mb.get("l", {}).values()) + list(mb.get("t", {}).values())
+    check(f"index.html references hashed files ({len(hashed)})",
+          len(refs) == 3 and all(re.search(r"\.[0-9a-f]{8}\.(css|js|json)$", x) for x in hashed))
+    bad = []
+    for x in hashed:
+        c, h, _ = raw_get("/" + x)
+        if c != 200 or "immutable" not in h.get("Cache-Control", "") or h.get("Content-Encoding") != "gzip":
+            bad.append((x, c, h.get("Cache-Control")))
+    check(f"every hashed file -> 200, gzip, immutable (bad: {bad})", not bad)
+    c, h, _ = raw_get("/fonts/fonts.json")
+    check("fonts/fonts.json served, cached 7 days", c == 200 and h.get("Cache-Control") == "max-age=604800")
+    c, h, _ = raw_get("/themes/swiss.png")
+    check("themes/swiss.png served", c == 200 and h.get("Content-Type") == "image/png")
+    check("unhashed or unknown file -> 404", raw_get("/app.js")[0] == 404 and raw_get("/nope.css")[0] == 404)
 finally:
     proc.terminate()
 

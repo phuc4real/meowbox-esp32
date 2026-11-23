@@ -70,6 +70,13 @@ Số đo lúc lên plan (`python build.py`):
 - `test_api.py` thêm phần kiểm tra: hai file ngôn ngữ có cùng bộ khoá, mọi khoá `t('…')` trong code đều có trong `vi.json`.
 
 ### 1.2 Tối ưu build và cache
+> **Trạng thái (2026-11-23):** xong phần tên có hash + cache + ETag/304, tách CSS theo theme, nhúng web vào app (3.1).
+> Khác plan: bảng ngôn ngữ/theme → tên file nằm ngay trong `index.html` (`window.MB`) thay vì `manifest.json` (đỡ một
+> request); `themes.css` (biến của cả 4 theme, 640 B gzip) vẫn luôn tải để ô xem trước ở trang Giao diện dùng được, chỉ
+> phần riêng của theme tách ra `src/theme/<id>.css`. **Chưa làm:** minify bằng esbuild (máy chưa có, phải tải từ npm),
+> tách `app.js` thành module. Lượt tải đầu (gzip): 26.2 KB với Brutal, khoảng 25 KB với Swiss; lần mở sau chỉ còn
+> `index.html` trả 304.
+
 - **Minify thật:** `build.py` dùng `esbuild` nếu máy có (gọi qua `npx`), máy không có thì dùng lại minify hiện tại.
   Nhờ vậy build vẫn chạy được chỉ với stdlib. Dự đoán `app.js` gzip còn khoảng 15–16 KB, đo lại sau khi làm.
 - **Tách `app.js` thành module lúc viết** (`src/js/core.js`, `src/js/pages/radio.js`…). `build.py` ghép lại thành
@@ -406,6 +413,10 @@ DESKTOP-X kết nối?". Bấm OK trên loa thì loa trả token về cho agent.
 - Không có internet vẫn cập nhật tay bằng file như bây giờ.
 
 ### 3.1 Đưa web vào trong app (thay đổi kiến trúc, làm trước)
+> **Trạng thái (2026-11-23):** xong. `components/webui` (`web.pack` qua `EMBED_FILES`, 25 file, 281 KB, app 3.14 MB,
+> slot còn trống 43%). Font và ảnh xem trước dời từ `storage/web/` sang `web/assets/`, phân vùng `storage` giờ trống.
+> Đã chạy trên loa: mọi trang vi/en, header cache, 304.
+
 - **Đã chốt.** Nhúng toàn bộ `storage/web/` vào app: `build.py` sinh một file pack (bảng tên file, kích thước, offset, hash) rồi
   nhúng bằng `EMBED_FILES`. `web.c` phục vụ static file từ bảng này thay vì `/storage/web`.
 - Lợi ích: web cập nhật cùng app qua OTA A/B, có rollback, chỉ cần tải **một file**. App lớn thêm khoảng 300 KB,

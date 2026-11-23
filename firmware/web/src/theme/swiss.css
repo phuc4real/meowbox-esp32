@@ -1,0 +1,6 @@
+/* MeowBox web UI: swiss theme flourishes. Loaded only while this theme is active (index.html, setTheme in app.js).
+   Colours/fonts come from themes.css; layout is shared in app.css. */
+/* ---------- Swiss (default): condensed display type, black rules, red active underline, hard shadow on hover */
+:root:not([data-theme]) button:not(.ic):not(:disabled):hover,[data-theme=swiss] button:not(.ic):not(:disabled):hover,[data-theme=swiss] .btn:hover{box-shadow:var(--hover-shadow);transform:translate(-2px,-2px)}
+[data-theme=swiss] .tc .nm::before{border-radius:0}
+[data-theme=swiss] .tc.on .nm::before{background:var(--text);box-shadow:inset 0 0 0 3px var(--bg)}

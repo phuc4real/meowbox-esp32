@@ -6,7 +6,8 @@ const RB='https://de1.api.radio-browser.info/json/stations/search',GEO='https://
 const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
 let lang=ls('lang')||'vi';
 const t=(k,v)=>{const x=L[k];if(x===undefined)return k;return v&&typeof x=='string'?x.replace(/\{(\w+)\}/g,(_,n)=>v[n]??''):x};
-const loadLang=async l=>{const r=await fetch('lang/'+l+'.json');if(!r.ok)throw Error(r.status);return r.json()};
+// file names come from window.mbP (index.html): content-hashed in the build, plain in src/
+const loadLang=async l=>{const r=await fetch(mbP('l',l));if(!r.ok)throw Error(r.status);return r.json()};
 const $=s=>document.querySelector(s),main=$('#main'),nav=$('#nav'),html=document.documentElement;
 function h(tag,a,...c){const e=document.createElement(tag);
 for(const x of c.flat(9))if(x!=null&&x!==false)e.append(x.nodeType?x:''+x);
@@ -80,7 +81,8 @@ let FT={};try{FT=JSON.parse(ls('mbF'))||{}}catch(e){}   // theme id -> font file
 let devTh='swiss',THS=[],fmap=null,fcur=null;
 // data-theme = speaker theme, unless this browser chose "always Swiss"
 function setTheme(id,fonts){if(id)devTh=id;if(fonts){FT[devTh]=fonts;ls('mbF',JSON.stringify(FT))}
-const u=ls('webT')=='swiss'?'swiss':devTh;html.dataset.theme=u;ls('mbT',u);loadFonts(FT[u]||[])}
+const u=ls('webT')=='swiss'?'swiss':devTh;html.dataset.theme=u;ls('mbT',u);loadFonts(FT[u]||[]);
+const c=$('#thc'),href=mbP('t',u);if(c&&c.getAttribute('href')!=href)c.setAttribute('href',href)}
 // @font-face for only this theme's files, described by /fonts/fonts.json {file:{family,weight,style,stretch}}. Missing -> CSS fallback stacks.
 async function loadFonts(fs){const k=fs.join();if(k===fcur)return;fcur=k;
 if(fs.length&&!fmap){try{const r=await fetch('/fonts/fonts.json');fmap=r.ok?await r.json():{}}catch(e){fmap={}}fmap=fmap.fonts||fmap;if(Array.isArray(fmap))fmap=Object.fromEntries(fmap.map(x=>[x.file,x]))}

@@ -10,7 +10,9 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlsplit, parse_qs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-STORAGE = os.path.normpath(os.path.join(HERE, "..", "storage", "web"))  # /fonts/*, /themes/*.png come from here
+STORAGE = os.path.join(HERE, "assets")  # /fonts/*, /themes/*.png come from here
+PACK_FILE = os.path.normpath(os.path.join(HERE, "..", "components", "webui", "web.pack"))
+PACK = None  # --dist: {path: (data, gzip, immutable, etag)} read from web.pack, served like the firmware does
 THEMES = json.load(open(os.path.join(HERE, "themes.json"), encoding="utf-8"))  # written by tools/gen_themes.py
 THEME_IDS = [t["id"] for t in THEMES]
 DEFAULT_THEME = next((t["id"] for t in THEMES if t.get("default")), "swiss")
@@ -235,7 +237,33 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def static_pack(self, path):
+        f = PACK.get(path.lstrip("/") or "index.html")
+        if not f or ".." in path:
+            return self.send_json({"err": "not_found"}, 404)
+        data, gz, imm, etag = f
+        p = path.lstrip("/")
+        cache = ("public, max-age=31536000, immutable" if imm else
+                 "max-age=604800" if p.startswith(("fonts/", "themes/")) else "no-cache")
+        if self.headers.get("If-None-Match") == f'"{etag}"':
+            self.send_response(304)
+            self.send_header("ETag", f'"{etag}"')
+            self.send_header("Cache-Control", cache)
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", MIME.get(os.path.splitext(p or "index.html")[1].lower(), "application/octet-stream"))
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", cache)
+        self.send_header("ETag", f'"{etag}"')
+        if gz:
+            self.send_header("Content-Encoding", "gzip")
+        self.end_headers()
+        self.wfile.write(data)
+
     def static(self, path):
+        if PACK is not None:
+            return self.static_pack(path)
         if path in ("", "/"):
             path = "/index.html"
         root = self.root
@@ -553,6 +581,19 @@ class H(BaseHTTPRequestHandler):
         raise Err(404, "not_found")
 
 
+def read_pack(fn):
+    """web.pack written by build.py -> {path: (data, gzip, immutable, etag)}"""
+    b = open(fn, "rb").read()
+    magic, ver, count, off = struct.unpack_from("<4sIII", b, 0)
+    if magic != b"MBWP" or ver != 1:
+        sys.exit(f"{fn}: not a web pack")
+    out = {}
+    for i in range(count):
+        p, o, n, fl, e = struct.unpack_from("<56sIII12s", b, 16 + 80 * i)
+        out[p.rstrip(b"\0").decode()] = (b[off + o:off + o + n], bool(fl & 1), bool(fl & 2), e.rstrip(b"\0").decode())
+    return out
+
+
 def main():
     for f in (sys.stdout, sys.stderr):
         try:
@@ -566,7 +607,11 @@ def main():
     ap.add_argument("--no-auth", action="store_true", help="skip login (dev only)")
     ap.add_argument("--no-screenshot", action="store_true", help="/api/screenshot returns 404")
     ap.add_argument("--theme", choices=THEME_IDS, help="start with this display.theme")
+    ap.add_argument("--dist", action="store_true", help="serve the built pack (components/webui/web.pack) like the firmware")
     a = ap.parse_args()
+    if a.dist:
+        global PACK
+        PACK = read_pack(PACK_FILE)
     global NO_AUTH, NO_SHOT
     NO_AUTH, NO_SHOT = a.no_auth, a.no_screenshot
     if a.theme:

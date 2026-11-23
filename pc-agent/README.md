@@ -17,7 +17,7 @@ Không cần Python. Bộ cài:
 - cài vào `Program Files\MeowBox Agent` (hỏi quyền admin), có shortcut ở Start Menu;
 - mở tường lửa cho agent trên mạng **Private** (relay, mDNS, gói thông báo của loa);
 - tùy chọn: chạy cùng Windows (mặc định bật), thêm `meowbox.exe` vào PATH;
-- tải yt-dlp bản mới nhất về `%LOCALAPPDATA%\MeowBoxin` (không đóng gói kèm, để luôn cập nhật được);
+- tải yt-dlp bản mới nhất về `%LOCALAPPDATA%\MeowBox\bin` (không đóng gói kèm, để luôn cập nhật được);
 - gỡ bản cũ chạy bằng Python (task "MeowBox Agent" trong Task Scheduler, shortcut Startup), giữ cấu hình cũ.
 
 Cài xong agent chạy luôn, hiện icon con mèo ở khay hệ thống, và lần đầu tự mở cửa sổ **Kết nối loa**:
@@ -37,6 +37,18 @@ nghe gói thông báo loa phát mỗi 2 giây ở cổng 8767). Nó nhớ loa th
 nối nhầm, loa đổi IP vẫn tìm ra. Mỗi lúc một loa chỉ nhận một PC.
 
 Cấu hình: `%APPDATA%\MeowBox\agent.json`. Log: `%APPDATA%\MeowBox\agent.log` (xoay vòng 1 MB × 3).
+
+**Cài đặt…** (menu tray): phiên bản và cập nhật của agent (tải bộ cài mới rồi tự chạy), yt-dlp, ffmpeg; tự kiểm tra
+mỗi ngày; chạy cùng Windows; cổng relay; thư mục log.
+
+### YouTube
+
+- Video thường: yt-dlp tải audio AAC (m4a, itag 140, ~128 kbps), agent bỏ vỏ MP4 thành ADTS cho loa. Không mã hoá lại,
+  không cần ffmpeg.
+- Live: yt-dlp không tải luồng live HLS nếu không có ffmpeg, nên lần đầu phát live agent tự tải ffmpeg bản LGPL
+  (BtbN `win64-lgpl-shared`, ~75 MB, kiểm tra SHA-256) về `%LOCALAPPDATA%\MeowBox\bin\ffmpeg`. Âm thanh chỉ được chép
+  nguyên (AAC trong MPEG-TS). Trong lúc tải loa tự thử lại, tray hiện thông báo. Máy có ffmpeg trong PATH thì dùng luôn.
+- yt-dlp là bản zip thuần Python (~3 MB) chạy bằng `meowbox.exe ytdlp …`; xem/cập nhật: `meowbox tools status|update`.
 
 ## Dòng lệnh
 
@@ -60,7 +72,7 @@ Nhiệt độ CPU/GPU: chạy [LibreHardwareMonitor](https://github.com/LibreHar
 
 ## Chạy từ source
 
-Python 3.11+ (đã test 3.14), `ffmpeg` và `yt-dlp` trong PATH (hoặc trong `%LOCALAPPDATA%\MeowBox\bin`).
+Python 3.11+ (đã test 3.14). yt-dlp: `python agent.py tools update` (vào `%LOCALAPPDATA%\MeowBox\bin`).
 
 ```powershell
 cd pc-agent
@@ -76,12 +88,12 @@ các lệnh cũ vẫn chạy.
 
 ```
 GET http://<pc>:8765/yt/info?url=<link>                → JSON: type, title, duration, is_live, entries (playlist)
-GET http://<pc>:8765/yt/stream?url=<link>              → audio/mpeg (chunked), header icy-name = tên bài
+GET http://<pc>:8765/yt/stream?url=<link>              → audio/aac (live: video/mp2t), header icy-name = tên bài
 GET http://<pc>:8765/yt/stream?url=<playlist>&index=N  → bài thứ N trong playlist (đếm từ 0)
 GET http://<pc>:8765/yt/ping                           → {"ok":true} (loa dùng cho relay_test)
 ```
 
-Chỉ IP của loa đang nối được phép, máy khác nhận 403. Mỗi ngày agent chạy `yt-dlp -U` một lần.
+Chỉ IP của loa đang nối được phép, máy khác nhận 403.
 
 ## Build file cài đặt
 
@@ -92,9 +104,8 @@ Cần PyInstaller (`pip install --user pyinstaller`) và Inno Setup 6 (`winget i
 .\build.ps1 -Venv    # build trong .venv sạch
 ```
 
-Ra `packaging\build\MeowBoxAgent-Setup-<version>.exe`. Muốn kèm ffmpeg/yt-dlp thì đặt trước vào `packaging\vendor\`:
-`ffmpeg.exe` bản **LGPL** (ví dụ BtbN FFmpeg-Builds `win64-lgpl`, kèm file license vào `vendor\licenses\`) và
-`yt-dlp.exe`. Phiên bản lấy từ `meowbox_agent/__init__.py` (`__version__`, chung số với firmware).
+Ra `packaging\build\MeowBoxAgent-Setup-<version>.exe` (~20 MB, không kèm yt-dlp hay ffmpeg). Phiên bản lấy từ
+`meowbox_agent/__init__.py` (`__version__`, chung số với firmware).
 
 ## Test không cần loa (mock)
 
@@ -115,5 +126,7 @@ curl "http://127.0.0.1:8081/mock/cmd?cmd=vol_up"     # loa giả gửi media_cmd
 - Chỉ chạy trên Windows (Media Session, pycaw, SAPI).
 - Không có LibreHardwareMonitor hay nvidia-smi thì không có GPU % và nhiệt độ (gửi `null`).
 - `pos`/`len` của bài hát tuỳ app. Chrome với video live thì báo 0.
-- Relay chỉ dùng cá nhân. YouTube đổi cách chặn thì phải đợi yt-dlp bản mới.
+- Relay chỉ dùng cá nhân. YouTube đổi cách chặn thì cập nhật yt-dlp trong Cài đặt (hoặc chờ lần tự kiểm tra hằng ngày).
+- yt-dlp cảnh báo thiếu runtime JavaScript (deno): một số định dạng YouTube có thể thiếu. Video thường vẫn có AAC.
+- Hai agent cùng chạy trên một máy (ví dụ `meowbox run` khi bản tray đang chạy) sẽ giành loa qua lại.
 - File cài đặt chưa ký số: SmartScreen sẽ báo "Unknown publisher", bấm *More info → Run anyway*.

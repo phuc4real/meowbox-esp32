@@ -385,7 +385,7 @@ static void fetch_task(void *arg)
     }
     if (alive(gen) && !s_eof) set_state(PLAYER_ERR);
     free(url);
-    vTaskDelete(NULL);
+    vTaskDeleteWithCaps(NULL);
 }
 
 /* ---------------- decode task (persistent) ---------------- */
@@ -420,7 +420,7 @@ static void decode_task(void *arg)
     esp_audio_dec_register_default();
     esp_audio_simple_dec_register_default();
     const int IN_CAP = 8192;
-    uint8_t *in = heap_caps_malloc(IN_CAP, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    uint8_t *in = heap_caps_malloc(IN_CAP, MALLOC_CAP_SPIRAM); /* compressed input, read sequentially: PSRAM is fine */
     uint32_t out_cap = 16384;
     uint8_t *out = heap_caps_malloc(out_cap, MALLOC_CAP_SPIRAM);
     uint32_t cur_gen = 0;
@@ -568,7 +568,8 @@ void player_init(void)
 {
     s_lock = xSemaphoreCreateMutex();
     s_rb = xRingbufferCreateWithCaps(RB_SIZE, RINGBUF_TYPE_BYTEBUF, MALLOC_CAP_SPIRAM);
-    xTaskCreatePinnedToCore(decode_task, "decode", 8192, NULL, 7, &s_dec_task, 1);
+    /* measured peak use ~1.5 KB (docs/perf/results-0.2.0.md); stays in internal RAM (real-time, high priority) */
+    xTaskCreatePinnedToCore(decode_task, "decode", 4096, NULL, 7, &s_dec_task, 1);
 }
 
 esp_err_t player_play(const char *url, const char *name, int id)
@@ -588,7 +589,8 @@ esp_err_t player_play(const char *url, const char *name, int id)
     xSemaphoreGive(s_lock);
     set_state(PLAYER_BUF);
     ESP_LOGI(TAG, "play %s (%s)", url, name ? name : "");
-    if (xTaskCreatePinnedToCore(fetch_task, "fetch", 8192, (void *)(uintptr_t)gen, 5, NULL, 0) != pdPASS) {
+    /* stack in PSRAM: fetch only does network I/O, never writes flash (a PSRAM stack must not) */
+    if (xTaskCreatePinnedToCoreWithCaps(fetch_task, "fetch", 8192, (void *)(uintptr_t)gen, 5, NULL, 0, MALLOC_CAP_SPIRAM) != pdPASS) {
         set_state(PLAYER_ERR);
         return ESP_ERR_NO_MEM;
     }

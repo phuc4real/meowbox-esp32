@@ -1,0 +1,280 @@
+I (231094) ui: redraw 10s: 854 areas, 2041012 px, tile 0, big 0,ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x8 (SPI_FAST_FLASH_BOOT)
+Saved PC:0x40382cc6
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x1668
+load:0x403c8700,len:0xeec
+load:0x403cb700,len:0x3270
+entry 0x403c891c
+I (24) boot: ESP-IDF c43d665a 2nd stage bootloader
+I (24) boot: compile time Nov 22 2026 17:49:23
+I (25) boot: chip revision: v0.2
+I (25) qio_mode: Enabling default flash chip QIO
+I (25) boot.esp32s3: Boot SPI Speed : 80MHz
+I (25) boot.esp32s3: SPI Mode       : QIO
+I (25) boot.esp32s3: SPI Flash Size : 16MB
+I (26) boot: Partition Table:
+I (26) boot: ## Label            Usage          Type ST Offset   Length
+I (26) boot:  0 nvs              WiFi data        01 02 00009000 00004000
+I (26) boot:  1 otadata          OTA data         01 00 0000d000 00002000
+I (27) boot:  2 phy_init         RF data          01 01 0000f000 00001000
+I (27) boot:  3 ota_0            OTA app          00 10 00020000 00540000
+I (28) boot:  4 ota_1            OTA app          00 11 00560000 00540000
+I (28) boot:  5 storage          Unknown data     01 83 00aa0000 00460000
+I (28) boot:  6 data             Unknown data     01 83 00f00000 00100000
+I (29) esp_image: segment 0: paddr=00020020 vaddr=3c1a0020 size=109af8h (1088248) map
+I (194) esp_image: segment 1: paddr=00129b20 vaddr=3fca0b00 size=05990h ( 22928) load
+I (199) esp_image: segment 2: paddr=0012f4b8 vaddr=40378000 size=00b60h (  2912) load
+I (200) esp_image: segment 3: paddr=00130020 vaddr=42000020 size=191650h (1644112) map
+I (449) esp_image: segment 4: paddr=002c1678 vaddr=40378b60 size=17ed0h ( 98000) load
+I (468) esp_image: segment 5: paddr=002d9550 vaddr=50000000 size=00024h (    36) load
+I (479) boot: Loaded app from partition at offset 0x20000
+I (480) octal_psram: vendor id    : 0x0d (AP)
+I (480) octal_psram: dev id       : 0x02 (generation 3)
+I (480) octal_psram: density      : 0x03 (64 Mbit)
+I (480) octal_psram: good-die     : 0x01 (Pass)
+I (480) octal_psram: Latency      : 0x01 (Fixed)
+I (481) octal_psram: VCC          : 0x01 (3V)
+I (481) octal_psram: SRF          : 0x01 (Fast Refresh)
+I (481) octal_psram: BurstType    : 0x01 (Hybrid Wrap)
+I (481) octal_psram: BurstLen     : 0x01 (32 Byte)
+I (481) octal_psram: Readlatency  : 0x02 (10 cycles@Fixed)
+I (482) octal_psram: DriveStrength: 0x00 (1/1)
+I (482) MSPI Timing: Enter psram timing tuning
+I (483) esp_psram: Found 8MB PSRAM device
+I (483) esp_psram: Speed: 80MHz
+I (483) cpu_start: Multicore app
+I (492) cpu_start: Pro cpu start user code
+I (492) cpu_start: cpu freq: 240000000 Hz
+I (492) app_init: Application information:
+I (492) app_init: Project name:     meowbox
+I (492) app_init: App version:      0.1.0
+I (492) app_init: Compile time:     Nov 22 2026 19:19:03
+I (493) app_init: ELF file SHA256:  3e0d0ceed...
+I (493) app_init: ESP-IDF:          c43d665a
+I (493) efuse_init: Min chip rev:     v0.0
+I (493) efuse_init: Max chip rev:     v0.99 
+I (493) efuse_init: Chip rev:         v0.2
+I (493) heap_init: Initializing. RAM available for dynamic allocation:
+I (494) heap_init: At 3FCB0CB0 len 00038A60 (226 KiB): RAM
+I (494) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+I (494) heap_init: At 600FE000 len 00001FE8 (7 KiB): RTCRAM
+I (494) esp_psram: Adding pool of 8192K of PSRAM memory to heap allocator
+I (495) spi_flash: detected chip: boya
+I (495) spi_flash: flash io: qio
+I (496) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (496) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (497) main_task: Started on CPU0
+I (497) esp_psram: Reserving pool of 64K of internal memory for DMA/internal allocations
+I (498) main_task: Calling app_main()
+I (498) meowbox: MeowBox 0.1.0 starting
+I (517) settings: storage mounted at /storage: 344/4480 KB used
+I (529) settings: data mounted at /data: 28/1024 KB used
+I (567) lcd_panel.nv3023: LCD panel create success, version: 1.0.1
+W (798) lcd_panel.nv3023: The 3Ah command has been used and will be overwritten by external initialization sequence
+I (919) LVGL: Starting LVGL task
+I (922) CST816S: IC id: 184
+I (951) button: IoT Button Version: 4.2.3
+I (952) board: board ready
+W (953) i2s_common: the rx channel on I2S0 is switched from master to slave for full-duplex mode
+I (960) ES8311: Work in Slave mode
+I (966) ES7210: Work in Slave mode
+I (972) ES7210: Enable ES7210_INPUT_MIC1
+I (975) ES7210: Enable ES7210_INPUT_MIC2
+I (978) ES7210: Enable ES7210_INPUT_MIC3
+I (981) ES7210: Enable ES7210_INPUT_MIC4
+I (984) ES7210: Enable TDM mode
+I (988) I2S_IF: Paired data: 0x3fcd3df8, current mode: playback, paired in_enable: 0, paired out_enable: 0
+I (989) I2S_IF: STD: TX, data_bit: 16, slot_bit: 16, ws_width: 16, slot_mode: MONO, slot_mask: 0x1
+I (989) I2S_IF: STD: TX, sample_rate_hz: 44100, mclk_multiple: 256, clk_src: 6
+I (1005) Adev_Codec: Open codec device OK
+I (1006) audio_hw: ES8311 + ES7210 ready, 44100 Hz
+I (1015) pp: pp rom version: e7ae62f
+I (1016) net80211: net80211 rom version: e7ae62f
+I (1017) wifi:wifi driver task: 3fcd9768, prio:23, stack:6656, core=0
+I (1019) wifi:wifi firmware version: 5bb751d
+I (1019) wifi:wifi certification version: v7.0
+I (1019) wifi:config NVS flash: enabled
+I (1019) wifi:config nano formatting: disabled
+I (1019) wifi:Init data frame dynamic rx buffer num: 32
+I (1020) wifi:Init static rx mgmt buffer num: 5
+I (1020) wifi:Init management short buffer num: 32
+I (1020) wifi:Init static tx buffer num: 16
+I (1021) wifi:Init tx cache buffer num: 32
+I (1021) wifi:Init static tx FG buffer num: 2
+I (1021) wifi:Init static rx buffer size: 1600
+I (1021) wifi:Init static rx buffer num: 16
+I (1021) wifi:Init dynamic rx buffer num: 32
+I (1022) wifi_init: rx ba win: 16
+I (1023) wifi_init: accept mbox: 6
+I (1023) wifi_init: tcpip mbox: 32
+I (1023) wifi_init: udp mbox: 6
+I (1023) wifi_init: tcp mbox: 6
+I (1023) wifi_init: tcp tx win: 5760
+I (1023) wifi_init: tcp rx win: 5760
+I (1023) wifi_init: tcp mss: 1440
+I (1023) wifi_init: WiFi/LWIP prefer SPIRAM
+I (1023) wifi_init: WiFi IRAM OP enabled
+I (1023) wifi_init: WiFi RX IRAM OP enabled
+I (1024) phy_init: phy_version 712,87e8c20e,Apr 13 2026,18:51:10
+I (1056) wifi:mode : sta (xx:xx:xx:xx:xx:xx)
+I (1057) wifi:enable tsf
+I (1059) wifi:Set ps type: 1, coexist: 0
+
+I (1061) mdns_mem: mDNS task will be created from internal RAM
+I (1063) wifi: trying <home-wifi>
+I (1078) ui: ui ready, theme swiss
+I (1088) I2S_IF: Peer mode playback need extend bits 32 to 64
+I (1093) I2S_IF: TDM: RX, data_bit: 16, slot_bit: 16, ws_width: 32, total_slot: 4, slot_mask: 0xf
+I (1094) I2S_IF: TDM: RX, sample_rate_hz: 44100, mclk_multiple: 256, clk_src: 6
+I (1096) I2S_IF: STD: TX, data_bit: 16, slot_bit: 32, ws_width: 32, slot_mode: MONO, slot_mask: 0x1
+I (1097) I2S_IF: STD: TX, sample_rate_hz: 44100, mclk_multiple: 256, clk_src: 6
+I (1101) ES7210: Bits 16
+I (1130) ES7210: Enable ES7210_INPUT_MIC1
+I (1139) ES7210: Enable ES7210_INPUT_MIC2
+I (1152) ES7210: Enable ES7210_INPUT_MIC3
+I (1160) ES7210: Enable ES7210_INPUT_MIC4
+I (1172) ES7210: Enable TDM mode
+I (1193) ES7210: Unmuted
+I (1193) Adev_Codec: Open codec device OK
+I (1228) ui: built theme swiss (day)
+I (1228) web: web server ready
+I (1229) meowbox: up
+I (1229) main_task: Returned from app_main()
+I (3516) wifi:new:<3,0>, old:<1,0>, ap:<255,255>, sta:<3,0>, prof:1, snd_ch_cfg:0x0
+I (3517) wifi:state: init -> auth (0xb0)
+I (3520) wifi:state: auth -> assoc (0x0)
+I (3524) wifi:state: assoc -> run (0x10)
+I (3619) wifi:[ADDBA]RX DELBA, reason:39, delete tid:0, initiator:1(originator)
+I (3621) wifi:[ADDBA]RX DELBA, reason:39, delete tid:0, initiator:0(recipient)
+I (3622) wifi:[ADDBA]RX DELBA, reason:39, delete tid:6, initiator:1(originator)
+I (3627) wifi:connected with <home-wifi>, aid = 1, channel 3, BW20, bssid = xx:xx:xx:xx:xx:xx
+I (3627) wifi:security: WPA2-PSK, phy: bgn, rssi: -48, cipher(pairwise:CCMP, group:CCMP), pmf:0
+I (3628) wifi:pm start, type: 1
+
+I (3628) wifi:dp: 1, bi: 102400, li: 3, scale listen interval from 307200 us to 307200 us
+I (3628) wifi:set rx beacon pti, rx_bcn_pti: 0, bcn_timeout: 25000, mt_pti: 0, mt_time: 10000
+I (3636) wifi:AP's beacon interval = 102400 us, DTIM period = 1
+I (4591) wifi:<ba-add>idx:0 (ifx:0, xx:xx:xx:xx:xx:xx), tid:6, ssn:2, winSize:64
+I (6807) esp_netif_handlers: sta ip: 192.168.1.130, mask: 255.255.255.0, gw: 192.168.1.1
+I (6807) wifi: connected to <home-wifi>, ip 192.168.1.130
+I (6807) wifi: mode -> sta
+I (8049) wifi:<ba-add>idx:1 (ifx:0, xx:xx:xx:xx:xx:xx), tid:0, ssn:2, winSize:64
+I (8216) player: state stop -> 1
+I (8216) player: play https://stream.zeno.fm/jxniabwipmhtv (99.8 Radio (MP3 128k))
+I (11078) ui: redraw 10s: 425 areas, 2724575 px, tile 0, big 0,0-295,239, last 0,0-0,29 0,41-229,143
+I (12472) clock: weather 23.0 C code 51 (27/19)
+I (12477) player: stream https://stream.zeno.fm/jxniabwipmhtv type=audio/mpeg fmt=1 metaint=16000
+I (12480) player: title: OFF AIR - GOODBYE!
+I (14967) player: state buf -> 2
+I (14967) ESP_ES_PARSER: The version of es_parser is v1.0.1
+I (14971) player: decoding 44100 Hz, 2 ch, 16 bit, 0 kbps
+I (21078) ui: redraw 10s: 728 areas, 1914006 px, tile 0, big 0,41-229,143, last 146,186-227,212 0,0-0,26
+I (31077) ui: redraw 10s: 846 areas, 2037188 px, tile 0, big 0,41-229,143, last 146,186-227,212 0,0-0,26
+I (32489) wifi: time synced
+I (41076) ui: redraw 10s: 851 areas, 2152242 px, tile 0, big 0,41-229,143, last 146,186-227,212 0,0-0,26
+I (51076) ui: redraw 10s: 847 areas, 1922165 px, tile 0, big 0,41-229,143, last 0,0-0,26 146,186-227,212
+I (61079) ui: redraw 10s: 850 areas, 2015930 px, tile 0, big 0,41-224,143, last 146,186-227,212 0,0-0,26
+I (71084) ui: redraw 10s: 854 areas, 2126196 px, tile 0, big 0,41-224,143, last 146,186-227,212 0,0-0,26
+I (81086) ui: redraw 10s: 840 areas, 2004725 px, tile 0, big 0,41-224,143, last 146,186-227,212 0,0-0,26
+I (91086) ui: redraw 10s: 841 areas, 1922116 px, tile 0, big 0,41-224,143, last 0,41-224,143 0,0-0,26
+I (101089) ui: redraw 10s: 847 areas, 1990514 px, tile 0, big 0,41-224,143, last 0,0-0,26 146,186-227,212
+I (111093) ui: redraw 10s: 856 areas, 2119171 px, tile 0, big 0,41-224,143, last 146,186-227,212 0,0-0,26
+I (114289) player: state play -> 0
+I (121091) ui: redraw 10s: 521 areas, 2752823 px, tile 1, big 0,0-295,239, last 0,0-0,51 46,163-65,189
+I (121185) player: state stop -> 1
+I (121185) player: play https://stream.zeno.fm/jxniabwipmhtv (99.8 Radio (MP3 128k))
+I (121224) player: state buf -> 0
+I (122058) player: state stop -> 1
+I (122058) player: play https://stream.zeno.fm/jxniabwipmhtv (99.8 Radio (MP3 128k))
+I (122100) player: state buf -> 0
+I (123547) player: state stop -> 1
+I (123548) player: play https://stream.zeno.fm/jxniabwipmhtv (99.8 Radio (MP3 128k))
+I (123649) player: state buf -> 0
+I (125457) player: stream https://stream.zeno.fm/jxniabwipmhtv type=audio/mpeg fmt=1 metaint=16000
+I (126642) player: stream https://stream.zeno.fm/jxniabwipmhtv type=audio/mpeg fmt=1 metaint=16000
+I (127352) meowbox: volume 75
+I (127952) meowbox: volume 70
+I (128065) player: stream https://stream.zeno.fm/jxniabwipmhtv type=audio/mpeg fmt=1 metaint=16000
+I (128857) meowbox: volume 65
+I (130334) player: state stop -> 1
+I (130334) player: play https://stream.zeno.fm/jxniabwipmhtv (99.8 Radio (MP3 128k))
+I (130363) player: state buf -> 0
+I (131094) ui: redraw 10s: 276 areas, 343048 px, tile 1, big 20,150-91,201, last 191,8-277,34 0,0-0,26
+I (131798) player: state stop -> 1
+I (131798) player: play https://stream.zeno.fm/jxniabwipmhtv (99.8 Radio (MP3 128k))
+I (131840) player: state buf -> 0
+I (134719) player: stream https://stream.zeno.fm/jxniabwipmhtv type=audio/mpeg fmt=1 metaint=16000
+I (136174) player: stream https://stream.zeno.fm/jxniabwipmhtv type=audio/mpeg fmt=1 metaint=16000
+I (141098) ui: redraw 10s: 236 areas, 275828 px, tile 1, big 20,150-91,201, last 191,8-277,34 0,0-0,26
+I (151095) ui: redraw 10s: 220 areas, 248940 px, tile 1, big 191,8-277,34, last 191,8-277,34 0,0-0,26
+I (161097) ui: redraw 10s: 220 areas, 248940 px, tile 1, big 191,8-277,34, last 191,8-277,34 0,0-0,26
+I (171096) ui: redraw 10s: 220 areas, 248940 px, tile 1, big 191,8-277,34, last 191,8-277,34 0,0-0,26
+I (181099) ui: redraw 10s: 220 areas, 248940 px, tile 1, big 191,8-277,34, last 191,8-277,34 0,0-0,26
+I (191102) ui: redraw 10s: 214 areas, 244323 px, tile 1, big 191,8-277,34, last 46,163-65,189 191,8-277,34
+I (192069) player: state stop -> 1
+I (192069) player: play http://ice.digitalradiohk.net:8000/drhk (Digital Radio HK (AAC+))
+I (193089) player: stream http://ice.digitalradiohk.net:8000/drhk type=audio/aacp fmt=2 metaint=16000
+I (194231) player: title: Digital Radio Hong Kong 22:00:05 
+I (197620) player: state buf -> 2
+I (197620) ESP_ES_PARSER: The version of es_parser is v1.0.1
+I (197626) player: decoding 22050 Hz, 2 ch, 16 bit, 127 kbps
+I (201100) ui: redraw 10s: 252 areas, 314589 px, tile 1, big 18,33-275,70, last 0,0-0,26 0,0-0,2
+I (211100) ui: redraw 10s: 246 areas, 284727 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (221104) ui: redraw 10s: 256 areas, 288522 px, tile 1, big 191,8-277,34, last 191,8-277,34 0,0-0,26
+I (231106) ui: redraw 10s: 240 areas, 282450 px, tile 1, big 191,8-277,34, last 191,8-277,34 0,0-0,26
+W (231426) player: underrun
+I (231426) player: state play -> 1
+I (235626) player: state buf -> 2
+I (241109) ui: redraw 10s: 252 areas, 284268 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,2
+I (245738) player: title: Digital Radio Hong Kong 22:03:05 
+I (251107) ui: redraw 10s: 257 areas, 301830 px, tile 1, big 18,74-277,100, last 0,0-0,26 0,0-0,26
+I (261108) ui: redraw 10s: 244 areas, 283968 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,2
+I (271109) ui: redraw 10s: 246 areas, 284727 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (281112) ui: redraw 10s: 254 areas, 287763 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+W (288596) player: underrun
+I (288596) player: state play -> 1
+I (291109) ui: redraw 10s: 235 areas, 278658 px, tile 1, big 191,8-277,34, last 0,0-0,2 0,0-0,26
+I (292646) player: state buf -> 2
+I (301111) ui: redraw 10s: 247 areas, 284265 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (311115) ui: redraw 10s: 248 areas, 285486 px, tile 1, big 191,8-277,34, last 191,8-277,34 0,0-0,26
+I (321118) ui: redraw 10s: 232 areas, 279414 px, tile 1, big 191,8-277,34, last 191,8-277,34 0,0-0,26
+I (331115) ui: redraw 10s: 240 areas, 282450 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,2
+W (335725) player: underrun
+I (335725) player: state play -> 1
+I (340475) player: state buf -> 2
+I (341115) ui: redraw 10s: 242 areas, 279069 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (351118) ui: redraw 10s: 252 areas, 287004 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,2
+W (356770) player: underrun
+I (356770) player: state play -> 1
+I (360770) player: state buf -> 2
+I (361123) ui: redraw 10s: 249 areas, 276042 px, tile 1, big 191,8-277,34, last 191,8-277,34 18,112-77,138
+I (371120) ui: redraw 10s: 244 areas, 281487 px, tile 1, big 191,8-277,34, last 191,8-277,34 0,0-0,26
+I (375985) player: state play -> 1
+I (375985) player: play https://str.vov.gov.vn/vovlive/vov1vov5Vietnamese.sdp_aac/playlist.m3u8 (VOV1 (HLS AAC))
+I (376720) player: hls variant https://str.vov.gov.vn:443/vovlive/vov1vov5Vietnamese.sdp_aac/chunklist_w2015988333.m3u8
+I (380091) player: state buf -> 2
+I (380091) ESP_ES_PARSER: The version of es_parser is v1.0.1
+I (380096) player: decoding 48000 Hz, 1 ch, 16 bit, 255 kbps
+I (381119) ui: redraw 10s: 236 areas, 309621 px, tile 1, big 18,33-275,70, last 0,0-0,26 0,0-0,2
+I (391122) ui: redraw 10s: 250 areas, 286245 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (401123) ui: redraw 10s: 246 areas, 284727 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (411123) ui: redraw 10s: 256 areas, 288522 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,2
+I (421125) ui: redraw 10s: 250 areas, 286245 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (431125) ui: redraw 10s: 250 areas, 286245 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (441124) ui: redraw 10s: 258 areas, 289281 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (451125) ui: redraw 10s: 248 areas, 285486 px, tile 1, big 191,8-277,34, last 191,8-277,34 0,0-0,26
+I (461130) ui: redraw 10s: 248 areas, 285486 px, tile 1, big 191,8-277,34, last 191,8-277,34 0,0-0,26
+I (471133) ui: redraw 10s: 260 areas, 290040 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,2
+I (481135) ui: redraw 10s: 250 areas, 286245 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (491138) ui: redraw 10s: 246 areas, 284727 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (501139) ui: redraw 10s: 258 areas, 289281 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (511144) ui: redraw 10s: 248 areas, 285486 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,2
+I (521147) ui: redraw 10s: 254 areas, 287763 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (531148) ui: redraw 10s: 258 areas, 289281 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (541145) ui: redraw 10s: 235 areas, 270984 px, tile 1, big 191,8-277,34, last 0,0-0,26 0,0-0,26
+I (551147) ui: redraw 10s: 240 areas, 282450 px, tile 1, big 191,8-277,34, last 191,8-277,34 0,0-0,26
+I (557835) player: state play -> 0
+I (561147) ui: redraw 10s: 254 areas, 298014 px, tile 1, big 18,74-277,100, last 0,0-0,26 0,0-0,26

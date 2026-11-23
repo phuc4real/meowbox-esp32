@@ -22,7 +22,8 @@ from pathlib import Path
 from . import CONFIG_PATH, PROTO, __version__
 from .config import AgentState, pc_name, save_config
 from .discovery import find_speaker
-from .relay import NOWIN, kill_all, start_relay, update_ytdlp
+from .relay import NOWIN, kill_all, start_relay
+from .tools import maintain_ytdlp
 
 log = logging.getLogger("meowbox")
 compact = functools.partial(json.dumps, ensure_ascii=False, separators=(",", ":"))
@@ -315,7 +316,7 @@ class Core:
                 self.state.update(error="port", relay_port=0)
                 port = 0
             if port and self.ytdlp_update:
-                asyncio.create_task(update_ytdlp())
+                asyncio.create_task(asyncio.to_thread(maintain_ytdlp, bool(self.cfg.get("auto_update", True))))
         await self._link_loop(port)
 
     async def _sleep(self, secs: int) -> None:

@@ -66,6 +66,7 @@ class TrayApp:
         self.root.withdraw()
         self.core = Core(self.cfg, self.state, cfg_path=CONFIG_PATH)
         self.dialog = None
+        self.settings = None
         self._last_line = None
         self.icon = pystray.Icon("MeowBox", cat_icon(64, GREY), "MeowBox Agent", menu=self.menu())
         self.state.on_change(lambda _s: self.q.put(self.refresh))
@@ -84,6 +85,7 @@ class TrayApp:
             item("Tạm dừng gửi số liệu", self.toggle_pause, checked=lambda _i: bool(self.cfg.get("paused"))),
             sep,
             item("Kết nối loa…", lambda: ui(self.open_dialog)),
+            item("Cài đặt…", lambda: ui(self.open_settings)),
             item("Tìm lại loa ngay", lambda: self.core.reconnect_now()),
             item("Chạy cùng Windows", self.toggle_autostart, checked=lambda _i: autostart_enabled()),
             item("Mở thư mục log", lambda: os.startfile(APP_DIR)),
@@ -122,6 +124,15 @@ class TrayApp:
             return
         self.dialog = ConnectDialog(self.root, self.cfg, self.state, self.core, on_done=lambda: setattr(self, "dialog", None))
 
+    def open_settings(self):
+        from .settings_dialog import SettingsDialog
+
+        if self.settings and self.settings.win.winfo_exists():
+            self.settings.win.lift()
+            return
+        self.settings = SettingsDialog(self.root, self.cfg, on_quit=lambda: self.q.put(self.quit),
+                                       on_done=lambda: setattr(self, "settings", None))
+
     def test_notify(self):
         from .core import speaker_request
 
@@ -147,10 +158,15 @@ class TrayApp:
         self.icon.update_menu()
 
     def check_update(self):
-        v = latest_version()
-        if newer_than_running(v):
-            self.state.update(new_version=v)
-            self.icon.notify(f"Có MeowBox Agent {v}", "MeowBox")
+        """Daily, if 'auto_update' (Settings): a newer agent on GitHub (menu + toast), a newer yt-dlp (installed)."""
+        if self.cfg.get("auto_update", True):
+            from .tools import maintain_ytdlp
+
+            v = latest_version()
+            if newer_than_running(v):
+                self.state.update(new_version=v)
+                self.icon.notify(f"Có MeowBox Agent {v}: mở Cài đặt để cập nhật", "MeowBox")
+            maintain_ytdlp(daily_check=True)
         self.root.after(24 * 3600 * 1000, lambda: threading.Thread(target=self.check_update, daemon=True).start())
 
     def quit(self):
@@ -169,9 +185,9 @@ class TrayApp:
         self.root.after(100, self.pump)
 
     def run(self):
-        from .relay import ensure_tools
+        from . import relay
 
-        ensure_tools()
+        relay.NOTIFY.append(lambda text: self.icon.notify(text, "MeowBox"))
         self.core.start()
         self.icon.run_detached()
         self.refresh()

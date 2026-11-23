@@ -36,6 +36,10 @@ def main(argv: list[str] | None = None) -> None:
         if s:  # None under pythonw.exe / the windowed exe
             s.reconfigure(encoding="utf-8", errors="replace")
     argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["ytdlp"]:  # child process of the relay (installed build): yt-dlp from its zip, args untouched
+        from .tools import run_ytdlp_inprocess
+
+        raise SystemExit(run_ytdlp_inprocess(argv[1:]))
     ap = argparse.ArgumentParser(prog="meowbox", description=f"MeowBox PC agent {__version__}")
     ap.add_argument("--config", type=Path, default=CONFIG_PATH, help=f"file cấu hình (mặc định {CONFIG_PATH})")
     ap.add_argument("--host", help="IP[:port] của loa (bỏ qua tìm tự động)")
@@ -59,6 +63,8 @@ def main(argv: list[str] | None = None) -> None:
     w = sub.add_parser("wifi-setup", help="bật/tắt Wi-Fi cài đặt MeowBox-XXXX trên loa (tự tắt sau 10 phút không ai vào)")
     w.add_argument("action", nargs="?", choices=["on", "off", "status"], default="on")
     sub.add_parser("discover", help="liệt kê các loa tìm được qua mDNS và broadcast")
+    tl = sub.add_parser("tools", help="yt-dlp dùng cho YouTube relay: xem phiên bản / tải bản mới nhất")
+    tl.add_argument("action", nargs="?", choices=["status", "update"], default="status")
     c = sub.add_parser("config", help="xem/sửa cấu hình")
     c.add_argument("--set-host", dest="set_host", metavar="HOST", help="IP[:port] loa, '' = tự tìm")
     c.add_argument("--speaker", help="tên loa sẽ dùng, vd MeowBox-1A2B ('' = loa đầu tiên tìm thấy)")
@@ -98,6 +104,16 @@ def main(argv: list[str] | None = None) -> None:
             core.run_forever()
         except KeyboardInterrupt:
             pass
+    elif args.cmd == "tools":
+        from .tools import YTDLP, ytdlp_latest, ytdlp_update, ytdlp_version
+
+        if args.action == "update":
+            try:
+                print("yt-dlp", ytdlp_update(lambda step: print("…", step, flush=True)), "->", YTDLP)
+            except RuntimeError as e:
+                raise SystemExit(f"yt-dlp: {e}") from None
+        else:
+            print(f"yt-dlp: {ytdlp_version() or 'chưa cài'} ({YTDLP}), mới nhất trên GitHub: {ytdlp_latest() or '?'}")
     elif args.cmd == "discover":
         from .discovery import discover_all
 

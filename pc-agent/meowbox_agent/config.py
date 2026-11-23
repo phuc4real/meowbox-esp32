@@ -19,6 +19,7 @@ DEFAULTS = {
     "token": "",        # notify token (Notifications page on the speaker)
     "relay_port": 8765,
     "paused": False,    # tray: pause sending stats
+    "auto_update": True,  # check GitHub daily for a newer agent and yt-dlp (Settings window)
 }
 
 

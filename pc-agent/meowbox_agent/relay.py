@@ -1,4 +1,6 @@
-"""YouTube relay: the speaker asks http://<pc>:8765/yt/stream?url=..., yt-dlp + ffmpeg turn it into MP3 128 kbps.
+"""YouTube relay: the speaker asks http://<pc>:8765/yt/stream?url=..., yt-dlp downloads the AAC audio and the relay
+sends it as ADTS (m4a container stripped, no re-encoding, no ffmpeg). Live streams need ffmpeg (yt-dlp will not
+download live HLS without it): the agent downloads an LGPL build the first time, and the AAC is only copied.
 
 Only the connected speaker may use it (docs/firmware_v0.2.0.md, 2.3): any other client gets 403, so a PC on a shared
 Wi-Fi cannot be used by others to run yt-dlp/ffmpeg on arbitrary URLs. /yt/ping answers the speaker's relay_test.
@@ -8,7 +10,6 @@ import json
 import logging
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -18,44 +19,27 @@ from pathlib import Path
 import aiohttp
 from aiohttp import web
 
-from . import APP_DIR, FROZEN
+from .mp4adts import Mp4ToAdts, Unsupported
+from .tools import ffmpeg_install_background, ffmpeg_path, ffmpeg_status, ytdlp_command
 
 log = logging.getLogger("meowbox")
 _info_cache: dict[tuple, tuple[float, dict]] = {}
 NOWIN = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
-def tool(name: str) -> str:
-    """ffmpeg / yt-dlp: PATH first, then the copy shipped with the installer (%LOCALAPPDATA%\\MeowBox\\bin)."""
-    found = shutil.which(name)
-    if found:
-        return found
-    for d in (Path(os.environ.get("LOCALAPPDATA", "")) / "MeowBox" / "bin",
-              Path(sys.executable).parent / "bin" if FROZEN else Path(__file__).parent.parent / "bin"):
-        p = d / f"{name}.exe"
-        if p.exists():
-            return str(p)
-    return name
+NOTIFY: list = []  # callbacks(text) for the tray, e.g. "downloading ffmpeg"
 
 
-def ensure_tools() -> None:
-    """Installed build: copy the bundled yt-dlp.exe to %LOCALAPPDATA%/MeowBox/bin once, where `yt-dlp -U` can
-    update it (Program Files is read-only for the user). ffmpeg is used straight from the install folder."""
-    if not FROZEN:
-        return
-    src = Path(sys.executable).parent / "bin" / "yt-dlp.exe"
-    dst = Path(os.environ.get("LOCALAPPDATA", "")) / "MeowBox" / "bin" / "yt-dlp.exe"
-    if src.exists() and not dst.exists():
+def _notify(text: str) -> None:
+    for fn in NOTIFY:
         try:
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, dst)
-            log.info("yt-dlp copied to %s", dst)
-        except OSError as e:
-            log.warning("could not copy yt-dlp: %s", e)
+            fn(text)
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def ytdlp_args() -> list[str]:
-    return [tool("yt-dlp"), "--no-warnings", "--quiet", "--no-progress"]
+    return [*ytdlp_command(), "--no-warnings", "--quiet", "--no-progress"]
 
 
 async def ytjson(url: str, single: bool) -> dict:
@@ -112,54 +96,141 @@ def kill_tree(p: asyncio.subprocess.Process) -> None:
 RUNNING: set[asyncio.subprocess.Process] = set()  # killed on exit (tray "Quit")
 
 
+def pick_aac(info: dict) -> dict | None:
+    """Best AAC-in-MP4 audio-only format (YouTube itag 140 is ~128 kbps), not above 192 kbps."""
+    fmts = [f for f in info.get("formats") or []
+            if f.get("vcodec") == "none" and str(f.get("acodec", "")).startswith("mp4a")
+            and f.get("protocol") in ("https", "http")]
+    good = [f for f in fmts if (f.get("abr") or 0) <= 192] or fmts
+    return max(good, key=lambda f: f.get("abr") or 0) if good else None
+
+
+def pick_hls(info: dict) -> dict | None:
+    """Live: YouTube's audio-only HLS formats (233 ~48 kbps, 234 ~128 kbps; acodec reported as None): the best one."""
+    fmts = [f for f in info.get("formats") or [] if str(f.get("protocol", "")).startswith("m3u8")
+            and f.get("vcodec") == "none" and f.get("acodec") != "none"]
+    known = {"233": 48, "234": 128}  # YouTube gives no bitrate for these two
+    return max(fmts, key=lambda f: f.get("tbr") or f.get("abr") or known.get(str(f.get("format_id")), 0)) if fmts else None
+
+
+def base_headers(info: dict, title: str, i, count, ctype: str, br: int | None) -> dict:
+    h = {"Content-Type": ctype, "Cache-Control": "no-cache", "icy-name": title,
+         "X-Is-Live": str(bool(info.get("is_live"))).lower()}
+    if br:
+        h["icy-br"] = str(br)
+    if info.get("duration"):
+        h["X-Duration"] = str(round(info["duration"]))
+    if i is not None:
+        h.update({"X-Playlist-Index": str(i), "X-Playlist-Count": str(count)})
+    return h
+
+
+async def pipe(req, procs: list, src, convert, headers: dict, stat: dict) -> web.StreamResponse | None:
+    """Read src (a process stdout), convert, send; headers go out with the first audio (so errors can still be 502)."""
+    resp = None
+    RUNNING.update(procs)
+    try:
+        while chunk := await src.read(16384):
+            frames = convert(chunk)
+            if not frames:
+                continue
+            if resp is None:
+                resp = web.StreamResponse(headers=headers)
+                resp.enable_chunked_encoding()
+                await resp.prepare(req)
+            data = b"".join(frames)
+            await resp.write(data)
+            stat["sent"] += len(data)
+    finally:
+        for p in procs:
+            kill_tree(p)
+        RUNNING.difference_update(procs)
+    return resp
+
+
+async def need_ffmpeg() -> str | None:
+    """ffmpeg for a live stream: the one in PATH / already downloaded, else start the one-time download and wait a
+    few seconds (the speaker reconnects by itself, so a slow download just takes a few of its retries)."""
+    p = ffmpeg_path()
+    if p:
+        return p
+    if not ffmpeg_status()["busy"]:
+        _notify("Đang tải ffmpeg cho YouTube live (một lần, khoảng 75 MB)…")
+        ffmpeg_install_background(lambda: _notify("Đã tải xong ffmpeg: YouTube live phát được." if ffmpeg_path()
+                                                  else "Không tải được ffmpeg: " + ffmpeg_status()["error"]))
+    for _ in range(12):
+        await asyncio.sleep(0.5)
+        if ffmpeg_path():
+            return ffmpeg_path()
+    return None
+
+
 async def yt_stream(req: web.Request) -> web.StreamResponse:
+    """yt-dlp downloads (it handles YouTube's throttling, retries and link refresh) and writes to stdout; the relay
+    only changes the container. Video: m4a -> ADTS (Mp4ToAdts), no ffmpeg. Live: yt-dlp + ffmpeg copy the AAC into
+    MPEG-TS (ffmpeg downloaded on first use). A video without AAC (rare): ffmpeg encodes AAC."""
     url = req.query.get("url") or ""
     if not url:
         raise web.HTTPBadRequest(text="missing url")
     index = int(req.query["index"]) if req.query.get("index", "").isdigit() else None
     info, i, count = await resolve_video(url, index)
     title = re.sub(r"[\r\n]+", " ", info.get("fulltitle") or info.get("title") or "YouTube")
-
+    live = bool(info.get("is_live"))
+    fmt = pick_hls(info) if live else pick_aac(info)
+    ff = None
+    if live or not fmt:
+        ff = await need_ffmpeg()
+        if not ff:
+            raise web.HTTPServiceUnavailable(text="downloading ffmpeg (first live stream), the speaker will retry")
+    stat, how, resp = {"sent": 0}, "", None
     fd, info_path = tempfile.mkstemp(suffix=".info.json")
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        json.dump(info, f)
-    rfd, wfd = os.pipe()
-    ytdlp = await asyncio.create_subprocess_exec(
-        *ytdlp_args(), "--load-info-json", info_path, "-f", "bestaudio/best", "-o", "-",
-        stdout=wfd, stderr=subprocess.DEVNULL, creationflags=NOWIN)
-    ffmpeg = await asyncio.create_subprocess_exec(
-        tool("ffmpeg"), "-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-vn", "-c:a", "libmp3lame",
-        "-b:a", "128k", "-ar", "44100", "-ac", "2", "-f", "mp3", "pipe:1",
-        stdin=rfd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, creationflags=NOWIN)
-    os.close(rfd)
-    os.close(wfd)
-    RUNNING.update((ytdlp, ffmpeg))
-    log.info("relay start: %s (%s)", title, req.remote)
-    resp, sent = None, 0
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(info, fh)
     try:
-        while chunk := await ffmpeg.stdout.read(16384):
-            if resp is None:  # send headers only once audio really flows, so errors can still be a 502
-                headers = {"Content-Type": "audio/mpeg", "Cache-Control": "no-cache", "icy-name": title,
-                           "icy-br": "128", "X-Is-Live": str(bool(info.get("is_live"))).lower()}
-                if info.get("duration"):
-                    headers["X-Duration"] = str(round(info["duration"]))
-                if i is not None:
-                    headers.update({"X-Playlist-Index": str(i), "X-Playlist-Count": str(count)})
-                resp = web.StreamResponse(headers=headers)
-                resp.enable_chunked_encoding()
-                await resp.prepare(req)
-            await resp.write(chunk)
-            sent += len(chunk)
+        if live:
+            how = f"live itag {fmt.get('format_id') if fmt else 'best'}, AAC copied into MPEG-TS"
+            log.info("relay start: %s (%s, %s)", title, how, req.remote)
+            yt = await asyncio.create_subprocess_exec(
+                *ytdlp_args(), "--ffmpeg-location", ff, "--load-info-json", info_path,
+                "-f", fmt["format_id"] if fmt else "bestaudio/best", "-o", "-",
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, creationflags=NOWIN)
+            resp = await pipe(req, [yt], yt.stdout, lambda c: [c],
+                              base_headers(info, title, i, count, "video/mp2t", None), stat)
+        elif fmt:
+            br = round(fmt.get("abr") or 128)
+            how = f"AAC itag {fmt.get('format_id')}, {br} kbps"
+            log.info("relay start: %s (%s, %s)", title, how, req.remote)
+            yt = await asyncio.create_subprocess_exec(
+                *ytdlp_args(), "--load-info-json", info_path, "-f", fmt["format_id"], "-o", "-",
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, creationflags=NOWIN)
+            resp = await pipe(req, [yt], yt.stdout, Mp4ToAdts().feed,
+                              base_headers(info, title, i, count, "audio/aac", br), stat)
+        else:
+            how = "no AAC: ffmpeg -> AAC 128k"
+            log.info("relay start: %s (%s, %s)", title, how, req.remote)
+            rfd, wfd = os.pipe()
+            yt = await asyncio.create_subprocess_exec(
+                *ytdlp_args(), "--load-info-json", info_path, "-f", "bestaudio/best", "-o", "-",
+                stdout=wfd, stderr=subprocess.DEVNULL, creationflags=NOWIN)
+            enc = await asyncio.create_subprocess_exec(
+                ff, "-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-vn", "-c:a", "aac",
+                "-b:a", "128k", "-ar", "44100", "-ac", "2", "-f", "adts", "pipe:1",
+                stdin=rfd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, creationflags=NOWIN)
+            os.close(rfd)
+            os.close(wfd)
+            resp = await pipe(req, [yt, enc], enc.stdout, lambda c: [c],
+                              base_headers(info, title, i, count, "audio/aac", 128), stat)
     except (ConnectionError, aiohttp.ClientConnectionResetError):
         log.info("relay client gone")
+    except Unsupported as e:
+        log.warning("relay: %s", e)
+        if resp is None:
+            raise web.HTTPBadGateway(text=f"cannot convert this video: {e}") from None
     finally:
-        kill_tree(ytdlp)
-        kill_tree(ffmpeg)
-        RUNNING.difference_update((ytdlp, ffmpeg))
         Path(info_path).unlink(missing_ok=True)
-        log.info("relay stop: %s, %d KB sent", title, sent // 1024)
+        log.info("relay stop: %s (%s), %d KB sent", title, how, stat["sent"] // 1024)
     if resp is None:
-        raise web.HTTPBadGateway(text="no audio from yt-dlp/ffmpeg")
+        raise web.HTTPBadGateway(text="no audio from yt-dlp")
     return resp
 
 
@@ -189,22 +260,3 @@ async def start_relay(port: int, allowed) -> web.AppRunner:
     await web.TCPSite(runner, "0.0.0.0", port).start()
     log.info("YouTube relay on http://0.0.0.0:%d/yt/stream?url=...", port)
     return runner
-
-
-async def update_ytdlp() -> None:
-    """yt-dlp -U at most once per day; failures (e.g. winget/pip installs) are ignored."""
-    stamp = APP_DIR / "ytdlp_update.stamp"
-    try:
-        if time.time() - stamp.stat().st_mtime < 86400:
-            return
-    except FileNotFoundError:
-        pass
-    stamp.parent.mkdir(parents=True, exist_ok=True)
-    stamp.touch()
-    try:
-        p = await asyncio.create_subprocess_exec(tool("yt-dlp"), "-U", stdout=subprocess.PIPE,
-                                                 stderr=subprocess.STDOUT, creationflags=NOWIN)
-        out, _ = await asyncio.wait_for(p.communicate(), 180)
-        log.info("yt-dlp -U: %s", out.decode(errors="replace").strip().splitlines()[-1:])
-    except Exception as e:  # noqa: BLE001
-        log.info("yt-dlp -U skipped: %s", e)

@@ -10,7 +10,21 @@ HERE = os.path.abspath(SPECPATH)
 ROOT = os.path.dirname(HERE)
 ICON = os.path.join(HERE, "build", "meowbox.ico")
 
-hidden = (
+# yt-dlp runs inside meowbox.exe (`meowbox ytdlp ...`, imported from its zip at run time), so the exe needs the
+# standard library modules yt-dlp uses even though the agent itself does not import them: ship the whole stdlib.
+import sys
+
+SKIP = ("test", "idlelib", "lib2to3", "ensurepip", "turtledemo", "pydoc_data", "venv", "unittest", "tkinter.test")
+stdlib = []
+for m in sorted(sys.stdlib_module_names):
+    if m.startswith("_") or m in SKIP:
+        continue
+    try:
+        stdlib += collect_submodules(m, filter=lambda n: not any(n == s or n.startswith(s + ".") for s in SKIP))
+    except Exception:  # noqa: BLE001
+        stdlib.append(m)
+
+hidden = stdlib + (
     collect_submodules("winrt.windows.media.control")
     + collect_submodules("winrt.windows.media.speechsynthesis")
     + collect_submodules("winrt.windows.storage.streams")

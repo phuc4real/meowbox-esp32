@@ -39,9 +39,6 @@ Name: "addpath"; Description: "Add meowbox.exe to PATH (meowbox notify ""Build d
 
 [Files]
 Source: "{#Dist}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "vendor\ffmpeg.exe"; DestDir: "{app}\bin"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "vendor\yt-dlp.exe"; DestDir: "{app}\bin"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "vendor\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\MeowBox Agent"; Filename: "{app}\MeowBoxAgent.exe"
@@ -59,7 +56,11 @@ Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; Value
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""MeowBox Agent"""; Flags: runhidden
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""MeowBox Agent"" dir=in action=allow program=""{app}\MeowBoxAgent.exe"" profile=private enable=yes"; Flags: runhidden
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""MeowBox Agent"" dir=in action=allow program=""{app}\meowbox.exe"" profile=private enable=yes"; Flags: runhidden
-Filename: "{app}\MeowBoxAgent.exe"; Description: "Start MeowBox Agent"; Flags: nowait postinstall skipifsilent
+; yt-dlp is not shipped: fetch the latest one for the user (if offline, the agent fetches it on its first start).
+; ffmpeg is fetched by the agent only if YouTube live is used.
+Filename: "{app}\meowbox.exe"; Parameters: "tools update"; StatusMsg: "Downloading yt-dlp (YouTube)..."; \
+  Flags: runhidden runasoriginaluser waituntilterminated
+Filename: "{app}\MeowBoxAgent.exe"; Description: "Start MeowBox Agent"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM MeowBoxAgent.exe /T"; Flags: runhidden; RunOnceId: "kill"
@@ -103,9 +104,11 @@ begin
         RegWriteExpandStringValue(HKCU, 'Environment', 'Path', Path);
       end;
     end;
-    if DirExists(ExpandConstant('{userappdata}\MeowBox')) then
-      if MsgBox('Delete the MeowBox Agent settings and logs too (token, speaker, %APPDATA%\MeowBox)?',
-                mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
+    if DirExists(ExpandConstant('{userappdata}\MeowBox')) or DirExists(ExpandConstant('{localappdata}\MeowBox')) then
+      if MsgBox('Delete the MeowBox Agent settings, logs and downloaded tools too (token, speaker, yt-dlp, ffmpeg)?',
+                mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then begin
         DelTree(ExpandConstant('{userappdata}\MeowBox'), True, True, True);
+        DelTree(ExpandConstant('{localappdata}\MeowBox'), True, True, True);
+      end;
   end;
 end;

@@ -17,6 +17,7 @@ Không cần Python. Bộ cài:
 - cài vào `Program Files\MeowBox Agent` (hỏi quyền admin), có shortcut ở Start Menu;
 - mở tường lửa cho agent trên mạng **Private** (relay, mDNS, gói thông báo của loa);
 - tùy chọn: chạy cùng Windows (mặc định bật), thêm `meowbox.exe` vào PATH;
+- tải yt-dlp bản mới nhất về `%LOCALAPPDATA%\MeowBoxin` (không đóng gói kèm, để luôn cập nhật được);
 - gỡ bản cũ chạy bằng Python (task "MeowBox Agent" trong Task Scheduler, shortcut Startup), giữ cấu hình cũ.
 
 Cài xong agent chạy luôn, hiện icon con mèo ở khay hệ thống, và lần đầu tự mở cửa sổ **Kết nối loa**:

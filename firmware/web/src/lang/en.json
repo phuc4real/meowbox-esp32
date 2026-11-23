@@ -359,5 +359,17 @@
   "usb_only": "This version has to be flashed over USB.",
   "no_mem": "Not enough memory: restart the speaker and retry.",
   "no_release": "No release has been published on GitHub yet."
- }
+ },
+ "relayTest": "Test the YouTube relay",
+ "relayTesting": "The speaker is calling the relay on the PC…",
+ "relayOk": "The speaker reaches the relay ({ms} ms): YouTube will play.",
+ "relayFail": "The speaker cannot reach the relay: {e}.",
+ "relayE": {
+  "no_relay": "no PC has the relay on",
+  "timeout": "timed out (firewall on the PC?)",
+  "unreachable": "PC unreachable (firewall or another network?)"
+ },
+ "agentOld": "old (before 0.2.0)",
+ "agentUpd": "Update MeowBox Agent",
+ "agentGet": "Download MeowBox Agent"
 }

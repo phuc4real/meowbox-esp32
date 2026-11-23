@@ -68,7 +68,7 @@ static void sys_tick(lv_timer_t *t)
         else if (left == -2)
             lv_label_set_text_fmt(s_addr, "http://%s\n%s %s, %s", ip, ui_tr("Đang phát", "Hotspot"),
                                   wifi_mgr_ap_ssid(), ui_tr("có máy đang kết nối", "a device is connected"));
-        else lv_label_set_text_fmt(s_addr, "meowbox.local\nhttp://%s", ip);
+        else lv_label_set_text_fmt(s_addr, "%s.local\nhttp://%s", wifi_mgr_hostname(), ip);
     } else if (wifi_mgr_mode() == NET_MODE_AP) {
         lv_label_set_text_fmt(s_net, "%s %s", ui_tr("Cài đặt: vào Wi-Fi", "Setup: join"), wifi_mgr_ap_ssid());
         lv_label_set_text_fmt(s_addr, "%s %s\nhttp://192.168.4.1", ui_tr("Mật khẩu", "Password"), wifi_mgr_ap_pass());

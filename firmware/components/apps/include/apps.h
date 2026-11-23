@@ -19,6 +19,7 @@ int radio_play_id(int id);            /* 0 ok, -1 not found, -2 YouTube needs th
 void radio_toggle(void);
 bool radio_playing(void);
 void radio_set_relay(const char *host_port);
+bool radio_relay_hostport(char *hp, size_t len); /* "ip:port" of the YouTube relay in use, false if none */
 void radio_status_hook(cJSON *status);
 
 /* Notifications (P4) */

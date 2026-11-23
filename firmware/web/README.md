@@ -1,6 +1,6 @@
 # Trang web cấu hình MeowBox
 
-Giao diện web chạy ngay trên loa (`http://meowbox.local`). Viết bằng HTML + CSS + JS thuần, không framework,
+Giao diện web chạy ngay trên loa (`http://meowbox-xxxx.local`). Viết bằng HTML + CSS + JS thuần, không framework,
 không CDN. Font tự host trong `assets/fonts/` (chỉ tải font của theme đang dùng). `build.py` đóng tất cả thành một file
 `components/webui/web.pack` **nhúng trong app firmware**, nên web luôn cập nhật cùng firmware (OTA có rollback);
 firmware phục vụ bằng `esp_http_server`.

@@ -17,6 +17,8 @@
 #include "lwip/sockets.h"
 #include "nvs.h"
 #include "esp_timer.h"
+#include "esp_app_desc.h"
+#include "esp_heap_caps.h"
 #include "settings.h"
 
 static const char *TAG = "wifi";
@@ -38,6 +40,7 @@ static net_mode_t s_mode = NET_MODE_CONNECTING;
 static bool s_ap_on;
 static volatile int64_t s_ap_idle_since; /* esp_timer us; last moment the hotspot had a client */
 static char s_ap_ssid[20];
+static char s_hostname[20];
 
 /* ---- power save while streaming (4.1) ---- */
 static portMUX_TYPE s_hold_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -540,6 +543,58 @@ cJSON *wifi_mgr_scan(void)
     return r;
 }
 
+const char *wifi_mgr_hostname(void) { return s_hostname; }
+
+/* UDP discovery for networks that filter mDNS multicast but pass broadcast (docs/firmware_v0.2.0.md, 2.8): the agent
+ * broadcasts "MEOWBOX?" to port 8766, we answer it directly. Only on the home network (not the setup hotspot), at most
+ * 5 answers a second. Blocking socket in its own small task: no CPU while idle; network only, so the stack is in PSRAM. */
+static void discovery_task(void *arg)
+{
+    int s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    struct sockaddr_in a = {.sin_family = AF_INET, .sin_port = htons(MB_DISCOVERY_PORT), .sin_addr.s_addr = htonl(INADDR_ANY)};
+    if (s < 0 || bind(s, (struct sockaddr *)&a, sizeof(a)) < 0) {
+        ESP_LOGE(TAG, "discovery: cannot bind udp %d", MB_DISCOVERY_PORT);
+        if (s >= 0) close(s);
+        vTaskDeleteWithCaps(NULL);
+        return;
+    }
+    int on = 1;
+    setsockopt(s, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on));
+    struct timeval tv = {.tv_sec = 2};
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    /* Announce too: with Wi-Fi power save on, the speaker misses most broadcast/multicast frames sent TO it (measured:
+     * 0-2 of 5 queries answered, mDNS too), while frames it SENDS always go out. So every 2 s it broadcasts the same
+     * answer to port 8767, where the agent listens; a few dozen bytes, negligible for the battery. */
+    struct sockaddr_in ann = {.sin_family = AF_INET, .sin_port = htons(MB_DISCOVERY_PORT + 1),
+                              .sin_addr.s_addr = htonl(INADDR_BROADCAST)};
+    int64_t win = 0, last_ann = 0;
+    int answered = 0;
+    char buf[16];
+    while (1) {
+        struct sockaddr_in from;
+        socklen_t fl = sizeof(from);
+        int n = recvfrom(s, buf, sizeof(buf) - 1, 0, (struct sockaddr *)&from, &fl);
+        if (s_mode != NET_MODE_STA) continue;
+        int64_t now = esp_timer_get_time();
+        bool query = n >= 8 && memcmp(buf, "MEOWBOX?", 8) == 0;
+        bool announce = now - last_ann >= 2000000;
+        if (!query && !announce) continue;
+        if (query) {
+            if (now - win > 1000000) win = now, answered = 0;
+            if (++answered > 5) query = false;
+        }
+        char ip[16] = "", out[128];
+        wifi_mgr_info(NULL, 0, ip, sizeof(ip), NULL);
+        int l = snprintf(out, sizeof(out), "{\"name\":\"%s\",\"ip\":\"%s\",\"ver\":\"%s\",\"proto\":%d}", s_ap_ssid, ip,
+                         esp_app_get_description()->version, MB_PROTO);
+        if (query) sendto(s, out, l, 0, (struct sockaddr *)&from, fl);
+        if (announce) {
+            last_ann = now;
+            sendto(s, out, l, 0, (struct sockaddr *)&ann, sizeof(ann));
+        }
+    }
+}
+
 esp_err_t wifi_mgr_start(void)
 {
     s_ev = xEventGroupCreate();
@@ -563,6 +618,8 @@ esp_err_t wifi_mgr_start(void)
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
     snprintf(s_ap_ssid, sizeof(s_ap_ssid), "MeowBox-%02X%02X", mac[4], mac[5]);
+    snprintf(s_hostname, sizeof(s_hostname), "meowbox-%02x%02x", mac[4], mac[5]);
+    xTaskCreatePinnedToCoreWithCaps(discovery_task, "discovery", 3072, NULL, 2, NULL, tskNO_AFFINITY, MALLOC_CAP_SPIRAM);
 
     esp_wifi_set_mode(WIFI_MODE_STA);
     ESP_ERROR_CHECK(esp_wifi_start());
@@ -575,12 +632,16 @@ esp_err_t wifi_mgr_start(void)
     sc.sync_cb = time_synced;
     esp_netif_sntp_init(&sc);
 
-    /* mDNS: meowbox.local + service for the PC agent */
+    /* mDNS: meowbox-xxxx.local (unique per speaker, same 4 hex digits as the setup hotspot) + service for the PC
+     * agent with the speaker's name as instance, so two speakers in one home never clash */
     if (mdns_init() == ESP_OK) {
-        mdns_hostname_set("meowbox");
-        mdns_instance_name_set("MeowBox");
+        mdns_hostname_set(s_hostname);
+        mdns_instance_name_set(s_ap_ssid);
         mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
-        mdns_service_add(NULL, "_meowbox", "_tcp", 80, NULL, 0);
+        char proto[4];
+        snprintf(proto, sizeof(proto), "%d", MB_PROTO);
+        mdns_txt_item_t txt[] = {{"ver", esp_app_get_description()->version}, {"proto", proto}};
+        mdns_service_add(s_ap_ssid, "_meowbox", "_tcp", 80, txt, 2);
     }
 
     xTaskCreate(conn_task, "wifi_conn", 4096, NULL, 4, NULL);

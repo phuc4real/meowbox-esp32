@@ -359,5 +359,17 @@
   "usb_only": "Bản này phải nạp qua USB.",
   "no_mem": "Loa không đủ bộ nhớ, khởi động lại rồi thử lại.",
   "no_release": "Chưa có bản phát hành nào trên GitHub."
- }
+ },
+ "relayTest": "Kiểm tra YouTube relay",
+ "relayTesting": "Loa đang gọi relay trên máy tính…",
+ "relayOk": "Loa gọi được relay ({ms} ms): YouTube phát được.",
+ "relayFail": "Loa không gọi được relay: {e}.",
+ "relayE": {
+  "no_relay": "chưa có PC nào bật relay",
+  "timeout": "quá thời gian (tường lửa trên PC?)",
+  "unreachable": "không tới được PC (tường lửa hoặc khác mạng?)"
+ },
+ "agentOld": "bản cũ (trước 0.2.0)",
+ "agentUpd": "Nên cập nhật MeowBox Agent",
+ "agentGet": "Tải MeowBox Agent"
 }

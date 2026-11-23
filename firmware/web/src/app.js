@@ -302,7 +302,7 @@ sec(t('danger'),btn(t('reset'),async()=>{if(await ask(t('reset'),t('resetQ'),t('
 
 async function pNotify(){const c=await api('/api/config/notify'),hl=h('ol',{class:'log'}),ex=h('pre'),tk={v:c.token};
 const ti=bind(tk,'v',{type:'password',readOnly:true,style:'font-family:var(--font-data)','aria-label':t('token')});
-const drawEx=()=>{const H=location.host||'meowbox.local',T=c.token;tk.v=ti.value=T;ex.textContent=
+const drawEx=()=>{const H=location.host||'meowbox-xxxx.local',T=c.token;tk.v=ti.value=T;ex.textContent=
 `curl -X POST http://${H}/api/notify -H "Authorization: Bearer ${T}" -H "Content-Type: application/json" -d '{"title":"Build xong","text":"esp32 OK","sound":"chime","priority":"normal","duration":10}'\n\ncurl "http://${H}/api/notify?token=${T}&text=Xin%20chao"\n\ncurl -X POST http://${H}/api/notify/audio -H "Authorization: Bearer ${T}" -H "Content-Type: audio/mpeg" --data-binary @tieng.mp3\n\n# PowerShell\nInvoke-RestMethod -Method Post -Uri http://${H}/api/notify -Headers @{Authorization="Bearer ${T}"} -ContentType "application/json; charset=utf-8" -Body '{"text":"Xong"}'`};
 const loadH=async()=>{const r=await api('/api/notify/history',{tok:c.token});hl.replaceChildren(...(r.items.length?r.items.map(n=>h('li',{class:n.priority=='high'?'hi':''},h('time',0,fHr(n.ts)),h('span',0,h('b',0,(n.title?n.title+': ':'')+n.text),h('br'),h('small',{class:'muted'},[fT(n.ts),t('pr')[n.priority]||n.priority,t('snd')[n.sound]||n.sound,n.src].join(', '))))):[h('li',{class:'muted'},t('none'))]))};
 const m={title:t('testT'),text:t('testX'),sound:'chime',priority:'normal',duration:c.dur};
@@ -318,7 +318,13 @@ btn(t('save'),async()=>{Object.assign(c,await put('/api/config/notify',{dur:c.du
 sec(t('hist'),hl,btn(t('refresh'),loadH,'lk')),sec(t('ex'),ex)]}
 
 async function pPc(){const c=await api('/api/config/pc'),g=h('div');
-const draw=()=>{const s=c.st||{};g.replaceChildren(kv([[t('pcSt'),s.on?t('pcOn'):t('pcOff'),null,s.on?'okc':''],['PC',s.name||'—',s.ip],['Agent',s.ver||'—'],[t('seen'),s.on?s.seen+' '+t('ago'):'—']]))};
+const rl=h('p',{class:'muted'}),rb=btn(t('relayTest'),async()=>{rb.disabled=true;rl.className='muted';rl.textContent=t('relayTesting');
+try{const r=await api('/api/pc/relay_test',{b:{},quiet:1});rl.className=r.ok?'okc':'err';rl.textContent=r.ok?t('relayOk',{ms:r.ms}):t('relayFail',{e:t('relayE')[r.err]||r.err})}
+catch(e){rl.className='err';rl.textContent=t('err')+': '+e.message}rb.disabled=false},'ghost sm');
+// agent version vs the protocol this firmware speaks (docs/firmware_v0.2.0.md, 2.6)
+const old=s=>s.proto>=0&&s.proto<(s.proto_need||1);
+const draw=()=>{const s=c.st||{};g.replaceChildren(kv([[t('pcSt'),s.on?t('pcOn'):t('pcOff'),null,s.on?'okc':''],['PC',s.name||'—',s.ip],['Agent',s.ver||(s.proto==0?t('agentOld'):'—'),old(s)?t('agentUpd'):null,'err'],[t('seen'),s.on?s.seen+' '+t('ago'):'—']]),
+h('p',0,rb),rl,h('p',0,h('a',{href:'https://github.com/phuc4real/meowbox-esp32/releases',target:'_blank',rel:'noopener',class:'lk'},t('agentGet')+' ↗')))};
 draw();every(async()=>{try{c.st=(await api('/api/config/pc',{quiet:1})).st;draw()}catch(e){}},5000);
 return[sec(t('pcSt'),g),sec(t('opts'),h('div',{class:'lim'},h('p',{class:'muted'},t('pcHint')),sw(c,'auto',t('auto')),h('div',{class:'two'},fld(t('pcHost'),bind(c,'host',{placeholder:'192.168.1.10'})),fld(t('port'),bind(c,'port',{type:'number',min:1,max:65535}))),
 btn(t('save'),async()=>{Object.assign(c,await put('/api/config/pc',{host:c.host.trim(),port:c.port,auto:c.auto}));draw();toast(t('saved'))})))]}

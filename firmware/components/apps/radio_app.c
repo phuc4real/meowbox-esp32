@@ -39,6 +39,18 @@ static void url_encode(const char *in, char *out, size_t len)
 
 void radio_set_relay(const char *host_port) { snprintf(s_relay, sizeof(s_relay), "%s", host_port ? host_port : ""); }
 
+bool radio_relay_hostport(char *hp, size_t len)
+{
+    char host[48];
+    settings_get_str("pc", "host", host, sizeof(host), "");
+    bool aut = settings_get_bool("pc", "auto", true);
+    if (aut && s_relay[0]) snprintf(hp, len, "%s", s_relay);
+    else if (host[0]) snprintf(hp, len, "%s:%d", host, settings_get_int("pc", "port", 8765));
+    else if (s_relay[0]) snprintf(hp, len, "%s", s_relay);
+    else return false;
+    return true;
+}
+
 /* Build the URL the player should open. Returns false if a YouTube station has no relay. */
 static bool station_url(const cJSON *st, char *out, size_t len)
 {

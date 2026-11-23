@@ -5,7 +5,7 @@ The mock in `web/mock_server.py` implements exactly this document.
 
 ## General rules
 
-- Transport: plain HTTP on port 80 (`http://meowbox.local` or the device IP). JSON bodies are UTF-8,
+- Transport: plain HTTP on port 80 (`http://meowbox-xxxx.local` or the device IP). JSON bodies are UTF-8,
   `Content-Type: application/json`. Request bodies are at most **8 KB**, except `/api/ota` and
   `/api/notify/audio`.
 - Shapes are kept flat and short so the firmware can parse them with cJSON. Booleans are JSON `true`/`false`.
@@ -348,14 +348,38 @@ Last 20, newest first (RAM only):
 ### `GET /api/config/pc`
 ```json
 {"host":"192.168.1.10","port":8765,"auto":true,
- "st":{"on":true,"name":"DESKTOP-MEO","ip":"192.168.1.10","ver":"0.1.0","seen":1}}
+ "st":{"on":true,"name":"DESKTOP-MEO","ip":"192.168.1.10","ver":"0.2.0","proto":1,"proto_need":1,"seen":1}}
 ```
 - `host`/`port`: the agent's HTTP relay used for YouTube stations (`http://host:port/yt/stream?url=...`).
-- `auto`: take host from the connected agent (`/ws/pc` peer IP or mDNS `_meowbox-pc._tcp`) instead of `host`.
-- `st` is read-only: `on` = agent connected to `/ws/pc`, `seen` = seconds since last message.
+- `auto`: take the relay address from the connected agent's `hello` instead of `host`.
+- `st` is read-only: `on` = agent connected to `/ws/pc`, `seen` = seconds since last message, `name`/`ver`/`proto`
+  from the agent's `hello` (`proto` -1 = no agent since boot, 0 = agent before 0.2.0), `proto_need` = protocol this
+  firmware speaks: an agent with a lower `proto` should be updated.
 
 ### `PUT /api/config/pc`
 `{"host":"192.168.1.10","port":8765,"auto":false}` → same shape as GET.
+
+### `POST /api/pc/relay_test`
+Token or web session. Body `{}`. The speaker itself calls `GET http://<relay>/yt/ping` (3 s timeout): the only way to
+know YouTube will play, since a PC firewall blocks speaker → PC, not PC → speaker.
+→ `{"ok":true,"relay":"192.168.1.10:8765","ms":12}` or `{"ok":false,"relay":"…","err":"timeout"}`
+(`err`: `no_relay`, `timeout`, `unreachable`, `http_<code>`).
+
+### `GET /api/ping`
+**No auth.** → `{"name":"MeowBox-1A2B","host":"meowbox-1a2b","ver":"0.2.0","proto":1,"proto_min":0,"mac":"…"}`.
+Lets the agent check that an IP is a MeowBox, and which one. `mac` is for a DHCP reservation on the router.
+
+### `/ws/pc` protocol (agent ↔ speaker)
+- Agent → speaker first message: `{"t":"hello","name":"DESKTOP-MEO","ver":"0.2.0","proto":1,"relay":"http://ip:8765"}`,
+  optional `"take":true`. Then `stats` / `media` every second, `notify`.
+- Speaker → agent: `media_cmd`; `{"t":"busy","pc":"OTHER-PC"}` then close (one PC at a time: another PC is connected,
+  or this one was taken over; a hello with `take:true` takes over, the same PC name reconnecting is let in);
+  `{"t":"proto","need":N,"have":M}` then close when the agent's `proto` is below the firmware's minimum.
+
+### Discovery
+- mDNS: host `meowbox-xxxx.local`, service `_meowbox._tcp` with instance = speaker name and TXT `ver`, `proto`.
+- UDP: datagram `MEOWBOX?` to port 8766 (broadcast) → unicast reply
+  `{"name":"MeowBox-1A2B","ip":"192.168.1.42","ver":"0.2.0","proto":1}` (home Wi-Fi only, ≤ 5 replies/s).
 
 ---
 

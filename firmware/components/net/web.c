@@ -14,6 +14,7 @@
 #include "esp_heap_caps.h"
 #include "esp_memory_utils.h"
 #include "esp_app_desc.h"
+#include "esp_mac.h"
 #include "esp_ota_ops.h"
 #include "psa/crypto.h"
 #include "settings.h"
@@ -371,6 +372,24 @@ static esp_err_t h_password(httpd_req_t *req)
     return r;
 }
 
+/* ================= ping (no auth) ================= */
+/* GET /api/ping: lets the PC agent check that an IP really is a MeowBox, and which one, before using it. */
+static esp_err_t h_ping(httpd_req_t *req)
+{
+    uint8_t m[6];
+    char mac[18];
+    esp_read_mac(m, ESP_MAC_WIFI_STA);
+    snprintf(mac, sizeof(mac), "%02x:%02x:%02x:%02x:%02x:%02x", m[0], m[1], m[2], m[3], m[4], m[5]);
+    cJSON *r = cJSON_CreateObject();
+    cJSON_AddStringToObject(r, "name", wifi_mgr_ap_ssid());
+    cJSON_AddStringToObject(r, "host", wifi_mgr_hostname());
+    cJSON_AddStringToObject(r, "ver", esp_app_get_description()->version);
+    cJSON_AddNumberToObject(r, "proto", MB_PROTO);
+    cJSON_AddNumberToObject(r, "proto_min", MB_PROTO_MIN);
+    cJSON_AddStringToObject(r, "mac", mac); /* for a DHCP reservation on the router */
+    return web_send_json(req, r);
+}
+
 /* ================= status / config ================= */
 static esp_err_t h_status(httpd_req_t *req)
 {
@@ -686,6 +705,7 @@ esp_err_t web_start(void)
     if (r != ESP_OK) return r;
 
     web_register("/api/login", HTTP_POST, h_login, WEB_AUTH_NONE);
+    web_register("/api/ping", HTTP_GET, h_ping, WEB_AUTH_NONE);
     web_register("/api/logout", HTTP_POST, h_logout, WEB_AUTH_NONE);
     web_register("/api/session", HTTP_GET, h_session, WEB_AUTH_SESSION);
     web_register("/api/password", HTTP_POST, h_password, WEB_AUTH_SESSION);

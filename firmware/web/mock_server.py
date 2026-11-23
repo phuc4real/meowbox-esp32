@@ -138,8 +138,8 @@ def wifi_out():
 
 
 def pc_out():
-    return dict(S["pc"], st={"on": True, "name": "DESKTOP-MEO", "ip": "192.168.1.10", "ver": "0.1.0",
-                             "seen": random.randint(0, 2)})
+    return dict(S["pc"], st={"on": True, "name": "DESKTOP-MEO", "ip": "192.168.1.10", "ver": "0.2.0", "proto": 1,
+                             "proto_need": 1, "seen": random.randint(0, 2)})
 
 
 def add_notify(b, src):
@@ -605,6 +605,9 @@ class H(BaseHTTPRequestHandler):
             need(u["new"] and b.get("ver") == u["new"]["ver"], code=409, err="stale")
             u.update(state="download", t0=time.time(), pct=0, err="")
             return self.send_json(upd_out())
+        if key == ("POST", "/api/pc/relay_test"):
+            self.body()
+            return self.send_json({"ok": True, "relay": "192.168.1.10:8765", "ms": 4})
         if key == ("POST", "/api/reboot"):
             self.body()
             SESS.clear()

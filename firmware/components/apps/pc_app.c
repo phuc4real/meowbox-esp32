@@ -11,6 +11,7 @@
 #include "lwip/sockets.h"
 #include "ui.h"
 #include "net.h"
+#include "esp_http_client.h"
 
 static const char *TAG = "pc";
 
@@ -26,6 +27,8 @@ static SemaphoreHandle_t s_lock;
 static volatile int s_fd = -1;
 static volatile int64_t s_last_us;
 static char s_peer[16];
+static char s_agent_name[32], s_agent_ver[16]; /* from hello */
+static int s_agent_proto = -1;
 static volatile bool s_dirty;
 
 static lv_obj_t *s_arc[4], *s_arc_val[4], *s_net, *s_status, *s_app, *s_title, *s_artist, *s_play_lbl, *s_offline, *s_body;
@@ -65,6 +68,13 @@ static void handle_msg(cJSON *j)
         s_d.len = jint(j, "len", 0);
         xSemaphoreGive(s_lock);
     } else if (!strcmp(t, "hello")) {
+        const char *nm = cJSON_GetStringValue(cJSON_GetObjectItem(j, "name"));
+        const char *vr = cJSON_GetStringValue(cJSON_GetObjectItem(j, "ver"));
+        xSemaphoreTake(s_lock, portMAX_DELAY);
+        snprintf(s_agent_name, sizeof(s_agent_name), "%s", nm ? nm : "");
+        snprintf(s_agent_ver, sizeof(s_agent_ver), "%s", vr ? vr : "");
+        s_agent_proto = jint(j, "proto", 0);
+        xSemaphoreGive(s_lock);
         const char *relay = cJSON_GetStringValue(cJSON_GetObjectItem(j, "relay"));
         if (relay) {
             const char *hp = strstr(relay, "://");
@@ -91,13 +101,61 @@ static void learn_peer(int fd)
     ESP_LOGI(TAG, "agent connected from %s", s_peer);
 }
 
+static void send_to(int fd, const char *msg)
+{
+    httpd_ws_frame_t f = {.type = HTTPD_WS_TYPE_TEXT, .payload = (uint8_t *)msg, .len = strlen(msg), .final = true};
+    httpd_ws_send_frame_async(web_server(), fd, &f);
+}
+
+/* One PC at a time (docs/firmware_v0.2.0.md, 2.4): while one is online, another one's hello gets
+ * {"t":"busy","pc":"<name>"} and is closed, unless it says "take":true ("Take over" in the tray); then the old one
+ * gets the busy message instead. An agent with a protocol older than MB_PROTO_MIN gets {"t":"proto","need":N}. */
+static bool admit(int fd, cJSON *j)
+{
+    const char *t = cJSON_GetStringValue(cJSON_GetObjectItem(j, "t"));
+    bool hello = t && !strcmp(t, "hello");
+    char msg[96];
+    if (hello && jint(j, "proto", 0) < MB_PROTO_MIN) {
+        snprintf(msg, sizeof(msg), "{\"t\":\"proto\",\"need\":%d,\"have\":%d}", MB_PROTO_MIN, MB_PROTO);
+        send_to(fd, msg);
+        httpd_sess_trigger_close(web_server(), fd);
+        return false;
+    }
+    if (fd == s_fd) return true;
+    if (pc_online()) {
+        cJSON *take = cJSON_GetObjectItem(j, "take");
+        const char *who = cJSON_GetStringValue(cJSON_GetObjectItem(j, "name"));
+        bool same_pc = hello && who && who[0] && !strcmp(who, s_agent_name); /* reconnect before the old link timed out */
+        if (!hello || (!cJSON_IsTrue(take) && !same_pc)) {
+            if (hello) {
+                const char *nm = cJSON_GetStringValue(cJSON_GetObjectItem(j, "name"));
+                snprintf(msg, sizeof(msg), "{\"t\":\"busy\",\"pc\":\"%.40s\"}", s_agent_name[0] ? s_agent_name : s_peer);
+                send_to(fd, msg);
+                httpd_sess_trigger_close(web_server(), fd);
+                ESP_LOGI(TAG, "%s refused: busy with %s", nm ? nm : "agent", s_agent_name);
+            }
+            return false;
+        }
+        const char *nm = cJSON_GetStringValue(cJSON_GetObjectItem(j, "name"));
+        snprintf(msg, sizeof(msg), "{\"t\":\"busy\",\"pc\":\"%.40s\"}", nm ? nm : "?");
+        send_to(s_fd, msg);
+        httpd_sess_trigger_close(web_server(), s_fd);
+        ESP_LOGI(TAG, "%s takes over from %s", nm ? nm : "agent", s_agent_name);
+    }
+    s_fd = fd;
+    learn_peer(fd);
+    return true;
+}
+
 static esp_err_t ws_handler(httpd_req_t *req)
 {
     int fd = httpd_req_to_sockfd(req);
-    if (req->method == HTTP_GET) {
-        s_fd = fd;
-        s_last_us = esp_timer_get_time();
-        learn_peer(fd);
+    if (req->method == HTTP_GET) { /* handshake: the connection is admitted on its first message (hello) */
+        if (!pc_online()) {
+            s_fd = fd;
+            s_last_us = esp_timer_get_time();
+            learn_peer(fd);
+        }
         s_dirty = true;
         return ESP_OK;
     }
@@ -112,11 +170,11 @@ static esp_err_t ws_handler(httpd_req_t *req)
     f.payload = (uint8_t *)buf;
     if (httpd_ws_recv_frame(req, &f, f.len) == ESP_OK) {
         buf[f.len] = 0;
-        if (s_fd != fd || !s_peer[0]) learn_peer(fd);
-        s_fd = fd;
-        s_last_us = esp_timer_get_time();
         cJSON *j = cJSON_Parse(buf);
-        if (j) handle_msg(j);
+        if (j && admit(fd, j)) {
+            s_last_us = esp_timer_get_time();
+            handle_msg(j);
+        }
         cJSON_Delete(j);
     }
     free(buf);
@@ -128,8 +186,7 @@ static void send_cmd(const char *cmd)
     if (!pc_online()) return;
     char msg[64];
     snprintf(msg, sizeof(msg), "{\"t\":\"media_cmd\",\"cmd\":\"%s\"}", cmd);
-    httpd_ws_frame_t f = {.type = HTTPD_WS_TYPE_TEXT, .payload = (uint8_t *)msg, .len = strlen(msg), .final = true};
-    httpd_ws_send_frame_async(web_server(), s_fd, &f);
+    send_to(s_fd, msg);
 }
 
 /* ---------------- UI ---------------- */
@@ -257,13 +314,51 @@ static void pc_build(lv_obj_t *t)
     }
 }
 
+/* POST /api/pc/relay_test: the speaker itself calls http://<relay>/yt/ping, the only way to know that YouTube will
+ * play (a PC firewall blocks the speaker -> PC direction, not PC -> speaker). */
+static esp_err_t h_relay_test(httpd_req_t *req)
+{
+    cJSON *b = web_read_json(req);
+    if (!b) return ESP_OK;
+    cJSON_Delete(b);
+    char hp[64], url[96];
+    cJSON *r = cJSON_CreateObject();
+    if (!radio_relay_hostport(hp, sizeof(hp))) {
+        cJSON_AddBoolToObject(r, "ok", false);
+        cJSON_AddStringToObject(r, "err", "no_relay");
+        return web_send_json(req, r);
+    }
+    snprintf(url, sizeof(url), "http://%s/yt/ping", hp);
+    esp_http_client_config_t cfg = {.url = url, .timeout_ms = 3000};
+    esp_http_client_handle_t c = esp_http_client_init(&cfg);
+    int64_t t0 = esp_timer_get_time();
+    esp_err_t e = c ? esp_http_client_perform(c) : ESP_FAIL;
+    int st = c && e == ESP_OK ? esp_http_client_get_status_code(c) : 0;
+    if (c) esp_http_client_cleanup(c);
+    bool ok = st == 200;
+    cJSON_AddBoolToObject(r, "ok", ok);
+    cJSON_AddStringToObject(r, "relay", hp);
+    if (ok) cJSON_AddNumberToObject(r, "ms", (double)((esp_timer_get_time() - t0) / 1000));
+    else {
+        char err[16];
+        if (st) snprintf(err, sizeof(err), "http_%d", st);
+        else snprintf(err, sizeof(err), "%s", e == ESP_ERR_HTTP_EAGAIN || e == ESP_ERR_TIMEOUT ? "timeout" : "unreachable");
+        cJSON_AddStringToObject(r, "err", err);
+    }
+    return web_send_json(req, r);
+}
+
 static void pc_cfg_hook(cJSON *doc)
 {
     cJSON *st = cJSON_AddObjectToObject(doc, "st");
     cJSON_AddBoolToObject(st, "on", pc_online());
-    cJSON_AddStringToObject(st, "name", "");
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    cJSON_AddStringToObject(st, "name", s_agent_name);
     cJSON_AddStringToObject(st, "ip", s_peer);
-    cJSON_AddStringToObject(st, "ver", "");
+    cJSON_AddStringToObject(st, "ver", s_agent_ver);
+    cJSON_AddNumberToObject(st, "proto", s_agent_proto); /* -1 = no agent seen since boot, 0 = agent before 0.2.0 */
+    xSemaphoreGive(s_lock);
+    cJSON_AddNumberToObject(st, "proto_need", MB_PROTO);  /* agent older than this: suggest updating it */
     cJSON_AddNumberToObject(st, "seen", s_last_us ? (double)((esp_timer_get_time() - s_last_us) / 1000000) : -1);
 }
 
@@ -273,5 +368,6 @@ void pc_app_init(void)
     ui_register_builder(UI_TILE_PC, pc_build);
     lv_timer_create(pc_tick, 500, NULL);
     web_register_ws("/ws/pc", ws_handler);
+    web_register("/api/pc/relay_test", HTTP_POST, h_relay_test, WEB_AUTH_TOKEN);
     web_set_config_hook("pc", pc_cfg_hook);
 }

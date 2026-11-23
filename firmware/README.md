@@ -24,8 +24,8 @@ idf.py -p COM10 -b 921600 flash          # first time: bootloader + partitions +
 After that, update the app without a cable from the web UI (Cài đặt → Hệ thống → firmware upload), or:
 
 ```bash
-curl -c c.txt -H "Content-Type: application/json" -d '{"user":"meowbox","pass":"m3owb0x2026"}' http://meowbox.local/api/login
-curl -b c.txt -H "Content-Type: application/octet-stream" --data-binary @build/meowbox.bin http://meowbox.local/api/ota
+curl -c c.txt -H "Content-Type: application/json" -d '{"user":"meowbox","pass":"m3owb0x2026"}' http://meowbox-xxxx.local/api/login
+curl -b c.txt -H "Content-Type: application/octet-stream" --data-binary @build/meowbox.bin http://meowbox-xxxx.local/api/ota
 ```
 
 Web UI changes: `python web/build.py` (writes `storage/web/*.gz`), then `idf.py -p COM10 storage-flash`
@@ -40,15 +40,15 @@ Web UI changes: `python web/build.py` (writes `storage/web/*.gz`), then `idf.py 
 | Volume buttons | click ±5, hold to repeat. During an alarm: snooze |
 | Cat corner on the clock | tap to open the Cat tile |
 | System tile | long-press the title to show the safe-area calibration frames |
-| Web | `http://meowbox.local` (or the IP on the System tile), `meowbox` / `m3owb0x2026`; change the password |
+| Web | `http://meowbox-xxxx.local` (or the IP on the System tile), `meowbox` / `m3owb0x2026`; change the password |
 | First setup / new Wi-Fi | with no known network the speaker opens the hotspot `MeowBox-XXXX` (WPA2, password `meowbox2026`, also shown on screen) by itself; otherwise System tile → "Wi-Fi", hold VOL+ and VOL− together for 3 s, the web Wi-Fi page or `agent.py wifi-setup`. Join it and the setup page opens. It closes 10 s after the speaker gets online, or after 10 min with nobody on it |
 
 Notifications from anything on the LAN (token on the web page → Thông báo):
 
 ```bash
-curl "http://meowbox.local/api/notify?token=TOKEN&title=Build&text=Xong%20roi"
+curl "http://meowbox-xxxx.local/api/notify?token=TOKEN&title=Build&text=Xong%20roi"
 curl -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" \
-     -d '{"title":"Server","text":"CPU 95%","sound":"alert","priority":"high"}' http://meowbox.local/api/notify
+     -d '{"title":"Server","text":"CPU 95%","sound":"alert","priority":"high"}' http://meowbox-xxxx.local/api/notify
 ```
 
 Battery runtime: unplug and use it normally. MeowBox logs a sample every minute while on battery, shows
@@ -82,7 +82,7 @@ PC screen, media keys, YouTube relay and spoken notifications: see [../pc-agent/
 | `components/board` | pins (from `../hw/ostb_xiaozhi_3st.h`), LCD + LVGL, touch, buttons, backlight, battery |
 | `components/audio` | ES8311/ES7210 duplex I2S (`audio_hw`), synthesised UI sounds (`audio_sfx`) |
 | `components/player` | HTTP/HLS streaming player (esp_audio_codec), resampling to 44.1 kHz mono |
-| `components/net` | Wi-Fi manager + captive portal, mDNS `meowbox.local`, SNTP, HTTP server, auth, OTA |
+| `components/net` | Wi-Fi manager + captive portal, mDNS `meowbox-xxxx.local`, SNTP, HTTP server, auth, OTA |
 | `components/settings` | JSON settings per group in `/data/cfg/*.json` (LittleFS) |
 | `components/ui` | tileview shell, theme engine (`theme.h`, generated `themes_gen.c`), themed widgets, overlay cards, backlight / night mode |
 | `themes/` | one JSON per UI theme (colours, fonts, shapes, effects, cat palette, web fonts) |

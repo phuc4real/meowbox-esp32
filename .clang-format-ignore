@@ -1,0 +1,5 @@
+firmware/components/fonts/*
+firmware/components/cat_sprites/*
+firmware/components/ui/themes_gen.c
+firmware/components/ui/ui_assets.c
+hw/nv3023_init_cmds.h

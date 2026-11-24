@@ -128,3 +128,10 @@ PC screen, media keys, YouTube relay and spoken notifications: see [../pc-agent/
 | data | 0xf00000 | 1 MB | settings, Wi-Fi list, password hash, cat save, battery log |
 
 On first boot MeowBox imports the Wi-Fi networks that xiaozhi saved in NVS.
+
+Forgot the web password? Erase only the `data` partition over USB. That resets settings, Wi-Fi list, stations,
+alarms, cat, password and token to the defaults, and keeps the firmware:
+
+```powershell
+python -m esptool --port COM10 erase-region 0xf00000 0x100000
+```

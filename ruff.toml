@@ -1,0 +1,12 @@
+# Python lint for tools/, firmware/tools, firmware/web, pc-agent. Run: python -m ruff check .
+line-length = 120
+target-version = "py311"
+extend-exclude = ["backup", "firmware/managed_components", "firmware/build"]
+
+[lint]
+select = ["E", "F", "W", "B"]
+# The code packs short statements on one line on purpose (E701/E702/E401) and has long data-table lines (E501).
+ignore = ["E501", "E701", "E702", "E401", "E731", "B905"]
+
+[lint.per-file-ignores]
+"tools/*" = ["F403", "F405"]  # RE scripts share helpers via `from fwimage import *`

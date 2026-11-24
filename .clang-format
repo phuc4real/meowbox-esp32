@@ -1,0 +1,21 @@
+# Matches the existing firmware style. Format only the lines you changed: `git clang-format` (needs clang-format
+# on PATH, e.g. `pip install --user clang-format`). Never reformat whole files: hand-packed lines would churn.
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 130
+BreakBeforeBraces: Linux
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortLoopsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Empty
+AllowShortFunctionsOnASingleLine: All
+AllowShortCaseLabelsOnASingleLine: true
+IndentCaseLabels: false
+PointerAlignment: Right
+SortIncludes: Never
+AlignConsecutiveMacros: Consecutive
+AlignTrailingComments: true
+SpaceAfterCStyleCast: false
+ReflowComments: false
+ForEachMacros: [cJSON_ArrayForEach]
+AllowShortEnumsOnASingleLine: true
+SpaceBeforeParens: ControlStatementsExceptForEachMacros

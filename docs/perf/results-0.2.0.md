@@ -82,3 +82,76 @@ CPU của `taskLVGL` ở màn Đồng hồ (đo 30 s mỗi theme):
   1 px `0,0-0,26…36`. Chưa rõ nguyên nhân, đã ghi vào mục "Tối ưu lại các theme về UI/UX" trong `docs/roadmap.md`.
 - Log `ui: redraw 10s` (đếm vùng vẽ lại) là tạm thời, bỏ đi sau khi xong việc ở roadmap.
 
+
+## After sections 1–4 + review fixes (2026-11-24)
+
+Firmware at `eededba` plus the fixes in `review-0.2.0.md`. Home Wi-Fi, RSSI -54 to -63 dBm, theme Cyberpunk.
+
+### Idle, 5 min (`v020-idle.*`)
+
+| | 0.1.0 | now |
+|---|---|---|
+| Internal RAM free (lowest) | 33.0 KB | **47.5 KB** |
+| Largest free block | 14 KB | **32 KB** |
+| DMA free (lowest) | 25.3 KB | 39.4 KB |
+| `taskLVGL` CPU (peak) | 12–18% | 4.1% |
+
+### Heaviest scenario, 11 min (`v020-heavy.*`)
+
+At the same time:
+- radio: 99.8 Radio (MP3 128k, HTTPS), then Digital Radio HK (AAC+), then VOV1 (HLS 256k), then RFI (MP3 64k, HTTPS),
+  2.5 min each;
+- two web sessions polling `/api/status` every 2 s, one of them also taking `/api/screenshot` every 10 s;
+- `POST /api/notify` every 10 s;
+- a weather refresh every 60 s;
+- `POST /api/update/check` (GitHub) during the last station.
+
+| | Target (plan 5) | Result |
+|---|---|---|
+| Internal RAM free (lowest) | ≥ 40 KB | **40.8 KB** |
+| Largest free block (lowest) | ≥ 16 KB | **31 KB** |
+| DMA free (lowest) | | 32.7 KB |
+| PSRAM free (lowest) | | 7.34 MB |
+| Underruns / reconnects | | **0 / 0** on all four stations |
+| Request errors | | 0 of 610 status, 61 screenshots, 62 notifications, 11 weather |
+
+- zeno.fm, which took 58 s to start in 0.1.0, started at once and kept 6–16 s of buffer. The prebuffer stayed at 3 s
+  (no underrun to step it up).
+- Download rate tracks the bitrate: 128/128, 133/128, 236–308/256, 63/64 kbps.
+- Update check answered `no_release` (no GitHub release yet), as expected.
+- Wi-Fi power save went off when the stream started (`power save off (streaming)`).
+
+Lowest free stack (bytes) in the heavy run, all above the 25% / 768 B rule:
+
+| Task | Stack | Lowest free | CPU peak |
+|---|---|---|---|
+| `decode` | 4096 | 2528 (62%) | 13.7% |
+| `fetch` (PSRAM) | 8192 | 3636 | 11.4% |
+| `httpd` | 8192 | 3180 | 5.1% |
+| `taskLVGL` | | 2956 | 8.0% |
+| `weather` | 6144 | 2456 | 6.3% |
+| `upd_check` (PSRAM) | 6144 | 2272 | 0.0% |
+| `discovery` (PSRAM) | 3072 | 1572 | 0.0% |
+| `battery` | 4096 | 1432 (35%) | 2.4% |
+
+### The 7.6 KB `heap_min` from boot
+Found with a temporary 20 ms timer that logged `heap_caps_get_minimum_free_size` (not committed):
+
+| Time after boot | Lowest so far | Free at that moment | What runs |
+|---|---|---|---|
+| 503 ms | 95 KB | 160 KB | audio codec ready |
+| 551 ms | 17.9 KB | 82.7 KB | Wi-Fi driver start + PHY calibration |
+| 563 ms | 7.9 KB | 72.7 KB | mDNS init, `ui_build_all` |
+
+Both drops are short bursts of about 64 KB that are freed within 20 ms (free RAM stays above 70 KB). They happen
+once, before anything streams, so they do not limit playback. Not changed. If boot ever fails with out-of-memory,
+look there first.
+
+### Static RAM (`idf.py size`)
+DIRAM used 163.8 KB of 341.8 KB: IRAM code 99.9 KB, `.bss` 39.9 KB, `.data` 22.9 KB. Biggest internal-RAM users
+are IDF (Wi-Fi `pp`/`net80211` IRAM optimizations, `spi_flash`, FreeRTOS). Turning off `ESP_WIFI_IRAM_OPT` /
+`ESP_WIFI_RX_IRAM_OPT` would free roughly 10–20 KB but slows Wi-Fi; not needed now that the targets are met.
+
+### 5.4: what was not done, and why
+The targets are met, so the other ideas in 5.4 wait until a measurement asks for them: bigger TCP window, `PM_ENABLE`
+(CPU frequency scaling), stack trimming of `httpd`/`weather`, release build without asserts.

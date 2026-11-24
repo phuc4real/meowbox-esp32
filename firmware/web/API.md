@@ -108,7 +108,7 @@ All other sessions are invalidated.
   `kbps` download rate (5 s average); `br` stream bitrate (`icy-br` header or decoder, 0 = unknown); `buf` seconds of
   audio buffered; `pre` seconds collected before playing (3/6/10: one step up after each underrun, down after 5 min
   without one, back to 3 when Wi-Fi reconnects); `fill` buffering progress in %; `under` underruns while playing;
-  `reconn` reconnects; `fmt` `mp3`|`aac`|`ts`|`hls`; `err` last error `connect`|`http_<code>`|`read`|`stall` (under a quarter of the bitrate for 10 s while buffering: reconnected)|`decode` or `""`.
+  `reconn` reconnects; `fmt` `mp3`|`aac`|`ts`|`hls`; `err` last error `connect`|`http_<code>`|`read`|`stall` (under a quarter of the bitrate for 10 s while buffering: reconnected)|`decode`|`no_mem` or `""`.
   `title` is the ICY StreamTitle (may be empty).
 
 ---

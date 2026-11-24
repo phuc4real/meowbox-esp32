@@ -1,0 +1,162 @@
+t=12 int_free=42691 int_min=7796 int_big=31744 dma_free=34595 dma_big=31744 ps_free=7939868 ps_min=7912028 ps_big=7864320 rssi=-55 play=buf
+t=17 int_free=44763 int_min=7796 int_big=31744 dma_free=36651 dma_big=31744 ps_free=7900400 ps_min=7888244 ps_big=7864320 rssi=-56 play=play
+t=22 int_free=44771 int_min=7796 int_big=31744 dma_free=36683 dma_big=31744 ps_free=7902460 ps_min=7743012 ps_big=7864320 rssi=-56 play=play
+t=27 int_free=44771 int_min=7796 int_big=31744 dma_free=36683 dma_big=31744 ps_free=7910524 ps_min=7743012 ps_big=7864320 rssi=-56 play=play
+t=33 int_free=44771 int_min=7796 int_big=31744 dma_free=36683 dma_big=31744 ps_free=7908720 ps_min=7743012 ps_big=7864320 rssi=-56 play=play
+t=38 int_free=44771 int_min=7796 int_big=31744 dma_free=36683 dma_big=31744 ps_free=7906548 ps_min=7743012 ps_big=7864320 rssi=-55 play=play
+t=43 int_free=44771 int_min=7796 int_big=31744 dma_free=36683 dma_big=31744 ps_free=7910384 ps_min=7742084 ps_big=7864320 rssi=-63 play=play
+t=48 int_free=44771 int_min=7796 int_big=31744 dma_free=36683 dma_big=31744 ps_free=7897308 ps_min=7742084 ps_big=7864320 rssi=-64 play=play
+t=53 int_free=44771 int_min=7796 int_big=31744 dma_free=36683 dma_big=31744 ps_free=7901160 ps_min=7742084 ps_big=7864320 rssi=-64 play=play
+t=58 int_free=44771 int_min=7796 int_big=31744 dma_free=36683 dma_big=31744 ps_free=7899644 ps_min=7742084 ps_big=7864320 rssi=-65 play=play
+t=63 int_free=44771 int_min=7796 int_big=31744 dma_free=36683 dma_big=31744 ps_free=7900656 ps_min=7742084 ps_big=7864320 rssi=-66 play=play
+t=68 int_free=44771 int_min=7796 int_big=31744 dma_free=36683 dma_big=31744 ps_free=7902204 ps_min=7742084 ps_big=7864320 rssi=-65 play=play
+t=74 int_free=44743 int_min=7796 int_big=31744 dma_free=36643 dma_big=31744 ps_free=7915588 ps_min=7742084 ps_big=7864320 rssi=-64 play=play
+t=79 int_free=44743 int_min=7796 int_big=31744 dma_free=36643 dma_big=31744 ps_free=7909416 ps_min=7742084 ps_big=7864320 rssi=-65 play=play
+t=84 int_free=44787 int_min=7796 int_big=31744 dma_free=36671 dma_big=31744 ps_free=7915588 ps_min=7742084 ps_big=7864320 rssi=-55 play=play
+t=89 int_free=44787 int_min=7796 int_big=31744 dma_free=36671 dma_big=31744 ps_free=7915584 ps_min=7742084 ps_big=7864320 rssi=-55 play=play
+t=94 int_free=44779 int_min=7796 int_big=31744 dma_free=36671 dma_big=31744 ps_free=7915588 ps_min=7742084 ps_big=7864320 rssi=-55 play=play
+t=99 int_free=44539 int_min=7796 int_big=31744 dma_free=36435 dma_big=31744 ps_free=7908796 ps_min=7742084 ps_big=7864320 rssi=-55 play=play
+t=105 int_free=44767 int_min=7796 int_big=31744 dma_free=36671 dma_big=31744 ps_free=7901480 ps_min=7742084 ps_big=7864320 rssi=-55 play=play
+t=110 int_free=44647 int_min=7796 int_big=31744 dma_free=36551 dma_big=31744 ps_free=7909412 ps_min=7740432 ps_big=7864320 rssi=-55 play=play
+t=115 int_free=44503 int_min=7796 int_big=31744 dma_free=36411 dma_big=31744 ps_free=7891112 ps_min=7740432 ps_big=7864320 rssi=-54 play=play
+t=120 int_free=44743 int_min=7796 int_big=31744 dma_free=36639 dma_big=31744 ps_free=7910144 ps_min=7740432 ps_big=7864320 rssi=-61 play=play
+t=126 int_free=44787 int_min=7796 int_big=31744 dma_free=36683 dma_big=31744 ps_free=7895704 ps_min=7740432 ps_big=7864320 rssi=-62 play=play
+t=131 int_free=44787 int_min=7796 int_big=31744 dma_free=36683 dma_big=31744 ps_free=7902544 ps_min=7740432 ps_big=7864320 rssi=-56 play=play
+t=136 int_free=44743 int_min=7796 int_big=31744 dma_free=36643 dma_big=31744 ps_free=7906056 ps_min=7740432 ps_big=7864320 rssi=-57 play=play
+t=141 int_free=44739 int_min=7796 int_big=31744 dma_free=36643 dma_big=31744 ps_free=7905828 ps_min=7740432 ps_big=7864320 rssi=-58 play=play
+t=146 int_free=44727 int_min=7796 int_big=31744 dma_free=36615 dma_big=31744 ps_free=7904292 ps_min=7740432 ps_big=7864320 rssi=-58 play=play
+t=151 int_free=44287 int_min=7796 int_big=31744 dma_free=36179 dma_big=31744 ps_free=7897472 ps_min=7740432 ps_big=7864320 rssi=-55 play=play
+t=156 int_free=44739 int_min=7796 int_big=31744 dma_free=36635 dma_big=31744 ps_free=7902984 ps_min=7740432 ps_big=7864320 rssi=-56 play=play
+t=162 int_free=44499 int_min=7796 int_big=31744 dma_free=36399 dma_big=31744 ps_free=7894900 ps_min=7740432 ps_big=7864320 rssi=-57 play=play
+t=167 int_free=43483 int_min=7796 int_big=31744 dma_free=35367 dma_big=31744 ps_free=7898552 ps_min=7740432 ps_big=7864320 rssi=-55 play=play
+t=172 int_free=43487 int_min=7796 int_big=31744 dma_free=35379 dma_big=31744 ps_free=7898544 ps_min=7740160 ps_big=7864320 rssi=-55 play=play
+t=177 int_free=43483 int_min=7796 int_big=31744 dma_free=35367 dma_big=31744 ps_free=7898556 ps_min=7740160 ps_big=7864320 rssi=-55 play=play
+t=182 int_free=43483 int_min=7796 int_big=31744 dma_free=35367 dma_big=31744 ps_free=7898548 ps_min=7740160 ps_big=7864320 rssi=-61 play=play
+t=187 int_free=43487 int_min=7796 int_big=31744 dma_free=35367 dma_big=31744 ps_free=7898548 ps_min=7740160 ps_big=7864320 rssi=-58 play=play
+t=192 int_free=43483 int_min=7796 int_big=31744 dma_free=35379 dma_big=31744 ps_free=7898232 ps_min=7740160 ps_big=7864320 rssi=-57 play=play
+t=197 int_free=43439 int_min=7796 int_big=31744 dma_free=35347 dma_big=31744 ps_free=7898564 ps_min=7740160 ps_big=7864320 rssi=-58 play=play
+t=203 int_free=43439 int_min=7796 int_big=31744 dma_free=35347 dma_big=31744 ps_free=7898564 ps_min=7740160 ps_big=7864320 rssi=-56 play=play
+t=208 int_free=43471 int_min=7796 int_big=31744 dma_free=35371 dma_big=31744 ps_free=7898564 ps_min=7740160 ps_big=7864320 rssi=-56 play=play
+t=213 int_free=43471 int_min=7796 int_big=31744 dma_free=35379 dma_big=31744 ps_free=7898564 ps_min=7740160 ps_big=7864320 rssi=-56 play=play
+t=218 int_free=43467 int_min=7796 int_big=31744 dma_free=35351 dma_big=31744 ps_free=7896996 ps_min=7740160 ps_big=7864320 rssi=-56 play=play
+t=223 int_free=43467 int_min=7796 int_big=31744 dma_free=35351 dma_big=31744 ps_free=7898564 ps_min=7740160 ps_big=7864320 rssi=-56 play=play
+t=228 int_free=43395 int_min=7796 int_big=31744 dma_free=35291 dma_big=31744 ps_free=7896800 ps_min=7740160 ps_big=7864320 rssi=-57 play=play
+t=233 int_free=43351 int_min=7796 int_big=31744 dma_free=35231 dma_big=31744 ps_free=7896724 ps_min=7740160 ps_big=7864320 rssi=-56 play=play
+t=239 int_free=43467 int_min=7796 int_big=31744 dma_free=35351 dma_big=31744 ps_free=7895008 ps_min=7740160 ps_big=7864320 rssi=-56 play=play
+t=244 int_free=43467 int_min=7796 int_big=31744 dma_free=35351 dma_big=31744 ps_free=7898216 ps_min=7740160 ps_big=7864320 rssi=-56 play=play
+t=249 int_free=43479 int_min=7796 int_big=31744 dma_free=35379 dma_big=31744 ps_free=7898564 ps_min=7740160 ps_big=7864320 rssi=-56 play=play
+t=254 int_free=43499 int_min=7796 int_big=31744 dma_free=35383 dma_big=31744 ps_free=7898764 ps_min=7739928 ps_big=7864320 rssi=-55 play=play
+t=259 int_free=43463 int_min=7796 int_big=31744 dma_free=35351 dma_big=31744 ps_free=7898564 ps_min=7739928 ps_big=7864320 rssi=-57 play=play
+t=264 int_free=43463 int_min=7796 int_big=31744 dma_free=35351 dma_big=31744 ps_free=7898556 ps_min=7738388 ps_big=7864320 rssi=-55 play=play
+t=270 int_free=43475 int_min=7796 int_big=31744 dma_free=35351 dma_big=31744 ps_free=7898564 ps_min=7738388 ps_big=7864320 rssi=-56 play=play
+t=275 int_free=43291 int_min=7796 int_big=31744 dma_free=34971 dma_big=31744 ps_free=7898556 ps_min=7738388 ps_big=7864320 rssi=-55 play=play
+t=280 int_free=43363 int_min=7796 int_big=31744 dma_free=35235 dma_big=31744 ps_free=7896532 ps_min=7738388 ps_big=7864320 rssi=-56 play=play
+t=285 int_free=43479 int_min=7796 int_big=31744 dma_free=35351 dma_big=31744 ps_free=7898560 ps_min=7738376 ps_big=7864320 rssi=-55 play=play
+t=291 int_free=43359 int_min=7796 int_big=31744 dma_free=35235 dma_big=31744 ps_free=7890148 ps_min=7736140 ps_big=7864320 rssi=-58 play=play
+t=296 int_free=43475 int_min=7796 int_big=31744 dma_free=35351 dma_big=31744 ps_free=7898560 ps_min=7736140 ps_big=7864320 rssi=-57 play=play
+t=302 int_free=43459 int_min=7796 int_big=31744 dma_free=35351 dma_big=31744 ps_free=7898556 ps_min=7736140 ps_big=7864320 rssi=-55 play=play
+t=307 int_free=43463 int_min=7796 int_big=31744 dma_free=35363 dma_big=31744 ps_free=7898556 ps_min=7736140 ps_big=7864320 rssi=-57 play=play
+t=312 int_free=41007 int_min=7796 int_big=31744 dma_free=32903 dma_big=31744 ps_free=7887504 ps_min=7736140 ps_big=7864320 rssi=-62 play=play
+t=317 int_free=43795 int_min=7796 int_big=31744 dma_free=35707 dma_big=31744 ps_free=7910504 ps_min=7736140 ps_big=7864320 rssi=-62 play=buf
+t=322 int_free=41071 int_min=7796 int_big=31744 dma_free=32971 dma_big=31744 ps_free=7853416 ps_min=7700776 ps_big=7733248 rssi=-58 play=play
+t=327 int_free=41191 int_min=7796 int_big=31744 dma_free=33091 dma_big=31744 ps_free=7855052 ps_min=7700776 ps_big=7733248 rssi=-57 play=play
+t=332 int_free=41171 int_min=7796 int_big=31744 dma_free=33079 dma_big=31744 ps_free=7861920 ps_min=7700776 ps_big=7733248 rssi=-58 play=play
+t=337 int_free=41171 int_min=7796 int_big=31744 dma_free=33079 dma_big=31744 ps_free=7861932 ps_min=7700776 ps_big=7733248 rssi=-58 play=play
+t=342 int_free=43655 int_min=7796 int_big=31744 dma_free=35543 dma_big=31744 ps_free=7903248 ps_min=7700776 ps_big=7733248 rssi=-59 play=play
+t=348 int_free=41163 int_min=7796 int_big=31744 dma_free=33063 dma_big=31744 ps_free=7861524 ps_min=7700776 ps_big=7733248 rssi=-59 play=play
+t=353 int_free=41171 int_min=7796 int_big=31744 dma_free=33079 dma_big=31744 ps_free=7861304 ps_min=7699980 ps_big=7733248 rssi=-61 play=play
+t=358 int_free=41171 int_min=7796 int_big=31744 dma_free=33079 dma_big=31744 ps_free=7854232 ps_min=7699980 ps_big=7733248 rssi=-61 play=play
+t=363 int_free=41167 int_min=7796 int_big=31744 dma_free=33063 dma_big=31744 ps_free=7861088 ps_min=7696556 ps_big=7733248 rssi=-60 play=play
+t=368 int_free=41043 int_min=7796 int_big=31744 dma_free=32943 dma_big=31744 ps_free=7857688 ps_min=7696556 ps_big=7733248 rssi=-60 play=play
+t=373 int_free=43695 int_min=7796 int_big=31744 dma_free=35571 dma_big=31744 ps_free=7902396 ps_min=7693204 ps_big=7733248 rssi=-61 play=play
+t=378 int_free=40847 int_min=7796 int_big=31744 dma_free=32747 dma_big=31744 ps_free=7867404 ps_min=7693204 ps_big=7733248 rssi=-55 play=play
+t=383 int_free=41211 int_min=7796 int_big=31744 dma_free=33079 dma_big=31744 ps_free=7860856 ps_min=7693204 ps_big=7733248 rssi=-57 play=play
+t=389 int_free=41207 int_min=7796 int_big=31744 dma_free=33107 dma_big=31744 ps_free=7851824 ps_min=7693204 ps_big=7733248 rssi=-60 play=play
+t=394 int_free=41215 int_min=7796 int_big=31744 dma_free=33119 dma_big=31744 ps_free=7860648 ps_min=7693204 ps_big=7733248 rssi=-59 play=play
+t=399 int_free=41143 int_min=7796 int_big=31744 dma_free=33131 dma_big=31744 ps_free=7860644 ps_min=7693204 ps_big=7733248 rssi=-57 play=play
+t=404 int_free=43707 int_min=7796 int_big=31744 dma_free=35587 dma_big=31744 ps_free=7902180 ps_min=7693204 ps_big=7733248 rssi=-60 play=play
+t=409 int_free=40887 int_min=7796 int_big=31744 dma_free=32771 dma_big=31744 ps_free=7892252 ps_min=7693204 ps_big=7733248 rssi=-56 play=play
+t=414 int_free=41247 int_min=7796 int_big=31744 dma_free=33139 dma_big=31744 ps_free=7860668 ps_min=7693204 ps_big=7733248 rssi=-57 play=play
+t=419 int_free=41251 int_min=7796 int_big=31744 dma_free=33151 dma_big=31744 ps_free=7851616 ps_min=7693204 ps_big=7733248 rssi=-60 play=play
+t=424 int_free=41143 int_min=7796 int_big=31744 dma_free=33047 dma_big=31744 ps_free=7873936 ps_min=7693204 ps_big=7733248 rssi=-58 play=play
+t=429 int_free=41263 int_min=7796 int_big=31744 dma_free=33167 dma_big=31744 ps_free=7852052 ps_min=7693204 ps_big=7733248 rssi=-57 play=play
+t=435 int_free=43771 int_min=7796 int_big=31744 dma_free=35683 dma_big=31744 ps_free=7901880 ps_min=7693204 ps_big=7733248 rssi=-55 play=play
+t=440 int_free=40923 int_min=7796 int_big=31744 dma_free=32795 dma_big=31744 ps_free=7890412 ps_min=7693204 ps_big=7733248 rssi=-52 play=play
+t=445 int_free=41227 int_min=7796 int_big=31744 dma_free=33115 dma_big=31744 ps_free=7860860 ps_min=7693204 ps_big=7733248 rssi=-53 play=play
+t=450 int_free=41203 int_min=7796 int_big=31744 dma_free=33099 dma_big=31744 ps_free=7851820 ps_min=7693204 ps_big=7733248 rssi=-51 play=play
+t=455 int_free=40895 int_min=7796 int_big=31744 dma_free=32795 dma_big=31744 ps_free=7875152 ps_min=7692576 ps_big=7733248 rssi=-51 play=play
+t=461 int_free=41011 int_min=7796 int_big=31744 dma_free=32911 dma_big=31744 ps_free=7846828 ps_min=7692576 ps_big=7733248 rssi=-53 play=play
+t=466 int_free=45931 int_min=7796 int_big=31744 dma_free=37651 dma_big=31744 ps_free=7942508 ps_min=7692576 ps_big=7864320 rssi=-54 play=buf
+t=471 int_free=45851 int_min=7796 int_big=31744 dma_free=37763 dma_big=31744 ps_free=7912804 ps_min=7692576 ps_big=7864320 rssi=-56 play=play
+t=476 int_free=45839 int_min=7796 int_big=31744 dma_free=37731 dma_big=31744 ps_free=7912808 ps_min=7692576 ps_big=7864320 rssi=-55 play=play
+t=481 int_free=45839 int_min=7796 int_big=31744 dma_free=37731 dma_big=31744 ps_free=7913020 ps_min=7692576 ps_big=7864320 rssi=-53 play=play
+t=486 int_free=45843 int_min=7796 int_big=31744 dma_free=37747 dma_big=31744 ps_free=7913024 ps_min=7692576 ps_big=7864320 rssi=-52 play=play
+t=491 int_free=43407 int_min=7796 int_big=31744 dma_free=35307 dma_big=31744 ps_free=7887648 ps_min=7692576 ps_big=7864320 rssi=-54 play=play
+t=497 int_free=45731 int_min=7796 int_big=31744 dma_free=37643 dma_big=31744 ps_free=7909632 ps_min=7692576 ps_big=7864320 rssi=-53 play=play
+t=502 int_free=45839 int_min=7796 int_big=31744 dma_free=37743 dma_big=31744 ps_free=7913028 ps_min=7692576 ps_big=7864320 rssi=-53 play=play
+t=507 int_free=43235 int_min=7796 int_big=31744 dma_free=35147 dma_big=31744 ps_free=7883920 ps_min=7692576 ps_big=7864320 rssi=-53 play=play
+t=512 int_free=45839 int_min=7796 int_big=31744 dma_free=37743 dma_big=31744 ps_free=7913020 ps_min=7692576 ps_big=7864320 rssi=-54 play=play
+t=517 int_free=45839 int_min=7796 int_big=31744 dma_free=37747 dma_big=31744 ps_free=7913032 ps_min=7692576 ps_big=7864320 rssi=-54 play=play
+t=522 int_free=45839 int_min=7796 int_big=31744 dma_free=37747 dma_big=31744 ps_free=7913028 ps_min=7692576 ps_big=7864320 rssi=-54 play=play
+t=527 int_free=45839 int_min=7796 int_big=31744 dma_free=37747 dma_big=31744 ps_free=7913228 ps_min=7692576 ps_big=7864320 rssi=-54 play=play
+t=533 int_free=45719 int_min=7796 int_big=31744 dma_free=37619 dma_big=31744 ps_free=7910060 ps_min=7692576 ps_big=7864320 rssi=-53 play=play
+t=538 int_free=45839 int_min=7796 int_big=31744 dma_free=37747 dma_big=31744 ps_free=7913664 ps_min=7692576 ps_big=7864320 rssi=-56 play=play
+t=543 int_free=45847 int_min=7796 int_big=31744 dma_free=37751 dma_big=31744 ps_free=7911548 ps_min=7692576 ps_big=7864320 rssi=-53 play=play
+t=548 int_free=45851 int_min=7796 int_big=31744 dma_free=37739 dma_big=31744 ps_free=7913876 ps_min=7692576 ps_big=7864320 rssi=-53 play=play
+t=553 int_free=45827 int_min=7796 int_big=31744 dma_free=37739 dma_big=31744 ps_free=7913864 ps_min=7692576 ps_big=7864320 rssi=-53 play=play
+t=558 int_free=45887 int_min=7796 int_big=31744 dma_free=37791 dma_big=31744 ps_free=7914076 ps_min=7692576 ps_big=7864320 rssi=-55 play=play
+t=563 int_free=45887 int_min=7796 int_big=31744 dma_free=37791 dma_big=31744 ps_free=7914300 ps_min=7692576 ps_big=7864320 rssi=-54 play=play
+t=569 int_free=45735 int_min=7796 int_big=31744 dma_free=37643 dma_big=31744 ps_free=7911128 ps_min=7692576 ps_big=7864320 rssi=-54 play=play
+t=574 int_free=45855 int_min=7796 int_big=31744 dma_free=37759 dma_big=31744 ps_free=7914516 ps_min=7692576 ps_big=7864320 rssi=-56 play=play
+t=579 int_free=45735 int_min=7796 int_big=31744 dma_free=37639 dma_big=31744 ps_free=7911328 ps_min=7692576 ps_big=7864320 rssi=-54 play=play
+t=584 int_free=45855 int_min=7796 int_big=31744 dma_free=37759 dma_big=31744 ps_free=7914724 ps_min=7692576 ps_big=7864320 rssi=-52 play=play
+t=589 int_free=45855 int_min=7796 int_big=31744 dma_free=37759 dma_big=31744 ps_free=7914952 ps_min=7692576 ps_big=7864320 rssi=-53 play=play
+t=594 int_free=45855 int_min=7796 int_big=31744 dma_free=37759 dma_big=31744 ps_free=7914948 ps_min=7692576 ps_big=7864320 rssi=-55 play=play
+t=599 int_free=45855 int_min=7796 int_big=31744 dma_free=37759 dma_big=31744 ps_free=7914948 ps_min=7692576 ps_big=7864320 rssi=-55 play=play
+t=605 int_free=45855 int_min=7796 int_big=31744 dma_free=37759 dma_big=31744 ps_free=7907788 ps_min=7692576 ps_big=7864320 rssi=-57 play=play
+t=610 int_free=45855 int_min=7796 int_big=31744 dma_free=37759 dma_big=31744 ps_free=7914952 ps_min=7692576 ps_big=7864320 rssi=-57 play=play
+t=615 int_free=45611 int_min=7796 int_big=31744 dma_free=37499 dma_big=31744 ps_free=7912616 ps_min=7692576 ps_big=7864320 rssi=-54 play=play
+t=620 int_free=46475 int_min=7796 int_big=31744 dma_free=38371 dma_big=31744 ps_free=7966320 ps_min=7692576 ps_big=7864320 rssi=-54 play=stop
+t=625 int_free=46475 int_min=7796 int_big=31744 dma_free=38371 dma_big=31744 ps_free=7966324 ps_min=7692576 ps_big=7864320 rssi=-55 play=stop
+t=630 int_free=46347 int_min=7796 int_big=31744 dma_free=38255 dma_big=31744 ps_free=7966324 ps_min=7692576 ps_big=7864320 rssi=-56 play=stop
+t=635 int_free=46347 int_min=7796 int_big=31744 dma_free=38255 dma_big=31744 ps_free=7966324 ps_min=7692576 ps_big=7864320 rssi=-54 play=stop
+t=641 int_free=46335 int_min=7796 int_big=31744 dma_free=38235 dma_big=31744 ps_free=7966324 ps_min=7692576 ps_big=7864320 rssi=-54 play=stop
+t=646 int_free=46075 int_min=7796 int_big=31744 dma_free=38007 dma_big=31744 ps_free=7966328 ps_min=7692576 ps_big=7864320 rssi=-55 play=stop
+t=651 int_free=47439 int_min=7796 int_big=31744 dma_free=39335 dma_big=31744 ps_free=7966328 ps_min=7692576 ps_big=7864320 rssi=-54 play=stop
+t=656 int_free=47439 int_min=7796 int_big=31744 dma_free=39335 dma_big=31744 ps_free=7966328 ps_min=7692576 ps_big=7864320 rssi=-52 play=stop
+t=661 int_free=47439 int_min=7796 int_big=31744 dma_free=39335 dma_big=31744 ps_free=7966328 ps_min=7692576 ps_big=7864320 rssi=-53 play=stop
+t=667 int_free=47439 int_min=7796 int_big=31744 dma_free=39335 dma_big=31744 ps_free=7966328 ps_min=7692576 ps_big=7864320 rssi=-55 play=stop
+t=672 int_free=47439 int_min=7796 int_big=31744 dma_free=39335 dma_big=31744 ps_free=7966324 ps_min=7692576 ps_big=7864320 rssi=-53 play=stop
+
+== 129 samples -> ../docs/perf/v020-heavy.csv
+int_free  min     40847  max     47439
+int_min   min      7796  max      7796
+int_big   min     31744  max     31744
+dma_free  min     32747  max     39335
+dma_big   min     31744  max     31744
+ps_free   min   7846828  max   7966328
+ps_min    min   7692576  max   7912028
+ps_big    min   7733248  max   7864320
+
+== tasks: lowest free stack (bytes), peak CPU %
+ipc1             core  1  stack_free    512  cpu_peak   2.7%
+ipc0             core  0  stack_free    520  cpu_peak   2.1%
+IDLE0            core  0  stack_free    768  cpu_peak  95.5%
+IDLE1            core  1  stack_free    776  cpu_peak  96.4%
+Tmr Svc          core -1  stack_free   1424  cpu_peak   0.0%
+battery          core  1  stack_free   1432  cpu_peak   2.4%
+discovery        core -1  stack_free   1572  (PSRAM)  cpu_peak   0.0%
+tcpip            core -1  stack_free   1816  cpu_peak   4.1%
+wifi_conn        core -1  stack_free   2248  cpu_peak   0.0%
+upd_check        core  ?  stack_free   2272  cpu_peak   0.0%
+mdns             core  0  stack_free   2288  cpu_peak   0.1%
+weather          core -1  stack_free   2456  cpu_peak   6.3%
+decode           core  1  stack_free   2528  cpu_peak  13.7%
+mic              core  0  stack_free   2528  cpu_peak   1.4%
+sfx              core  0  stack_free   2572  cpu_peak   0.8%
+esp_timer        core  0  stack_free   2944  cpu_peak   1.6%
+taskLVGL         core  1  stack_free   2956  cpu_peak   8.0%
+httpd            core  0  stack_free   3180  cpu_peak   5.1%
+sys_evt          core  0  stack_free   3316  cpu_peak   0.2%
+fetch            core  ?  stack_free   3636  cpu_peak  11.4%
+wifi             core  0  stack_free   4340  cpu_peak   3.9%

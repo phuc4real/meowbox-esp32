@@ -43,35 +43,32 @@ static char s_ap_ssid[20];
 static char s_hostname[20];
 
 /* ---- power save while streaming (4.1) ---- */
-static portMUX_TYPE s_hold_mux = portMUX_INITIALIZER_UNLOCKED;
+/* one mutex around the whole decision and esp_wifi_set_ps: the restore timer (esp_timer task) and a new holder
+ * (LVGL / update task) must not interleave, or power save could come back on while a stream plays */
+static StaticSemaphore_t s_hold_buf;
+static SemaphoreHandle_t s_hold_lock;
 static uint32_t s_hold;            /* wifi_hold_t bits */
 static bool s_ps_off;              /* WIFI_PS_NONE is in effect */
 static esp_timer_handle_t s_ps_timer;
 
 static void ps_restore(void *arg)
 {
-    portENTER_CRITICAL(&s_hold_mux);
-    bool idle = s_hold == 0;
-    portEXIT_CRITICAL(&s_hold_mux);
-    if (idle && s_ps_off) {
+    xSemaphoreTake(s_hold_lock, portMAX_DELAY);
+    if (s_hold == 0 && s_ps_off) {
         esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
         s_ps_off = false;
         ESP_LOGI(TAG, "power save back on");
     }
+    xSemaphoreGive(s_hold_lock);
 }
 
 void wifi_mgr_hold_awake(wifi_hold_t who, bool on)
 {
-    if (!s_ps_timer) {
-        esp_timer_create_args_t a = {.callback = ps_restore, .name = "wifi_ps"};
-        if (esp_timer_create(&a, &s_ps_timer) != ESP_OK) return;
-    }
-    portENTER_CRITICAL(&s_hold_mux);
+    if (!s_hold_lock) return; /* before wifi_mgr_start */
+    xSemaphoreTake(s_hold_lock, portMAX_DELAY);
     uint32_t before = s_hold;
     s_hold = on ? s_hold | who : s_hold & ~who;
-    uint32_t after = s_hold;
-    portEXIT_CRITICAL(&s_hold_mux);
-    if (after) {
+    if (s_hold) {
         esp_timer_stop(s_ps_timer);
         if (!s_ps_off) {
             esp_wifi_set_ps(WIFI_PS_NONE);
@@ -82,6 +79,7 @@ void wifi_mgr_hold_awake(wifi_hold_t who, bool on)
         esp_timer_stop(s_ps_timer);
         esp_timer_start_once(s_ps_timer, 10 * 1000000); /* station switches and next/prev don't flap it */
     }
+    xSemaphoreGive(s_hold_lock);
 }
 static char s_cur_ssid[33];
 static esp_netif_t *s_sta_if, *s_ap_if;
@@ -598,6 +596,9 @@ static void discovery_task(void *arg)
 esp_err_t wifi_mgr_start(void)
 {
     s_ev = xEventGroupCreate();
+    s_hold_lock = xSemaphoreCreateMutexStatic(&s_hold_buf);
+    esp_timer_create_args_t pst = {.callback = ps_restore, .name = "wifi_ps"};
+    ESP_ERROR_CHECK(esp_timer_create(&pst, &s_ps_timer));
     s_lock = xSemaphoreCreateMutex();
     load_nets();
     if (s_nnets == 0) import_xiaozhi_nets();

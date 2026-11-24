@@ -676,8 +676,8 @@ tự tăng). Riêng bước đo mốc (5.1, 5.2) chạy trên 0.1.0 ngay từ đ
 - Toàn bộ chức năng của loa được chạy thử theo checklist, lỗi tìm thấy được sửa hoặc ghi lại.
 
 ### 5.1 Công cụ đo
-- `GET /api/debug` (cần đăng nhập web, chỉ có khi bật `CONFIG_MEOWBOX_DEBUG_API`, mặc định bật trong 0.2.0 để đo, xem
-  lại trước khi phát hành):
+- `GET /api/debug` (cần đăng nhập web). Decided in the review (2026-11-24): always on in 0.2.0, no Kconfig switch; it
+  only reads counters and needs a login:
   - RAM trong: trống, thấp nhất, khối lớn nhất (`heap_caps_get_largest_free_block`), riêng phần DMA;
   - PSRAM: trống, thấp nhất, khối lớn nhất;
   - từng task: tên, core, priority, stack còn dư thấp nhất (`uxTaskGetStackHighWaterMark`), % CPU (bật

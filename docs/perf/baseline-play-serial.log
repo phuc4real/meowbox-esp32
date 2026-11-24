@@ -159,8 +159,8 @@ I (3610) wifi:set rx beacon pti, rx_bcn_pti: 0, bcn_timeout: 25000, mt_pti: 0, m
 I (3640) wifi:<ba-add>idx:0 (ifx:0, xx:xx:xx:xx:xx:xx), tid:0, ssn:2, winSize:64
 I (3652) wifi:AP's beacon interval = 102400 us, DTIM period = 1
 I (4679) wifi:<ba-add>idx:1 (ifx:0, xx:xx:xx:xx:xx:xx), tid:6, ssn:2, winSize:64
-I (6763) esp_netif_handlers: sta ip: 192.168.1.130, mask: 255.255.255.0, gw: 192.168.1.1
-I (6763) wifi: connected to <home-wifi>, ip 192.168.1.130
+I (6763) esp_netif_handlers: sta ip: 192.168.x.x, mask: 255.255.255.0, gw: 192.168.x.1
+I (6763) wifi: connected to <home-wifi>, ip 192.168.x.x
 I (6763) wifi: mode -> sta
 I (8302) player: state stop -> 1
 I (8302) player: play https://stream.zeno.fm/jxniabwipmhtv (99.8 Radio (MP3 128k))

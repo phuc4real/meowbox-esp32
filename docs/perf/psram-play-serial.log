@@ -158,8 +158,8 @@ I (3628) wifi:dp: 1, bi: 102400, li: 3, scale listen interval from 307200 us to 
 I (3628) wifi:set rx beacon pti, rx_bcn_pti: 0, bcn_timeout: 25000, mt_pti: 0, mt_time: 10000
 I (3636) wifi:AP's beacon interval = 102400 us, DTIM period = 1
 I (4591) wifi:<ba-add>idx:0 (ifx:0, xx:xx:xx:xx:xx:xx), tid:6, ssn:2, winSize:64
-I (6807) esp_netif_handlers: sta ip: 192.168.1.130, mask: 255.255.255.0, gw: 192.168.1.1
-I (6807) wifi: connected to <home-wifi>, ip 192.168.1.130
+I (6807) esp_netif_handlers: sta ip: 192.168.x.x, mask: 255.255.255.0, gw: 192.168.x.1
+I (6807) wifi: connected to <home-wifi>, ip 192.168.x.x
 I (6807) wifi: mode -> sta
 I (8049) wifi:<ba-add>idx:1 (ifx:0, xx:xx:xx:xx:xx:xx), tid:0, ssn:2, winSize:64
 I (8216) player: state stop -> 1

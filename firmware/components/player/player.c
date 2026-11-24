@@ -244,6 +244,10 @@ static void parse_icy_meta(const char *m)
 static void stream_loop(uint32_t gen, esp_http_client_handle_t c, int metaint)
 {
     uint8_t *buf = malloc(4096);
+    if (!buf) {
+        set_err(gen, "no_mem", 0);
+        return;
+    }
     int until_meta = metaint;
     /* stall check: while buffering, under a quarter of the bitrate for 10 s -> reconnect (servers that trickle
      * bytes never hit the read timeout; a fresh connection usually comes back at full speed) */
@@ -298,11 +302,12 @@ static void hls_loop(uint32_t gen, const char *playlist_url)
 {
     char *url = heap_caps_malloc(URL_MAX, MALLOC_CAP_SPIRAM);
     char *seg = heap_caps_malloc(URL_MAX, MALLOC_CAP_SPIRAM);
-    snprintf(url, URL_MAX, "%s", playlist_url);
     long long last_seq = -1;
     int target = 6;
     uint8_t *buf = malloc(4096);
-    int fails = 0;
+    int fails = buf && url && seg ? 0 : 5; /* out of memory: skip the loop */
+    if (fails) set_err(gen, "no_mem", 0);
+    else snprintf(url, URL_MAX, "%s", playlist_url);
     s_hls = true;
     while (alive(gen) && fails < 5) {
         char final[URL_MAX];
@@ -385,6 +390,11 @@ static void fetch_task(void *arg)
 {
     uint32_t gen = (uint32_t)(uintptr_t)arg;
     char *url = heap_caps_malloc(URL_MAX, MALLOC_CAP_SPIRAM);
+    if (!url) {
+        if (alive(gen)) set_state(PLAYER_ERR);
+        vTaskDeleteWithCaps(NULL);
+        return;
+    }
     xSemaphoreTake(s_lock, portMAX_DELAY);
     snprintf(url, URL_MAX, "%s", s_url);
     xSemaphoreGive(s_lock);
@@ -403,6 +413,10 @@ static void fetch_task(void *arg)
                 int metaint = s_hdrs.metaint;
                 if (is_playlist(ctype, url) && !(ctype && strstr(ctype, "audio/mpeg"))) {
                     char *txt = calloc(1, 8193);
+                    if (!txt) {
+                        esp_http_client_cleanup(c);
+                        break;
+                    }
                     int n = 0, r;
                     while (n < 8192 && (r = esp_http_client_read(c, txt + n, 8192 - n)) > 0) n += r;
                     esp_http_client_cleanup(c);

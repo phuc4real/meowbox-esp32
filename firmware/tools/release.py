@@ -81,7 +81,7 @@ def main():
         shutil.copy(a.agent, out)
         files.append(os.path.join(out, os.path.basename(a.agent)))
     json.dump(manifest, open(files[1], "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    print(f"{tag}: {name} {len(data)} B sha256 {manifest["app"]["sha256"][:16]}... -> {out}")
+    print(f"{tag}: {name} {len(data)} B sha256 {manifest['app']['sha256'][:16]}... -> {out}")
 
     if a.publish:
         if git("status", "--porcelain", "--untracked-files=no"):

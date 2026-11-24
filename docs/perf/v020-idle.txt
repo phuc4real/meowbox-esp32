@@ -1,0 +1,61 @@
+t=33 int_free=47727 int_min=7796 int_big=32768 dma_free=39627 dma_big=32768 ps_free=7970664 ps_min=7943916 ps_big=7864320 rssi=-59 play=stop
+t=43 int_free=47727 int_min=7796 int_big=32768 dma_free=39627 dma_big=32768 ps_free=7970664 ps_min=7943916 ps_big=7864320 rssi=-57 play=stop
+t=53 int_free=47727 int_min=7796 int_big=32768 dma_free=39627 dma_big=32768 ps_free=7970664 ps_min=7943916 ps_big=7864320 rssi=-57 play=stop
+t=63 int_free=47727 int_min=7796 int_big=32768 dma_free=39627 dma_big=32768 ps_free=7970664 ps_min=7943916 ps_big=7864320 rssi=-58 play=stop
+t=73 int_free=47727 int_min=7796 int_big=32768 dma_free=39627 dma_big=32768 ps_free=7970664 ps_min=7943916 ps_big=7864320 rssi=-58 play=stop
+t=84 int_free=47727 int_min=7796 int_big=32768 dma_free=39627 dma_big=32768 ps_free=7970676 ps_min=7943916 ps_big=7864320 rssi=-57 play=stop
+t=94 int_free=47727 int_min=7796 int_big=32768 dma_free=39627 dma_big=32768 ps_free=7970676 ps_min=7943916 ps_big=7864320 rssi=-59 play=stop
+t=104 int_free=47539 int_min=7796 int_big=32768 dma_free=39447 dma_big=32768 ps_free=7970676 ps_min=7943916 ps_big=7864320 rssi=-60 play=stop
+t=115 int_free=47727 int_min=7796 int_big=32768 dma_free=39627 dma_big=32768 ps_free=7970676 ps_min=7943916 ps_big=7864320 rssi=-56 play=stop
+t=125 int_free=47727 int_min=7796 int_big=32768 dma_free=39627 dma_big=32768 ps_free=7970676 ps_min=7943916 ps_big=7864320 rssi=-56 play=stop
+t=135 int_free=47727 int_min=7796 int_big=32768 dma_free=39627 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-62 play=stop
+t=145 int_free=47727 int_min=7796 int_big=32768 dma_free=39627 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-60 play=stop
+t=156 int_free=47727 int_min=7796 int_big=32768 dma_free=39627 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-63 play=stop
+t=166 int_free=47727 int_min=7796 int_big=32768 dma_free=39627 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-59 play=stop
+t=176 int_free=47727 int_min=7796 int_big=32768 dma_free=39627 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-56 play=stop
+t=186 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-59 play=stop
+t=196 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-61 play=stop
+t=207 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-59 play=stop
+t=217 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-54 play=stop
+t=227 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-58 play=stop
+t=237 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-55 play=stop
+t=247 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-55 play=stop
+t=257 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-56 play=stop
+t=268 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-58 play=stop
+t=278 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-56 play=stop
+t=288 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-58 play=stop
+t=298 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-58 play=stop
+t=308 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-56 play=stop
+t=319 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-59 play=stop
+t=329 int_free=47707 int_min=7796 int_big=32768 dma_free=39615 dma_big=32768 ps_free=7970916 ps_min=7943916 ps_big=7864320 rssi=-57 play=stop
+
+== 30 samples -> ../docs/perf/v020-idle.csv
+int_free  min     47539  max     47727
+int_min   min      7796  max      7796
+int_big   min     32768  max     32768
+dma_free  min     39447  max     39627
+dma_big   min     32768  max     32768
+ps_free   min   7970664  max   7970916
+ps_min    min   7943916  max   7943916
+ps_big    min   7864320  max   7864320
+
+== tasks: lowest free stack (bytes), peak CPU %
+ipc1             core  1  stack_free    512  cpu_peak   0.0%
+ipc0             core  0  stack_free    552  cpu_peak   0.7%
+IDLE0            core  0  stack_free    768  cpu_peak  96.1%
+IDLE1            core  1  stack_free    776  cpu_peak  96.3%
+Tmr Svc          core -1  stack_free   1424  cpu_peak   0.0%
+battery          core  1  stack_free   1432  cpu_peak   0.9%
+discovery        core -1  stack_free   1572  (PSRAM)  cpu_peak   0.0%
+tcpip            core -1  stack_free   1816  cpu_peak   0.3%
+wifi_conn        core -1  stack_free   2248  cpu_peak   0.0%
+mdns             core  0  stack_free   2288  cpu_peak   0.1%
+weather          core -1  stack_free   2456  cpu_peak   0.0%
+mic              core  0  stack_free   2528  cpu_peak   1.2%
+sfx              core  0  stack_free   2572  cpu_peak   0.0%
+decode           core  1  stack_free   3056  cpu_peak   0.0%
+esp_timer        core  0  stack_free   3056  cpu_peak   1.1%
+sys_evt          core  0  stack_free   3316  cpu_peak   0.0%
+taskLVGL         core  1  stack_free   3948  cpu_peak   4.1%
+wifi             core  0  stack_free   4340  cpu_peak   1.7%
+httpd            core  0  stack_free   5884  cpu_peak   0.3%

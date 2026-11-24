@@ -174,7 +174,10 @@ try:
     c, j = req("POST", "/api/login", {"user": "meowbox", "pass": "m30w-secret"}); check("login new pw", c == 200 and j["def_pw"] is False)
     c, j = req("POST", "/api/reboot", {}); check("reboot", j.get("ok"))
     req("POST", "/api/login", {"user": "meowbox", "pass": "m30w-secret"})
-    c, j = req("POST", "/api/factory_reset", {"confirm": True}); check("factory reset", j.get("ok"))
+    check("factory_reset bad scope -> 400", req("POST", "/api/factory_reset", {"confirm": True, "scope": "x"})[0] == 400)
+    c, j = req("POST", "/api/factory_reset", {"confirm": True, "scope": "data"}); check("clear data", j.get("ok"))
+    c, j = req("POST", "/api/login", {"user": "meowbox", "pass": "m30w-secret"}); check("clear data keeps password", c == 200)
+    c, j = req("POST", "/api/factory_reset", {"confirm": True, "scope": "all"}); check("factory reset", j.get("ok"))
     c, j = req("POST", "/api/login", {"user": "meowbox", "pass": "m3owb0x2026"}); check("default pw after reset", c == 200 and j["def_pw"])
     c, j = req("GET", "/api/theme"); check("factory reset -> swiss", j.get("theme") == "swiss")
 

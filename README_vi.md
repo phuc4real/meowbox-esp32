@@ -74,7 +74,7 @@ máy tính phải cùng mạng Wi-Fi với loa.
 | Cài đặt → Giao diện | theme, chế độ đêm, độ sáng ban đêm, hiệu ứng, ngôn ngữ trên loa |
 | Cài đặt → Wi-Fi | các mạng đã lưu, thứ tự ưu tiên, Wi-Fi cài đặt |
 | Cài đặt → Thời tiết | thành phố, bật/tắt thời tiết trên đồng hồ |
-| Cài đặt → Hệ thống | đổi mật khẩu, cập nhật firmware, khởi động lại, xoá toàn bộ cấu hình |
+| Cài đặt → Hệ thống | đổi mật khẩu, cập nhật firmware, khởi động lại, xoá dữ liệu, khôi phục cài đặt gốc |
 
 ## 4. Radio
 
@@ -181,11 +181,15 @@ Loa còn chạy bản 0.1.0 thì chưa có nút cập nhật. Tải file `meowbo
 | Hiện tượng | Thử |
 |---|---|
 | Không mở được `meowbox-xxxx.local` | dùng IP trên màn Hệ thống; kiểm tra điện thoại có cùng Wi-Fi với loa |
-| Quên mật khẩu web | nút "Xoá toàn bộ cấu hình" cần đăng nhập, nên phải xoá phân vùng `data` qua cáp USB (xem [firmware/README.md](firmware/README.md)); loa về mật khẩu mặc định |
+| Quên mật khẩu web | hai nút xoá trên web đều cần đăng nhập, nên phải xoá phân vùng `data` qua cáp USB (xem [firmware/README.md](firmware/README.md)); loa về mật khẩu mặc định |
 | Loa không vào được Wi-Fi mới | mở Wi-Fi cài đặt (giữ VOL+ và VOL− 3 giây) và nhập lại |
 | Radio hay ngắt | xem số liệu ở màn Hệ thống: tốc độ tải thấp hơn bitrate là do mạng. Thử đài bitrate thấp hơn (64 kbps) |
 | YouTube không phát | máy tính phải bật PC agent và đã nối loa. Trong cửa sổ Kết nối loa có bước kiểm tra relay. Mạng Windows đặt là Public thì bấm "Cho phép trên mạng này" |
 | Màn PC trống | agent chưa chạy hoặc đang nối loa khác: xem icon con mèo ở khay hệ thống |
 
-**Xoá toàn bộ cấu hình** (Cài đặt → Hệ thống) xoá Wi-Fi, đài, báo thức, mèo, mật khẩu và token. Sau đó loa quay về
-Wi-Fi cài đặt `MeowBox-XXXX` như lúc mới.
+Hai nút ở **Cài đặt → Hệ thống**, phải đăng nhập mới dùng được. Bấm xong, trang web hỏi lại một lần nữa rồi mới làm:
+
+| Nút | Xoá | Giữ lại |
+|---|---|---|
+| **Xoá dữ liệu** | lịch sử pin, lịch sử thông báo, mèo (có mèo mới, vẫn giữ tên) | cài đặt, Wi-Fi, đài, báo thức, mật khẩu, token |
+| **Khôi phục cài đặt gốc** | tất cả, kể cả mật khẩu và token | không giữ gì: loa quay về Wi-Fi cài đặt `MeowBox-XXXX` như lúc mới |

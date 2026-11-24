@@ -17,6 +17,7 @@
 #include "esp_mac.h"
 #include "esp_ota_ops.h"
 #include "psa/crypto.h"
+#include "nvs.h"
 #include "settings.h"
 #include "webui.h"
 
@@ -575,14 +576,33 @@ static esp_err_t h_reboot(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* POST /api/factory_reset {"confirm":true,"scope":"all"|"data"}.
+ * "data": battery log, cat save and the like go at the next boot; settings, Wi-Fi, stations, alarms, password stay.
+ * "all" (default): /data is formatted, and the networks xiaozhi left in NVS are dropped too, or the next boot would
+ * import them again instead of opening the setup hotspot. */
 static esp_err_t h_factory(httpd_req_t *req)
 {
     cJSON *j = web_read_json(req);
     if (!j) return ESP_OK;
     bool ok = cJSON_IsTrue(cJSON_GetObjectItem(j, "confirm"));
+    const char *scope = cJSON_GetStringValue(cJSON_GetObjectItem(j, "scope"));
+    bool data_only = scope && !strcmp(scope, "data");
+    if (scope && !data_only && strcmp(scope, "all")) ok = false;
     cJSON_Delete(j);
     if (!ok) return web_send_err(req, 400, "bad_value");
+    if (data_only) {
+        if (settings_request_data_wipe() != ESP_OK) return web_send_err(req, 500, "busy");
+        web_send_ok(req);
+        reboot_later();
+        return ESP_OK;
+    }
     web_send_ok(req);
+    nvs_handle_t h;
+    if (nvs_open("wifi", NVS_READWRITE, &h) == ESP_OK) {
+        nvs_erase_all(h);
+        nvs_commit(h);
+        nvs_close(h);
+    }
     settings_factory_reset();
     reboot_later();
     return ESP_OK;

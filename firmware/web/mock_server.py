@@ -614,9 +614,14 @@ class H(BaseHTTPRequestHandler):
             return self.send_json({"ok": True})
         if key == ("POST", "/api/factory_reset"):
             b = self.body()
-            need(b.get("confirm") is True)
-            S.clear()
-            S.update(fresh_state())
+            need(b.get("confirm") is True and b.get("scope", "all") in ("all", "data"))
+            if b.get("scope") == "data":  # history and the cat go, configuration stays (the speaker reboots)
+                fresh = fresh_state()
+                S["hist"] = fresh["hist"]
+                S["cat"]["stats"] = fresh["cat"]["stats"]
+            else:
+                S.clear()
+                S.update(fresh_state())
             SESS.clear()
             return self.send_json({"ok": True})
         raise Err(404, "not_found")

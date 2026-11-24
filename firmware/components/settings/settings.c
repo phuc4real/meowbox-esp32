@@ -152,12 +152,58 @@ static esp_err_t mount(const char *label, const char *base, bool format_if_fail)
     return ESP_OK;
 }
 
+#define WIPE_FLAG "/data/.wipe"
+
+/* what "clear data" keeps: the configuration */
+static bool is_config(const char *name)
+{
+    return !strcmp(name, "cfg") || !strcmp(name, "auth.json") || !strcmp(name, "wifi.json");
+}
+
+static void rm_tree(const char *path)
+{
+    struct stat st;
+    if (stat(path, &st) != 0) return;
+    if (S_ISDIR(st.st_mode)) {
+        DIR *d = opendir(path);
+        struct dirent *e;
+        char sub[288]; /* d_name can be up to 255 */
+        while (d && (e = readdir(d))) {
+            if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+            snprintf(sub, sizeof(sub), "%s/%s", path, e->d_name);
+            rm_tree(sub);
+        }
+        if (d) closedir(d);
+        rmdir(path);
+    } else unlink(path);
+}
+
+static void wipe_data_if_requested(void)
+{
+    struct stat st;
+    if (stat(WIPE_FLAG, &st) != 0) return;
+    DIR *d = opendir("/data");
+    struct dirent *e;
+    char path[272];
+    while (d && (e = readdir(d))) {
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..") || is_config(e->d_name)) continue;
+        snprintf(path, sizeof(path), "/data/%s", e->d_name);
+        rm_tree(path);
+    }
+    if (d) closedir(d);
+    unlink(WIPE_FLAG);
+    ESP_LOGW(TAG, "data cleared (configuration kept)");
+}
+
+esp_err_t settings_request_data_wipe(void) { return settings_write_file(WIPE_FLAG, "1", 1); }
+
 esp_err_t settings_init(void)
 {
     s_lock = xSemaphoreCreateMutex();
     mount("storage", "/storage", false); /* assets; a missing image is not fatal */
     esp_err_t r = mount("data", "/data", true);
     if (r != ESP_OK) return r;
+    wipe_data_if_requested();
     mkdir(CFG_DIR, 0775);
     for (size_t i = 0; i < NGROUPS; i++) load_group(&s_groups[i]);
     return ESP_OK;

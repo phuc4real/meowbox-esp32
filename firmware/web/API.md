@@ -431,8 +431,14 @@ Any failure before that leaves the running version untouched.
 Body `{}` → `{"ok":true}`, reboots after ~1 s.
 
 ### `POST /api/factory_reset`
-Body `{"confirm":true}` → `{"ok":true}`. Erases NVS (Wi-Fi, stations, alarms, cat, password, token) and
-reboots into the SoftAP portal. Without `confirm:true` → `400 bad_value`.
+Body `{"confirm":true,"scope":"all"}` → `{"ok":true}`, then the speaker reboots. Without `confirm:true`, or with
+another `scope` → `400 bad_value`.
+- `scope` `"all"` (default, **Factory reset** on the web page): formats `/data` (Wi-Fi list, stations, alarms, cat,
+  battery log, password, token, every setting) and drops the networks the vendor firmware left in NVS. The speaker
+  comes back in setup mode (SoftAP portal), login `meowbox` / `m3owb0x2026`.
+- `scope` `"data"` (**Clear data**): at the next boot deletes everything in `/data` except the configuration
+  (`cfg/`, `auth.json`, `wifi.json`): battery log and sessions, cat save (a new cat starts), update outcome. The
+  notification history is in RAM and goes with the reboot. Settings, Wi-Fi, stations, alarms, password and token stay.
 
 ---
 

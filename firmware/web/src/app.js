@@ -372,7 +372,8 @@ try{await api('/api/password',{b:{old:pw.old,new:pw.new},quiet:1});toast(t('pwOk
 fld(t('oldPw'),bind(pw,'old',{type:'password',autocomplete:'current-password',required:true})),fld(t('newPw'),bind(pw,'new',{type:'password',autocomplete:'new-password',required:true,minLength:6,maxLength:32})),
 fld(t('newPw2'),bind(pw,'n2',{type:'password',autocomplete:'new-password',required:true})),h('button',0,t('chpw')))),
 sec(t('nSys'),row(btn(t('reboot'),async()=>{if(await ask(t('reboot'),t('rebootQ'),t('reboot'))){await api('/api/reboot',{b:{}});waitBack(t('reboot'))}},'ghost'),btn(t('logout'),logout,'ghost'))),
-sec(t('danger'),h('div',{class:'lim'},h('p',{class:'muted'},t('factoryQ')),btn(t('factory'),async()=>{if(await ask(t('factory'),t('factoryQ'),t('factory'),1)){await api('/api/factory_reset',{b:{confirm:true}});main.replaceChildren(h('p',0,t('factoryOk')))}},'danger')))]}
+sec(t('danger'),h('div',{class:'lim'},h('p',{class:'muted'},t('dataQ')),btn(t('dataReset'),async()=>{if(await ask(t('dataReset'),t('dataQ'),t('dataReset'),1)){await api('/api/factory_reset',{b:{confirm:true,scope:'data'}});waitBack(t('dataOk'))}},'danger'),
+h('p',{class:'muted'},t('factoryQ')),btn(t('factory'),async()=>{if(await ask(t('factory'),t('factoryQ'),t('factory'),1)){await api('/api/factory_reset',{b:{confirm:true,scope:'all'}});main.replaceChildren(h('p',0,t('factoryOk')))}},'danger')))]}
 
 // ---------- shell ----------
 // key: [nav icon (0 = only in the settings sub-nav), label, page, settings group]

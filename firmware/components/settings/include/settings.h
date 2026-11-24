@@ -40,6 +40,10 @@ esp_err_t settings_write_file(const char *path, const void *data, size_t len); /
 /* Erases /data completely (factory reset). */
 esp_err_t settings_factory_reset(void);
 
+/* "Clear data": everything in /data except the configuration (cfg/, auth.json, wifi.json) is deleted at the next
+ * boot, before any app opens its files: battery log, cat save, update outcome... Call it, then restart. */
+esp_err_t settings_request_data_wipe(void);
+
 #ifdef __cplusplus
 }
 #endif

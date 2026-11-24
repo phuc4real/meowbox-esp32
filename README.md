@@ -10,14 +10,14 @@ other projects.
 
 | Swiss (default) | Cyberpunk | Zen | Brutalism |
 |---|---|---|---|
-| ![Swiss](firmware/storage/web/themes/swiss.png) | ![Cyberpunk](firmware/storage/web/themes/cyberpunk.png) | ![Zen](firmware/storage/web/themes/zen.png) | ![Brutalism](firmware/storage/web/themes/brutal.png) |
+| ![Swiss](firmware/web/assets/themes/swiss.png) | ![Cyberpunk](firmware/web/assets/themes/cyberpunk.png) | ![Zen](firmware/web/assets/themes/zen.png) | ![Brutalism](firmware/web/assets/themes/brutal.png) |
 
 ## Repository layout
 
 | Path | What |
 |---|---|
 | [`firmware/`](firmware/README.md) | **MeowBox** (ESP-IDF 6.1): board layer, audio, streaming player, Wi-Fi + web server, UI themes, apps, web UI |
-| [`pc-agent/`](pc-agent/README.md) | Windows companion: PC stats, media keys, YouTube relay, notifications, spoken alerts |
+| [`pc-agent/`](pc-agent/README.md) | Windows companion (tray app + installer): PC stats, media keys, YouTube relay, notifications, spoken alerts |
 | [`hw/`](hw/) | reusable C headers: every pin/address ([`ostb_xiaozhi_3st.h`](hw/ostb_xiaozhi_3st.h)), LCD init table |
 | [`docs/`](docs/) | hardware, pin map, reverse engineering, plans |
 | [`tools/`](tools/) | firmware analysis scripts used to reverse-engineer the vendor binary |
@@ -30,11 +30,14 @@ other projects.
 | [docs/hardware.md](docs/hardware.md) | parts, block diagram, audio path, power |
 | [docs/pinmap.md](docs/pinmap.md) | every GPIO with how it was verified, free pins, display geometry |
 | [docs/reverse-engineering.md](docs/reverse-engineering.md) | how the pins were dug out of the vendor binary, step by step |
-| [docs/plan.md](docs/plan.md) | MeowBox feature plan and status (in Vietnamese) |
+| [docs/plan.md](docs/plan.md) | original MeowBox feature plan, 0.1.0 (in Vietnamese) |
+| [docs/firmware_v0.2.0.md](docs/firmware_v0.2.0.md) | 0.2.0 plan and status: web, PC agent, GitHub updates, radio, performance (mostly Vietnamese) |
+| [docs/roadmap.md](docs/roadmap.md) | ideas parked for later: MeowBox Cloud, theme UI/UX pass, PC agent UI/UX |
+| [docs/perf/](docs/perf/results-0.2.0.md) | memory/CPU measurements and the 0.2.0 code review |
 | [docs/ui_redesign.md](docs/ui_redesign.md) | UI review, theme system, per-theme rules (in Vietnamese) |
-| [docs/agent_rework.md](docs/agent_rework.md) | planned PC agent rework: tray app + installer (in Vietnamese, not started) |
 | [firmware/README.md](firmware/README.md) | build, flash, use, regenerate assets, partitions |
 | [firmware/web/API.md](firmware/web/API.md) | REST API of the speaker |
+| [pc-agent/README.md](pc-agent/README.md) | PC agent: install, tray menu, YouTube relay, command line (in Vietnamese) |
 
 ## Hardware at a glance
 
@@ -49,7 +52,19 @@ other projects.
 | Power | charge detect 47, battery voltage on 17 (ADC2 CH6) |
 | USB | native USB-Serial/JTAG; flashing needs no buttons |
 
-## Quick start
+## Install a release
+
+Download from [Releases](https://github.com/phuc4real/meowbox-esp32/releases/latest):
+
+- `meowbox-<ver>.bin`: the firmware, web UI included. A speaker already on MeowBox updates itself from the web page
+  (**System → Check now → Update now**; it checks size and SHA-256 and rolls back if the new image does not start).
+  On 0.1.0, upload the `.bin` under **Firmware update** on the web page. Settings and Wi-Fi are kept.
+- `MeowBoxAgent-Setup-<ver>.exe`: the Windows PC agent (tray app, installer). See [pc-agent/README.md](pc-agent/README.md).
+- `manifest.json`: what the speaker reads to find updates.
+
+The first install on a speaker that still runs the vendor firmware needs USB: build and flash as below.
+
+## Build from source
 
 ```powershell
 # in an ESP-IDF 6.1 shell (or: . $env:IDF_PATH\export.ps1 / source $IDF_PATH/export.sh)
@@ -74,7 +89,10 @@ python -m esptool --port COM10 -b 921600 write-flash 0 backup\speaker_full_16MB.
 - [ ] Measure the visible screen area (System tile → long-press the title) and set `UI_SAFE_X/Y`
 - [ ] Run the battery flat once to calibrate the % scale; power saving
 - [ ] Night palette for the cat; mini game; ntfy.sh; FPS measurement
-- [ ] Internal RAM is tight while streaming (~8 KB minimum free); optimise before adding big features
+- [x] 0.2.0: web UI embedded in the app, updates from GitHub Releases, steadier radio, PC agent installer
+- [x] Internal RAM while streaming: lowest free 41 KB under the heaviest load tested (was ~18 KB), see
+      [docs/perf/results-0.2.0.md](docs/perf/results-0.2.0.md)
+- [ ] 0.2.0 hands-on checklist (buttons, battery, alarms, hotspot, unfamiliar Wi-Fi) and a 24 h run
 - [ ] Find out which "free" GPIOs actually reach pads on the PCB
 
 ## Licences
@@ -84,8 +102,9 @@ MeowBox code, docs, tools and the cat sprites (original pixel art) are released 
 
 | Part | Licence |
 |---|---|
-| Fonts in `firmware/tools/fonts/src/` and the fonts generated from them (`firmware/components/fonts/`, `firmware/storage/web/fonts/`): Be Vietnam Pro, Archivo, Chakra Petch, VT323, Cormorant Garamond, Noto Serif JP (one glyph), IBM Plex Mono, Tinos, JetBrains Mono | SIL Open Font License 1.1 (each font folder has its `OFL.txt`) |
+| Fonts in `firmware/tools/fonts/src/` and the fonts generated from them (`firmware/components/fonts/`, `firmware/web/assets/fonts/`): Be Vietnam Pro, Archivo, Chakra Petch, VT323, Cormorant Garamond, Noto Serif JP (one glyph), IBM Plex Mono, Tinos, JetBrains Mono | SIL Open Font License 1.1 (each font folder has its `OFL.txt`) |
 | Font Awesome symbols merged into the UI fonts (from LVGL) | SIL OFL 1.1 (Font Awesome Free) |
+| yt-dlp and ffmpeg (LGPL build), downloaded by the PC agent at install / first use, not shipped | Unlicense / LGPL 2.1+ |
 | ESP-IDF and the managed components (LVGL, esp_codec_dev, esp_audio_codec, ...) | fetched at build time under their own licences, not included here |
 
 This project is not affiliated with the speaker's vendor. No vendor firmware is included; the reverse

@@ -6,8 +6,9 @@ App nhỏ chạy trên PC Windows, làm mấy việc này cho loa MeowBox:
 - Gửi bài đang phát (Spotify, Chrome, Edge...) và nhận lệnh ⏮ ⏯ ⏭ 🔉 🔊 từ loa.
 - Gửi thông báo từ dòng lệnh (`notify`), hoặc đọc thành tiếng bằng TTS Windows (`say`).
 - Bật lại Wi-Fi cài đặt `MeowBox-XXXX` trên loa (`wifi-setup`).
-- Làm **YouTube relay**: loa xin `http://<pc>:8765/yt/stream?url=...` thì agent dùng yt-dlp + ffmpeg đổi
-  sang MP3 128 kbps rồi stream về như một đài radio. Chỉ loa đang nối mới dùng được relay, máy khác nhận 403.
+- Làm **YouTube relay**: loa xin `http://<pc>:8765/yt/stream?url=...` thì agent dùng yt-dlp lấy audio AAC rồi
+  stream về như một đài radio (không mã hoá lại, xem mục YouTube bên dưới). Chỉ loa đang nối mới dùng được relay,
+  máy khác nhận 403.
 
 ## Cài bằng file cài đặt (khuyên dùng)
 

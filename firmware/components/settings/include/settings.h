@@ -13,7 +13,7 @@
 extern "C" {
 #endif
 
-/* Mounts /storage (assets, read-only use) and /data (user data). */
+/* Mounts /data (user data, LittleFS) and loads every settings group. */
 esp_err_t settings_init(void);
 
 /* Returns a copy of the group (defaults merged in). Caller must cJSON_Delete(). NULL for unknown group. */

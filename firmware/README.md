@@ -17,7 +17,7 @@ the speaker. Plan and status: [../docs/firmware_v0.2.0.md](../docs/firmware_v0.2
 # in an ESP-IDF 6.1 shell (or: . $env:IDF_PATH\export.ps1 / source $IDF_PATH/export.sh)
 cd firmware
 idf.py build
-idf.py -p COM10 -b 921600 flash          # first time: bootloader + partitions + app (web UI inside) + storage
+idf.py -p COM10 -b 921600 flash          # first time: bootloader + partition table + app (web UI inside)
 # later, app only:   idf.py -p COM10 -b 921600 app-flash
 ```
 
@@ -114,18 +114,27 @@ PC screen, media keys, YouTube relay and spoken notifications: see [../pc-agent/
 | `components/fonts` | LVGL fonts with Vietnamese glyphs: base Be Vietnam Pro + 4 per theme (generated) |
 | `components/cat_sprites` | pixel-art cat (generated, see `tools/cat_sprites`) |
 | `web/` | web UI source, REST contract [`API.md`](web/API.md), mock server, tests |
-| `storage/` | assets image for the `storage` partition (empty for now: the web UI moved into the app in 0.2.0) |
 | `tools/` | asset generators (themes, fonts, sprites, ensō), `memwatch.py` (memory/CPU log), `release.py` |
 
 ## Partitions
 
 | Name | Offset | Size | Use |
 |---|---|---|---|
-| nvs | 0x9000 | 16 KB | Wi-Fi driver / PHY |
-| otadata | 0xd000 | 8 KB | |
-| ota_0 / ota_1 | 0x20000 / 0x560000 | 5.25 MB each | app (OTA, rollback enabled) |
-| storage | 0xaa0000 | 4.4 MB | read-only assets (unused since 0.2.0; kept so the layout does not change) |
-| data | 0xf00000 | 1 MB | settings, Wi-Fi list, password hash, cat save, battery log |
+| nvs | 0x9000 | 16 KB | Wi-Fi driver settings and PHY calibration (about 10 of 263 entries used) |
+| otadata | 0xd000 | 8 KB | which app slot boots |
+| ota_0 / ota_1 | 0x20000 / 0x560000 | 5.25 MB each | app with the web UI inside (3.1 MB in 0.2.0; OTA, rollback enabled) |
+| (free) | 0xaa0000 | 4.4 MB | unallocated, see below |
+| data | 0xf00000 | 1 MB | LittleFS: settings, Wi-Fi list, password hash, cat save, battery log (about 30 KB used, the battery log grows to ~200 KB) |
+
+Up to 0.2.0 the table also had `phy_init` (unused: calibration is kept in NVS) and `storage`, a 4.4 MB assets
+partition that held the web UI before it moved into the app. Both are gone from `partitions.csv`; every other offset
+is unchanged. What that means:
+
+- **Updating over the air** (web page or GitHub) never rewrites the partition table. A speaker updated that way keeps
+  the old table with an unused `storage` partition: harmless, the firmware no longer mounts it.
+- **A full USB flash** (`idf.py flash`) writes the new table. Settings in `data` survive because its offset did not
+  move. The old `storage` bytes stay in flash, unused.
+- The free 4.4 MB can become a new partition later (sounds, recordings, a core dump) without moving anything else.
 
 On first boot MeowBox imports the Wi-Fi networks that xiaozhi saved in NVS.
 

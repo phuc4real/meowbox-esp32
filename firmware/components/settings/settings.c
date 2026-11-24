@@ -200,7 +200,6 @@ esp_err_t settings_request_data_wipe(void) { return settings_write_file(WIPE_FLA
 esp_err_t settings_init(void)
 {
     s_lock = xSemaphoreCreateMutex();
-    mount("storage", "/storage", false); /* assets; a missing image is not fatal */
     esp_err_t r = mount("data", "/data", true);
     if (r != ESP_OK) return r;
     wipe_data_if_requested();

@@ -1,11 +1,10 @@
-# MeowBox — vendor layout, with the old 5.4 MB assets area split in two:
-#   storage = read-only assets image (web UI, sounds, sprites), rebuilt from firmware/storage/
-#   data    = user data (config JSON, cat save), never overwritten by flashing assets
+# MeowBox partition table (16 MB flash). Offsets of nvs, otadata, ota_0, ota_1 and data are the same as in 0.1.0/0.2.0,
+# so updates over the air (which never rewrite this table) and existing user data keep working.
+# 0.2.1 dropped the "storage" assets partition (the web UI is inside the app since 0.2.0) and the unused "phy_init"
+# (PHY calibration lives in NVS). 0xaa0000-0xf00000 (4.4 MB) is unallocated, free for a future partition.
 # Name,     Type, SubType,  Offset,   Size
 nvs,        data, nvs,      0x9000,   0x4000
 otadata,    data, ota,      0xd000,   0x2000
-phy_init,   data, phy,      0xf000,   0x1000
 ota_0,      app,  ota_0,    0x20000,  0x540000
 ota_1,      app,  ota_1,    0x560000, 0x540000
-storage,    data, littlefs, 0xaa0000, 0x460000
 data,       data, littlefs, 0xf00000, 0x100000

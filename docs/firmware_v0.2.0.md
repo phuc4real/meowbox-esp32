@@ -654,6 +654,15 @@ Player giữ một struct số liệu, reset mỗi lần bắt đầu phát mộ
 Làm **cuối cùng**, sau khi mục 1–4 đã xong, vì các mục đó đổi nhiều code (web nhúng vào app, task cập nhật, bộ đệm
 tự tăng). Riêng bước đo mốc (5.1, 5.2) chạy trên 0.1.0 ngay từ đầu để có số so sánh.
 
+### Status (2026-11-24)
+- Done: 5.1 tools, measurement after sections 1-4, 5.3 code review (`docs/perf/review-0.2.0.md`, fixes in
+  `d95bc15`), heaviest scenario. Targets met: lowest internal RAM 40.8 KB, largest block 31 KB, 0 underruns
+  (`docs/perf/results-0.2.0.md`).
+- 5.4: nothing else needed by the numbers.
+- Still to do on the speaker: the hands-on rows of the 5.2 checklist (buttons, battery, alarms, hotspot, two
+  devices, rollback) and the 24 h run, on the final build before the Release. `PROJECT_VER` is still `0.1.0`:
+  bump it to `0.2.0` when releasing.
+
 ### Hiện trạng (lúc lên plan)
 - ESP32-S3, PSRAM octal 80 MHz, CPU 240 MHz. `SPIRAM_USE_MALLOC`: `malloc` trên 1 KB tự vào PSRAM, giữ 64 KB RAM trong
   cho DMA/driver. Wi-Fi/lwIP và mbedTLS đã được phép cấp phát trong PSRAM. Cho phép stack task nằm ở PSRAM nhưng

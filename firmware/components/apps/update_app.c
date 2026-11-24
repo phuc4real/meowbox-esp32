@@ -96,7 +96,8 @@ static char *http_get_small(const char *url, int max, int *status)
 {
     *status = 0;
     esp_http_client_config_t cfg = {.url = url, .crt_bundle_attach = esp_crt_bundle_attach, .timeout_ms = 10000,
-                                    .buffer_size = 2048, .max_redirection_count = 5, .user_agent = "MeowBox"};
+                                    .buffer_size = 2048, .buffer_size_tx = 2048, /* GitHub redirects to a ~900-byte URL */
+                                    .max_redirection_count = 5, .user_agent = "MeowBox"};
     esp_http_client_handle_t c = esp_http_client_init(&cfg);
     if (!c) return NULL;
     char *buf = NULL;
@@ -231,7 +232,7 @@ static void install_task(void *arg)
     settings_write_file(PENDING_FILE, pend, pl);
 
     esp_http_client_config_t http = {.url = url, .crt_bundle_attach = esp_crt_bundle_attach, .timeout_ms = 15000,
-                                     .buffer_size = 4096, .buffer_size_tx = 1024, .keep_alive_enable = true,
+                                     .buffer_size = 4096, .buffer_size_tx = 2048, .keep_alive_enable = true,
                                      .max_redirection_count = 5, .user_agent = "MeowBox"};
     esp_https_ota_config_t cfg = {.http_config = &http};
     esp_https_ota_handle_t h = NULL;

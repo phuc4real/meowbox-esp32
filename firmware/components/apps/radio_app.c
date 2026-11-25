@@ -161,9 +161,9 @@ static void show_need_relay(void)
 static void btn_cb(lv_event_t *e)
 {
     int a = (int)(intptr_t)lv_event_get_user_data(e);
-    if (a == 0) {
-        if (!radio_playing() && radio_play_id(0) == -2) show_need_relay();
-        else if (radio_playing()) player_stop();
+    if (a == 0) { /* decide once: after radio_play_id() the state is already "buffering" */
+        if (radio_playing()) player_stop();
+        else if (radio_play_id(0) == -2) show_need_relay();
     } else {
         radio_step(a);
     }

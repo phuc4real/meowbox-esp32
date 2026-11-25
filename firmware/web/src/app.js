@@ -309,7 +309,7 @@ const m={title:t('testT'),text:t('testX'),sound:'chime',priority:'normal',durati
 drawEx();loadH();
 return[sec(t('token'),h('div',{class:'lim'},row(h('div',{class:'grow'},ti),btn(t('show'),()=>ti.type=ti.type=='password'?'text':'password','sm ghost'),btn(t('copy'),()=>copy(c.token),'sm ghost')),
 h('p',{style:'margin-top:12px'},btn(t('regen'),async()=>{if(await ask(t('regen'),t('regenQ'),t('regen'),1)){Object.assign(c,await put('/api/config/notify',{regen:true}));drawEx();toast(t('saved'))}},'sm danger')))),
-sec(t('test'),h('form',{class:'lim',onsubmit:async e=>{e.preventDefault();await api('/api/notify',{b:m,tok:c.token});toast(t('sent'));setTimeout(loadH,500)}},
+sec(t('test'),h('form',{class:'lim',onsubmit:async e=>{e.preventDefault();const B=s=>new TextEncoder().encode(s||'').length;if(B(m.title)>48||B(m.text)>200)return toast(t('tooLong',{t:48,n:200}),1);await api('/api/notify',{b:m,tok:c.token});toast(t('sent'));setTimeout(loadH,500)}},
 fld(t('title'),bind(m,'title',{maxLength:48})),fld(t('text'),bind(m,'text',{required:true,maxLength:200})),
 h('div',{class:'two'},fld(t('sound'),bind(m,'sound',{tag:'select',opts:opt('snd')})),fld(t('prio_'),bind(m,'priority',{tag:'select',opts:opt('pr')}))),
 fld(t('dur'),bind(m,'duration',{type:'number',min:1,max:300})),h('button',0,t('test')))),

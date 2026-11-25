@@ -280,6 +280,7 @@
  "test": "Gửi thử",
  "title": "Tiêu đề",
  "text": "Nội dung",
+ "tooLong": "Quá dài: tiêu đề tối đa {t} byte, nội dung {n} byte (chữ có dấu chiếm 2–3 byte)",
  "prio_": "Mức ưu tiên",
  "pr": {
   "low": "Thấp",

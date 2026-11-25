@@ -1,4 +1,5 @@
 #include "settings.h"
+#include "utf8.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -268,7 +269,7 @@ char *settings_get_str(const char *group, const char *key, char *buf, size_t len
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
     const cJSON *v = peek(group, key);
-    snprintf(buf, len, "%s", cJSON_IsString(v) ? v->valuestring : (def ? def : ""));
+    utf8_copy(buf, len, cJSON_IsString(v) ? v->valuestring : (def ? def : ""));
     xSemaphoreGive(s_lock);
     return buf;
 }

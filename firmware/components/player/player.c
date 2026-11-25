@@ -19,6 +19,7 @@
 #include "esp_audio_simple_dec_default.h"
 #include "esp_audio_dec_default.h"
 #include "audio_hw.h"
+#include "utf8.h"
 
 static const char *TAG = "player";
 
@@ -247,6 +248,7 @@ static void parse_icy_meta(const char *m)
     int n = e ? (int)(e - t) : (int)strlen(t);
     xSemaphoreTake(s_lock, portMAX_DELAY);
     snprintf(s_title, sizeof(s_title), "%.*s", n, t);
+    utf8_trim(s_title);
     xSemaphoreGive(s_lock);
     ESP_LOGI(TAG, "title: %s", s_title);
 }

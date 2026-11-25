@@ -14,6 +14,7 @@
 #include "settings.h"
 #include "player.h"
 #include "audio_sfx.h"
+#include "utf8.h"
 
 static const char *TAG = "notify";
 
@@ -39,7 +40,7 @@ static int s_next_id = 1;
 static SemaphoreHandle_t s_lock;
 static bool s_resume_radio;
 
-static void copy_str(char *dst, size_t len, const char *src) { snprintf(dst, len, "%s", src ? src : ""); }
+static void copy_str(char *dst, size_t len, const char *src) { utf8_copy(dst, len, src); }
 
 /* Returns id, or -1 if the queue is full / bad input */
 int notify_post(const char *title, const char *text, const char *sound, const char *prio, int duration, const char *src)
@@ -141,6 +142,8 @@ static esp_err_t h_get(httpd_req_t *req)
     web_query(req, "duration", dur, sizeof(dur));
     text[200] = 0;
     title[48] = 0;
+    utf8_trim(text);
+    utf8_trim(title);
     return reply_id(req, notify_post(title, text, sound, prio, atoi(dur), "api"));
 }
 
@@ -164,6 +167,8 @@ static esp_err_t h_audio(httpd_req_t *req)
     web_query(req, "text", text, sizeof(text));
     title[48] = 0;
     text[200] = 0;
+    utf8_trim(title);
+    utf8_trim(text);
     bool was_radio = radio_playing() && !player_is_mem();
     if (player_play_mem(buf, got, title[0] ? title : "Notification") != ESP_OK) return web_send_err(req, 400, "bad_value");
     if (was_radio) s_resume_radio = true;

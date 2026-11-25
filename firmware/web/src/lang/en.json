@@ -280,6 +280,7 @@
  "test": "Send test",
  "title": "Title",
  "text": "Text",
+ "tooLong": "Too long: title at most {t} bytes, text {n} bytes (accented letters take 2–3)",
  "prio_": "Priority",
  "pr": {
   "low": "Low",

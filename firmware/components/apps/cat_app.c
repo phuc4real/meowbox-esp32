@@ -16,6 +16,7 @@
 #include "settings.h"
 #include "audio_sfx.h"
 #include "cat_sprites.h"
+#include "utf8.h"
 
 static const char *TAG = "cat";
 #define CAT_FILE "/data/cat.json"
@@ -506,10 +507,11 @@ static void cat_tick(lv_timer_t *t)
     if (ui_active_tile() == UI_TILE_CLOCK) update_mini();
     if (ui_active_tile() != UI_TILE_CAT || !s_cat_spr.img) return;
 
-    char name[24];
+    char name[72]; /* the web allows 16 characters: up to 64 bytes of Vietnamese */
     settings_get_str("cat", "name", name, sizeof(name), "Mướp");
-    char title[64];
+    char title[112];
     snprintf(title, sizeof(title), "%s, %s", name, stage_name(stage(), ui_lang_en()));
+    utf8_trim(title);
     if (strcmp(lv_label_get_text(s_title), title)) lv_label_set_text(s_title, title);
     update_bars();
 

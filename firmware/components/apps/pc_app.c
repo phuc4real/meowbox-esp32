@@ -12,6 +12,7 @@
 #include "ui.h"
 #include "net.h"
 #include "esp_http_client.h"
+#include "utf8.h"
 
 static const char *TAG = "pc";
 
@@ -60,9 +61,9 @@ static void handle_msg(cJSON *j)
         xSemaphoreGive(s_lock);
     } else if (!strcmp(t, "media")) {
         xSemaphoreTake(s_lock, portMAX_DELAY);
-        snprintf(s_d.app, sizeof(s_d.app), "%s", cJSON_GetStringValue(cJSON_GetObjectItem(j, "app")) ?: "");
-        snprintf(s_d.title, sizeof(s_d.title), "%s", cJSON_GetStringValue(cJSON_GetObjectItem(j, "title")) ?: "");
-        snprintf(s_d.artist, sizeof(s_d.artist), "%s", cJSON_GetStringValue(cJSON_GetObjectItem(j, "artist")) ?: "");
+        utf8_copy(s_d.app, sizeof(s_d.app), cJSON_GetStringValue(cJSON_GetObjectItem(j, "app")));
+        utf8_copy(s_d.title, sizeof(s_d.title), cJSON_GetStringValue(cJSON_GetObjectItem(j, "title")));
+        utf8_copy(s_d.artist, sizeof(s_d.artist), cJSON_GetStringValue(cJSON_GetObjectItem(j, "artist")));
         snprintf(s_d.state, sizeof(s_d.state), "%s", cJSON_GetStringValue(cJSON_GetObjectItem(j, "state")) ?: "stopped");
         s_d.pos = jint(j, "pos", 0);
         s_d.len = jint(j, "len", 0);

@@ -247,6 +247,8 @@ static int ap_clients(void)
     return (s_ap_on && esp_wifi_ap_get_sta_list(&l) == ESP_OK) ? l.num : 0;
 }
 
+int wifi_mgr_ap_clients(void) { return ap_clients(); }
+
 static void ap_enable(bool on)
 {
     if (on) s_ap_idle_since = esp_timer_get_time();

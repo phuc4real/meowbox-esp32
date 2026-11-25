@@ -118,15 +118,129 @@ static void sys_tick(lv_timer_t *t)
         lv_bar_set_value(s_bar[c], s_mic_db[c] < 20 ? 0 : (s_mic_db[c] - 20) * 100 / 70, LV_ANIM_OFF);
 }
 
+/* ---------------- Wi-Fi setup card: QR codes instead of typing the hotspot name and password ----------------
+ * Shown on the top layer while the setup hotspot is on (first setup, or opened by hand). Step 1: a Wi-Fi QR code
+ * ("WIFI:T:WPA;S:...;P:...;;", read by phone cameras and Zalo) to join the hotspot. Step 2, once a phone has joined:
+ * a QR code for the setup page. A tap hides it until the hotspot opens again; it closes with the hotspot. */
+static lv_obj_t *s_setup;
+static int s_setup_step;       /* 0 = none shown, 1 = join, 2 = open the page */
+static bool s_setup_hidden;    /* tapped away */
+static const void *s_setup_th; /* theme the card was drawn with */
+static bool s_setup_night;
+
+static void qr_escape(char *out, size_t len, const char *in)
+{
+    size_t o = 0;
+    for (; *in && o + 2 < len; in++) {
+        if (strchr("\\;,:\"", *in)) out[o++] = '\\';
+        out[o++] = *in;
+    }
+    out[o] = 0;
+}
+
+static void setup_close(void)
+{
+    if (s_setup) lv_obj_delete(s_setup);
+    s_setup = NULL;
+    s_setup_step = 0;
+}
+
+static void setup_tapped(lv_event_t *e)
+{
+    s_setup_hidden = true;
+    lv_obj_delete_async(s_setup); /* not inside its own event */
+    s_setup = NULL;
+    s_setup_step = 0;
+}
+
+static lv_obj_t *setup_text(lv_obj_t *col, ui_font_t f, ui_color_t c, const char *txt)
+{
+    lv_obj_t *l = ui_label(col, f, c, txt);
+    lv_obj_set_width(l, lv_pct(100));
+    lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+    return l;
+}
+
+static void setup_build(int step)
+{
+    setup_close();
+    s_setup_step = step;
+    s_setup_th = ui_theme();
+    s_setup_night = ui_is_night();
+    s_setup = lv_obj_create(lv_layer_top());
+    lv_obj_remove_style_all(s_setup);
+    lv_obj_set_size(s_setup, UI_W, UI_H);
+    lv_obj_set_style_bg_color(s_setup, ui_lc(UI_C_BG), 0);
+    lv_obj_set_style_bg_opa(s_setup, LV_OPA_COVER, 0);
+    lv_obj_add_flag(s_setup, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(s_setup, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(s_setup, setup_tapped, LV_EVENT_CLICKED, NULL);
+
+    /* black on white with a white margin in every theme: phone cameras read inverted codes badly */
+    const int qs = 128, pad = 6, qx = 18;
+    lv_obj_t *box = lv_obj_create(s_setup);
+    lv_obj_remove_style_all(box);
+    lv_obj_set_size(box, qs + 2 * pad, qs + 2 * pad);
+    lv_obj_set_pos(box, qx, (UI_H - qs - 2 * pad) / 2 - 8);
+    lv_obj_set_style_bg_color(box, lv_color_white(), 0);
+    lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
+    lv_obj_remove_flag(box, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_t *qr = lv_qrcode_create(box);
+    lv_qrcode_set_size(qr, qs);
+    lv_qrcode_set_dark_color(qr, lv_color_black());
+    lv_qrcode_set_light_color(qr, lv_color_white());
+    lv_obj_center(qr);
+    char data[200], ss[72], pw[72];
+    if (step == 1) {
+        qr_escape(ss, sizeof(ss), wifi_mgr_ap_ssid());
+        qr_escape(pw, sizeof(pw), wifi_mgr_ap_pass());
+        snprintf(data, sizeof(data), "WIFI:T:WPA;S:%s;P:%s;;", ss, pw);
+    } else {
+        snprintf(data, sizeof(data), "http://192.168.4.1");
+    }
+    lv_qrcode_update(qr, data, strlen(data));
+
+    const int cx = qx + qs + 2 * pad + 10;
+    lv_obj_t *col = lv_obj_create(s_setup);
+    lv_obj_remove_style_all(col);
+    lv_obj_set_pos(col, cx, 40);
+    lv_obj_set_size(col, UI_W - cx - UI_SAFE_X, 160);
+    lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(col, 6, 0);
+    lv_obj_remove_flag(col, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    if (step == 1) {
+        setup_text(col, UI_F_BODY, UI_C_ACCENT, ui_tr("Cài đặt Wi-Fi", "Wi-Fi setup"));
+        setup_text(col, UI_F_SMALL, UI_C_TEXT, ui_tr("Quét mã để vào Wi-Fi của loa", "Scan to join the speaker's Wi-Fi"));
+        setup_text(col, UI_F_SMALL, UI_C_DIM, wifi_mgr_ap_ssid());
+        snprintf(data, sizeof(data), "%s %s", ui_tr("Mật khẩu", "Password"), wifi_mgr_ap_pass());
+        setup_text(col, UI_F_SMALL, UI_C_DIM, data);
+    } else {
+        setup_text(col, UI_F_BODY, UI_C_OK, ui_tr("Đã vào Wi-Fi", "Joined"));
+        setup_text(col, UI_F_SMALL, UI_C_TEXT, ui_tr("Quét tiếp để mở trang cài đặt", "Scan again to open the setup page"));
+        setup_text(col, UI_F_SMALL, UI_C_DIM, "192.168.4.1");
+    }
+    lv_obj_t *hint = ui_label(s_setup, UI_F_SMALL, UI_C_DIM, ui_tr("Chạm để ẩn", "Tap to hide"));
+    lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -UI_SAFE_Y - 4);
+}
+
+static void setup_tick(lv_timer_t *t)
+{
+    if (!wifi_mgr_portal_on()) {
+        setup_close();
+        s_setup_hidden = false; /* show again the next time the hotspot opens */
+        return;
+    }
+    if (s_setup_hidden) return;
+    int step = wifi_mgr_ap_clients() > 0 ? 2 : 1;
+    if (step != s_setup_step || s_setup_th != (const void *)ui_theme() || s_setup_night != ui_is_night()) setup_build(step);
+    ui_force_bright(3); /* no screen sleep while someone is setting the speaker up */
+}
+
 void system_wifi_setup(bool in_lvgl)
 {
     wifi_mgr_start_portal();
     audio_sfx_play(SFX_BEEP_HI);
-    if (!in_lvgl && !board_lvgl_lock(500)) return;
-    char txt[96];
-    snprintf(txt, sizeof(txt), "%s\n%s %s", wifi_mgr_ap_ssid(), ui_tr("Mật khẩu", "Password"), wifi_mgr_ap_pass());
-    ui_overlay_show(LV_SYMBOL_WIFI, ui_tr("Cài đặt Wi-Fi", "Wi-Fi setup"), txt, UI_C_ACCENT, 20, NULL, NULL);
-    if (!in_lvgl) board_lvgl_unlock();
+    s_setup_hidden = false; /* setup_tick shows the card within half a second */
 }
 
 static void portal_clicked(lv_event_t *e) { system_wifi_setup(true); }
@@ -385,6 +499,7 @@ static esp_err_t h_shot(httpd_req_t *req)
 void system_app_init(void)
 {
     ui_register_builder(UI_TILE_SYSTEM, system_build);
+    lv_timer_create(setup_tick, 500, NULL);
     web_register("/api/screenshot", HTTP_GET, h_shot, WEB_AUTH_SESSION);
     web_register("/api/wifi/portal", HTTP_GET, portal_state, WEB_AUTH_TOKEN);
     web_register("/api/wifi/portal", HTTP_POST, h_portal_post, WEB_AUTH_TOKEN);

@@ -20,8 +20,10 @@ Mọi cài đặt làm trên trang web của loa.
 ## 1. Cài đặt lần đầu
 
 1. Bật loa. Chưa có Wi-Fi nào quen thì loa tự phát Wi-Fi cài đặt tên **`MeowBox-XXXX`** (XXXX là 4 ký tự riêng của
-   từng loa). Mật khẩu **`meowbox2026`**, cũng hiện trên màn hình.
-2. Dùng điện thoại hoặc máy tính vào Wi-Fi đó. Trang cài đặt tự mở. Không thấy thì mở `http://192.168.4.1`.
+   từng loa) và hiện một **mã QR** trên màn hình.
+2. Mở camera điện thoại (hoặc Zalo) và quét mã: điện thoại tự vào Wi-Fi đó, không cần gõ mật khẩu. Trang cài đặt
+   thường tự mở. Không thấy thì quét mã thứ hai hiện trên loa (hoặc mở `http://192.168.4.1`).
+   Muốn vào bằng tay: mật khẩu **`meowbox2026`**, cũng ghi cạnh mã QR. Chạm vào màn hình để ẩn mã.
 3. Chọn Wi-Fi nhà, nhập mật khẩu. Loa nối mạng, rồi khoảng 10 giây sau Wi-Fi cài đặt tự tắt.
    Nếu không ai dùng, Wi-Fi cài đặt cũng tự tắt sau 10 phút.
 4. Mở trang web của loa (mục 3) và **đổi mật khẩu đăng nhập** ngay lần đầu.

@@ -37,6 +37,7 @@ esp_err_t wifi_mgr_connect(const char *ssid, const char *pass /* NULL = saved */
 void wifi_mgr_start_portal(void);           /* open the setup hotspot by hand */
 bool wifi_mgr_stop_portal(void);            /* close it; refused (false) while offline */
 bool wifi_mgr_portal_on(void);
+int wifi_mgr_ap_clients(void); /* phones/PCs joined to the setup hotspot (0 when it is off) */
 /* Seconds until a hand-opened hotspot closes on its own: -1 = not applicable (closed, or offline),
  * -2 = paused because a client is connected */
 int wifi_mgr_portal_left_s(void);

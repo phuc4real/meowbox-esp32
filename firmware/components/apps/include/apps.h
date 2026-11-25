@@ -51,7 +51,7 @@ const char *update_available(void);       /* newer version found by the last che
 
 /* System/diagnostics tile */
 void system_app_init(void);
-/* Open the Wi-Fi setup hotspot and show its name + password; in_lvgl = caller already holds the LVGL lock */
+/* Open the Wi-Fi setup hotspot; its QR-code card shows within 0.5 s (in_lvgl is kept for callers, unused) */
 void system_wifi_setup(bool in_lvgl);
 
 #ifdef __cplusplus

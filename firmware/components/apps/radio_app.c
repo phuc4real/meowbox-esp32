@@ -94,7 +94,6 @@ static bool station_url(const cJSON *st, char *out, size_t len)
     if (type && strcmp(type, "youtube") == 0) {
         char hp[80];
         if (!radio_relay_hostport(hp, sizeof(hp))) return false; /* same choice of relay as above */
-        else return false;
         char enc[400];
         url_encode(url, enc, sizeof(enc));
         snprintf(out, len, "http://%s/yt/stream?url=%s", hp, enc);

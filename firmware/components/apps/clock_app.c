@@ -176,7 +176,9 @@ static void finish_ring(bool snooze)
     if (s_ring_timer) lv_timer_delete(s_ring_timer);
     s_ring_timer = NULL;
     audio_sfx_stop();
-    if (s_ring_radio && !snooze) radio_toggle();
+    /* the alarm's own stream: stop it outright (also on snooze, the chime comes back later). radio_toggle() would
+     * START the radio if the stream had already failed (ERR) */
+    if (s_ring_radio) player_stop();
     s_ring_radio = false;
     lv_obj_t *top = lv_layer_top();
     for (int i = (int)lv_obj_get_child_count(top) - 1; i >= 0; i--) {

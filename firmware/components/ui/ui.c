@@ -681,6 +681,9 @@ static void inv_cb(lv_event_t *e)
 {
     const lv_area_t *a = lv_event_get_param(e);
     if (!a) return;
+    /* Not a redraw: lv_refr.c get_max_row() sends a probe area (0,0)-(0,rows-1) through this event before each
+     * refresh to let a rounder trim it. Counting it showed a "1 px column at x=0 redrawn all the time". */
+    if (a->x1 == 0 && a->x2 == 0 && a->y1 == 0) return;
     uint32_t px = lv_area_get_size(a);
     s_inv.n++;
     s_inv.px += px;

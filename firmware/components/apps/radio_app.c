@@ -37,16 +37,50 @@ static void url_encode(const char *in, char *out, size_t len)
     out[o] = 0;
 }
 
-void radio_set_relay(const char *host_port) { snprintf(s_relay, sizeof(s_relay), "%s", host_port ? host_port : ""); }
+/* s_sleep_until (64-bit: two words on this chip) and s_relay are written by httpd / the PC link and read by the LVGL
+ * task: copy them under a spinlock so a reader never sees half of a write. */
+static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
+
+static int64_t sleep_until(void)
+{
+    taskENTER_CRITICAL(&s_mux);
+    int64_t v = s_sleep_until;
+    taskEXIT_CRITICAL(&s_mux);
+    return v;
+}
+
+static int sleep_left_s(void)
+{
+    int64_t u = sleep_until();
+    int left = u ? (int)((u - esp_timer_get_time()) / 1000000) : 0;
+    return left > 0 ? left : 0;
+}
+
+void radio_set_relay(const char *host_port)
+{
+    char v[sizeof(s_relay)];
+    snprintf(v, sizeof(v), "%s", host_port ? host_port : "");
+    taskENTER_CRITICAL(&s_mux);
+    memcpy(s_relay, v, sizeof(s_relay));
+    taskEXIT_CRITICAL(&s_mux);
+}
+
+static void relay_get(char *out) /* out: sizeof(s_relay) bytes */
+{
+    taskENTER_CRITICAL(&s_mux);
+    memcpy(out, s_relay, sizeof(s_relay));
+    taskEXIT_CRITICAL(&s_mux);
+}
 
 bool radio_relay_hostport(char *hp, size_t len)
 {
-    char host[48];
+    char host[48], relay[sizeof(s_relay)];
     settings_get_str("pc", "host", host, sizeof(host), "");
+    relay_get(relay);
     bool aut = settings_get_bool("pc", "auto", true);
-    if (aut && s_relay[0]) snprintf(hp, len, "%s", s_relay);
+    if (aut && relay[0]) snprintf(hp, len, "%s", relay);
     else if (host[0]) snprintf(hp, len, "%s:%d", host, settings_get_int("pc", "port", 8765));
-    else if (s_relay[0]) snprintf(hp, len, "%s", s_relay);
+    else if (relay[0]) snprintf(hp, len, "%s", relay);
     else return false;
     return true;
 }
@@ -58,12 +92,8 @@ static bool station_url(const cJSON *st, char *out, size_t len)
     const char *type = cJSON_GetStringValue(cJSON_GetObjectItem(st, "type"));
     if (!url) return false;
     if (type && strcmp(type, "youtube") == 0) {
-        char host[64], hp[80];
-        settings_get_str("pc", "host", host, sizeof(host), "");
-        bool aut = settings_get_bool("pc", "auto", true);
-        if (aut && s_relay[0]) snprintf(hp, sizeof(hp), "%s", s_relay);
-        else if (host[0]) snprintf(hp, sizeof(hp), "%s:%d", host, settings_get_int("pc", "port", 8765));
-        else if (s_relay[0]) snprintf(hp, sizeof(hp), "%s", s_relay);
+        char hp[80];
+        if (!radio_relay_hostport(hp, sizeof(hp))) return false; /* same choice of relay as above */
         else return false;
         char enc[400];
         url_encode(url, enc, sizeof(enc));
@@ -245,8 +275,11 @@ static void open_list(lv_event_t *e)
 
 static void radio_tick(lv_timer_t *t)
 {
-    if (s_sleep_until && esp_timer_get_time() >= s_sleep_until) {
-        s_sleep_until = 0;
+    taskENTER_CRITICAL(&s_mux); /* check and clear together: a new timer set from the web must not be lost */
+    bool due = s_sleep_until && esp_timer_get_time() >= s_sleep_until;
+    if (due) s_sleep_until = 0;
+    taskEXIT_CRITICAL(&s_mux);
+    if (due) {
         player_stop();
         ESP_LOGI(TAG, "sleep timer: stop");
     }
@@ -288,8 +321,8 @@ static void radio_tick(lv_timer_t *t)
         snprintf(stb, sizeof(stb), "%s %u%%", sts, net.fill_pct);
         sts = stb;
     }
-    if (s_sleep_until) {
-        int left = (int)((s_sleep_until - esp_timer_get_time()) / 60000000) + 1;
+    if (sleep_until()) {
+        int left = sleep_left_s() / 60 + 1;
         snprintf(line, sizeof(line), "%s, %s %d %s", sts, ui_tr("tắt sau", "off in"), left, ui_tr("phút", "min"));
     } else snprintf(line, sizeof(line), "%s", sts);
     if (strcmp(lv_label_get_text(s_state), line)) lv_label_set_text(s_state, line);
@@ -384,8 +417,7 @@ static void add_play(cJSON *o)
 void radio_status_hook(cJSON *r)
 {
     add_play(r);
-    int left = s_sleep_until ? (int)((s_sleep_until - esp_timer_get_time()) / 1000000) : 0;
-    cJSON_ReplaceItemInObject(r, "sleep", cJSON_CreateNumber(left > 0 ? left : 0));
+    cJSON_ReplaceItemInObject(r, "sleep", cJSON_CreateNumber(sleep_left_s()));
 }
 
 static esp_err_t h_play(httpd_req_t *req)
@@ -433,9 +465,8 @@ static esp_err_t h_play(httpd_req_t *req)
 
 static esp_err_t send_sleep(httpd_req_t *req)
 {
-    int left = s_sleep_until ? (int)((s_sleep_until - esp_timer_get_time()) / 1000000) : 0;
     cJSON *r = cJSON_CreateObject();
-    cJSON_AddNumberToObject(r, "left", left > 0 ? left : 0);
+    cJSON_AddNumberToObject(r, "left", sleep_left_s());
     return web_send_json(req, r);
 }
 
@@ -449,7 +480,10 @@ static esp_err_t h_sleep_post(httpd_req_t *req)
     int min = cJSON_IsNumber(m) ? m->valueint : -1;
     cJSON_Delete(j);
     if (min < 0 || min > 240) return web_send_err(req, 400, "bad_value");
-    s_sleep_until = min ? esp_timer_get_time() + (int64_t)min * 60000000 : 0;
+    int64_t until = min ? esp_timer_get_time() + (int64_t)min * 60000000 : 0;
+    taskENTER_CRITICAL(&s_mux);
+    s_sleep_until = until;
+    taskEXIT_CRITICAL(&s_mux);
     return send_sleep(req);
 }
 

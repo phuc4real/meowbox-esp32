@@ -30,7 +30,8 @@ static bool s_mic_on;
 #define AMP_IDLE_US   (3 * 1000000LL)
 #define AMP_SETTLE_MS 10
 static volatile bool s_amp_on = true;
-static volatile int64_t s_last_write;
+static volatile int64_t s_last_write; /* written by the player, read by the UI task: 64-bit, so under s_amp_mux */
+static portMUX_TYPE s_amp_mux = portMUX_INITIALIZER_UNLOCKED;
 
 static esp_err_t create_i2s(int rate)
 {
@@ -132,7 +133,10 @@ int audio_hw_sample_rate(void) { return s_rate; }
 esp_err_t audio_hw_write(const int16_t *pcm, size_t samples)
 {
     if (!s_out) return ESP_ERR_INVALID_STATE;
-    s_last_write = esp_timer_get_time();
+    int64_t now = esp_timer_get_time();
+    taskENTER_CRITICAL(&s_amp_mux);
+    s_last_write = now;
+    taskEXIT_CRITICAL(&s_amp_mux);
     if (!s_amp_on) {
         gpio_set_level(OSTB_PA_ENABLE, 1);
         s_amp_on = true;
@@ -154,7 +158,10 @@ int audio_hw_get_volume(void) { return s_volume; }
 void audio_hw_power_save(bool on)
 {
     if (!s_out) return;
-    if (on && s_amp_on && esp_timer_get_time() - s_last_write > AMP_IDLE_US) {
+    taskENTER_CRITICAL(&s_amp_mux);
+    int64_t last = s_last_write;
+    taskEXIT_CRITICAL(&s_amp_mux);
+    if (on && s_amp_on && esp_timer_get_time() - last > AMP_IDLE_US) {
         gpio_set_level(OSTB_PA_ENABLE, 0);
         s_amp_on = false;
         ESP_LOGI(TAG, "amplifier off (idle)");

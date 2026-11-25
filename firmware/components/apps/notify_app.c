@@ -74,21 +74,23 @@ int notify_post(const char *title, const char *text, const char *sound, const ch
 
 static void show_next(lv_timer_t *t)
 {
+    /* radio was on before an audio notification: back on as soon as the clip ends or fails, not when its card
+     * closes (a stop pressed while the card showed was undone when it closed; ERR used to keep the flag for hours) */
+    if (s_resume_radio && !clock_alarm_ringing()) {
+        player_state_t ps = player_state();
+        bool busy = ps == PLAYER_PLAY || ps == PLAYER_BUF;
+        if (!busy) {
+            s_resume_radio = false;
+            radio_play_id(0);
+        } else if (!player_is_mem()) {
+            s_resume_radio = false; /* another stream took over */
+        }
+    }
     if (ui_overlay_visible() || clock_alarm_ringing()) return;
     note_t n;
     xSemaphoreTake(s_lock, portMAX_DELAY);
     if (!s_qn) {
         xSemaphoreGive(s_lock);
-        if (s_resume_radio) { /* radio was on before an audio notification */
-            player_state_t ps = player_state();
-            bool busy = ps == PLAYER_PLAY || ps == PLAYER_BUF;
-            if (!busy) { /* the clip ended or failed (ERR used to leave this flag set for a later stop to fire) */
-                s_resume_radio = false;
-                radio_play_id(0);
-            } else if (!player_is_mem()) {
-                s_resume_radio = false; /* another stream took over */
-            }
-        }
         return;
     }
     n = s_q[0];

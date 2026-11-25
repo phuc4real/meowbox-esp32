@@ -274,9 +274,10 @@ static void radio_tick(lv_timer_t *t)
     }
     char nm[80];
     snprintf(nm, sizeof(nm), "%s " LV_SYMBOL_DOWN, name);
-    if (strcmp(lv_label_get_text(s_name), nm)) lv_label_set_text(s_name, nm);
+    ui_set_text_clean(s_name, nm);
     const char *tt = title[0] ? title : st == PLAYER_STOP ? ui_tr("Bấm " LV_SYMBOL_PLAY " để nghe", "Press " LV_SYMBOL_PLAY " to listen") : "";
-    if (strcmp(lv_label_get_text(s_title), tt)) lv_label_set_text(s_title, tt);
+    if (title[0]) ui_set_text_clean(s_title, title); /* stream metadata: may hold emoji */
+    else if (strcmp(lv_label_get_text(s_title), tt)) lv_label_set_text(s_title, tt);
     const char *sts = st == PLAYER_PLAY ? ui_tr("Đang phát", "Playing")
                     : st == PLAYER_BUF  ? ui_tr("Đang tải", "Buffering")
                     : st == PLAYER_ERR  ? ui_tr("Lỗi kết nối", "Connection error")

@@ -70,7 +70,7 @@ static void sys_tick(lv_timer_t *t)
     int rssi = 0;
     wifi_mgr_info(ss, sizeof(ss), ip, sizeof(ip), &rssi);
     if (wifi_mgr_mode() == NET_MODE_STA) {
-        lv_label_set_text_fmt(s_net, "Wi-Fi %s, %d dBm", ss, rssi);
+        lv_label_set_text_fmt(s_net, "Wi-Fi %d dBm · %s", rssi, ss); /* a long name gets the "…", not the signal */
         int left = wifi_mgr_portal_left_s();
         if (left >= 0)
             lv_label_set_text_fmt(s_addr, "http://%s\n%s %s, %s %d:%02d", ip, ui_tr("Đang phát", "Hotspot"),
@@ -105,11 +105,12 @@ static void sys_tick(lv_timer_t *t)
         lv_obj_set_style_text_color(s_mem, ui_lc(slow || n.under ? UI_C_WARN : UI_C_DIM), 0);
     } else {
         const char *upd = update_available();
-        if (upd) lv_label_set_text_fmt(s_mem, "MeowBox %s, %s %s", esp_app_get_description()->version,
-                                       ui_tr("có bản", "new"), upd);
-        else lv_label_set_text_fmt(s_mem, "MeowBox %s, RAM %uk, PSRAM %uk", esp_app_get_description()->version,
-                                   (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
-                                   (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
+        if (upd) lv_label_set_text_fmt(s_mem, "v%s · %s %s", esp_app_get_description()->version, ui_tr("có bản", "new"), upd);
+        else {
+            unsigned ps = (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / (1024 * 1024 / 10)); /* 0.1 MB */
+            lv_label_set_text_fmt(s_mem, "v%s · RAM %uk · PSRAM %u.%uM", esp_app_get_description()->version,
+                                  (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024), ps / 10, ps % 10);
+        }
         lv_obj_set_style_text_color(s_mem, ui_lc(upd ? UI_C_ACCENT : UI_C_DIM), 0);
     }
     for (int c = 0; c < AUDIO_MIC_CHANNELS; c++)

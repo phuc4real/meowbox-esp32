@@ -31,7 +31,7 @@ static char s_agent_name[32], s_agent_ver[16]; /* from hello */
 static int s_agent_proto = -1;
 static volatile bool s_dirty;
 
-static lv_obj_t *s_arc[4], *s_arc_val[4], *s_net, *s_status, *s_app, *s_title, *s_artist, *s_play_lbl, *s_offline, *s_body;
+static lv_obj_t *s_arc_val[4], *s_net, *s_status, *s_app, *s_title, *s_artist, *s_play_lbl, *s_offline, *s_body;
 
 bool pc_online(void) { return s_fd >= 0 && esp_timer_get_time() - s_last_us < 6000000; }
 
@@ -240,8 +240,8 @@ static void pc_tick(lv_timer_t *t)
     lv_label_set_text_fmt(s_net, "%s %s   %s %s", LV_SYMBOL_UP, up, LV_SYMBOL_DOWN, dn);
     bool has_media = d.title[0] != 0;
     lv_label_set_text(s_app, has_media ? d.app : ui_tr("Không có nhạc", "Nothing playing"));
-    if (strcmp(lv_label_get_text(s_title), d.title) != 0) lv_label_set_text(s_title, d.title);
-    lv_label_set_text(s_artist, d.artist);
+    ui_set_text_clean(s_title, d.title);
+    ui_set_text_clean(s_artist, d.artist);
     lv_label_set_text(s_play_lbl, !strcmp(d.state, "playing") ? LV_SYMBOL_PAUSE : LV_SYMBOL_PLAY);
 }
 
@@ -285,18 +285,19 @@ static void pc_build(lv_obj_t *t)
     ui_rule(s_body, UI_SAFE_X + 8, 112, UI_W - 2 * UI_SAFE_X - 16);
     s_app = ui_label(s_body, UI_F_SMALL, UI_C_DIM, "");
     lv_obj_set_pos(s_app, UI_SAFE_X + 8, 118);
+    /* title on its own full-width line; artist and the buttons below it */
     s_title = ui_label(s_body, UI_F_TITLE, UI_C_TEXT, "");
-    lv_obj_set_width(s_title, 140);
+    lv_obj_set_width(s_title, UI_W - 2 * UI_SAFE_X - 16);
     ui_scroll(s_title);
-    lv_obj_set_pos(s_title, UI_SAFE_X + 8, 136);
+    lv_obj_set_pos(s_title, UI_SAFE_X + 8, 134);
     s_artist = ui_label(s_body, UI_F_SMALL, UI_C_ACCENT2, "");
-    lv_obj_set_width(s_artist, 140);
+    lv_obj_set_width(s_artist, UI_W - 2 * UI_SAFE_X - 16 - 124 - 8);
     ui_dot(s_artist);
-    lv_obj_set_pos(s_artist, UI_SAFE_X + 8, 162);
+    lv_obj_set_pos(s_artist, UI_SAFE_X + 8, 172);
     lv_obj_t *row = lv_obj_create(s_body);
     lv_obj_remove_style_all(row);
-    lv_obj_set_size(row, 124, 48);
-    lv_obj_align(row, LV_ALIGN_TOP_RIGHT, -UI_SAFE_X - 6, 130);
+    lv_obj_set_size(row, 124, 44);
+    lv_obj_align(row, LV_ALIGN_TOP_RIGHT, -UI_SAFE_X - 6, 162);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);

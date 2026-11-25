@@ -376,8 +376,8 @@ static void clock_tick(lv_timer_t *tmr)
         if (en) snprintf(buf, sizeof(buf), "%s, %s %d, %d", WD_EN[tm.tm_wday], MON_EN[tm.tm_mon], d, y);
         else snprintf(buf, sizeof(buf), "%s, %d/%d/%d", WD_VI[tm.tm_wday], d, m, y);
         set_text(l_date, buf);
-        if (th->clock == THEME_CLOCK_BLOCK)
-            snprintf(buf, sizeof(buf), "%s: %s, %s", en ? "Lunar" : "Âm lịch", lbuf, hol ? hol : cc);
+        if (th->clock == THEME_CLOCK_BLOCK) /* 186 px of monospace: short form, holiday instead of the year name */
+            snprintf(buf, sizeof(buf), "%s %s%s%s", en ? "Lunar" : "ÂL", lbuf, hol ? ", " : "", hol ? hol : "");
         else snprintf(buf, sizeof(buf), "%s, %s", lbuf, hol ? hol : cc);
         set_text(l_lunar, buf);
         break;
@@ -388,18 +388,14 @@ static void clock_tick(lv_timer_t *tmr)
         int tc = (int)(s_wx.t + (s_wx.t >= 0 ? 0.5f : -0.5f));
         const char *w = wmo_text(s_wx.code, en);
         switch (th->clock) {
-        case THEME_CLOCK_LEFT: {
-            char city[32];
-            settings_get_str("weather", "name", city, sizeof(city), "");
-            set_text(l_wx_head, city);
+        case THEME_CLOCK_LEFT: /* a 68 px column: like "Âm lịch" next to it, no city or high/low (the web has them) */
+            set_text(l_wx_head, en ? "Weather" : "Thời tiết");
             snprintf(buf, sizeof(buf), "%d°", tc);
             set_text(l_wx, buf);
-            snprintf(buf, sizeof(buf), "%s, %d°/%d°", w, s_wx.hi, s_wx.lo);
-            set_text(l_wx2, buf);
+            set_text(l_wx2, w);
             break;
-        }
         case THEME_CLOCK_BLOCK:
-            snprintf(buf, sizeof(buf), "%s: %d°C, %s", en ? "Weather" : "Thời tiết", tc, w);
+            snprintf(buf, sizeof(buf), "%d°C, %s", tc, w);
             set_text(l_wx, buf);
             break;
         case THEME_CLOCK_CENTER:
@@ -470,15 +466,15 @@ static void build_left(lv_obj_t *t) /* Swiss */
     ui_dot(l_lunar2);
     l_wx_head = ui_label(t, UI_F_SMALL, UI_C_DIM, "");
     lv_obj_set_pos(l_wx_head, 150, 150);
-    lv_obj_set_width(l_wx_head, 74);
+    lv_obj_set_width(l_wx_head, 68);
     ui_dot(l_wx_head);
     l_wx = ui_label(t, UI_F_TITLE, UI_C_TEXT, "");
     lv_obj_set_pos(l_wx, 150, 166);
-    lv_obj_set_width(l_wx, 76);
+    lv_obj_set_width(l_wx, 68);
     ui_dot(l_wx);
     l_wx2 = ui_label(t, UI_F_SMALL, UI_C_TEXT, "");
     lv_obj_set_pos(l_wx2, 150, 190);
-    lv_obj_set_width(l_wx2, 74);
+    lv_obj_set_width(l_wx2, 68);
     ui_dot(l_wx2);
     cat_mini_attach(t, 222, 138, 2); /* raised: the bottom-right corner is rounded off */
 }
@@ -571,7 +567,7 @@ static void build_block(lv_obj_t *t) /* Brutalism */
     l_time = clock_label(blk, UI_C_ON_ACCENT);
     lv_obj_center(l_time);
     lv_obj_t *pb = plain_box(t, 236, 32, 46, 46, UI_C_ALERT, 3);
-    l_bat = ui_label(pb, UI_F_SMALL, UI_C_TEXT, "");
+    l_bat = ui_label(pb, UI_F_SMALL, UI_C_ON_ACCENT, ""); /* on the alert colour: black by day, on yellow at night */
     lv_obj_set_pos(l_bat, 3, 2);
     lv_obj_t *col = lv_obj_create(t);
     lv_obj_remove_style_all(col);

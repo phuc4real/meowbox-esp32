@@ -69,9 +69,12 @@ int ui_inset_l(int y0, int y1);
 int ui_inset_r(int y0, int y1);
 lv_obj_t *ui_button(lv_obj_t *parent, const char *txt, bool primary, int w, int h);
 lv_obj_t *ui_button_label(lv_obj_t *btn);  /* the label inside a ui_button */
-/* Single-line label at its width: text that does not fit scrolls (marquee: one loop, then an 8 s pause). ui_dot and ui_scroll behave the same. */
+/* Single-line label at its width. ui_dot: text that doesn't fit is cut with "…" (the default). ui_scroll: it scrolls
+ * (marquee: one loop, then an 8 s pause); only for what is playing now, since a scrolling label keeps redrawing. */
 void ui_dot(lv_obj_t *label);
 void ui_scroll(lv_obj_t *label);
+/* lv_label_set_text() for text from outside: drops code points the label's font can't draw (emoji, symbols). */
+void ui_set_text_clean(lv_obj_t *label, const char *txt);
 lv_obj_t *ui_bar(lv_obj_t *parent, int w, int h, ui_color_t indicator);
 lv_obj_t *ui_rule(lv_obj_t *parent, int x, int y, int w);
 lv_obj_t *ui_header(lv_obj_t *tile, const char *left, const char *right); /* returns right label */

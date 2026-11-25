@@ -8,6 +8,7 @@
 #include "esp_timer.h"
 #include "board.h"
 #include "settings.h"
+#include "misc/lv_text_private.h" /* lv_text_encoded_next */
 
 static const char *TAG = "ui";
 
@@ -145,7 +146,7 @@ lv_obj_t *ui_button(lv_obj_t *parent, const char *txt, bool primary, int w, int 
             lv_obj_set_style_shadow_color(b, ui_lc(UI_C_LINE), 0);
             lv_obj_set_style_shadow_opa(b, LV_OPA_COVER, 0);
         }
-        fg = UI_C_TEXT;
+        fg = primary ? UI_C_ON_ACCENT : UI_C_TEXT; /* night turns the alert fill yellow: grey text would vanish */
         break;
     }
     lv_obj_set_style_text_color(l, ui_lc(fg), 0);
@@ -177,9 +178,35 @@ static void one_line(lv_obj_t *l, lv_label_long_mode_t m)
     lv_obj_set_height(l, lv_font_get_line_height(f));
 }
 
-/* Long single-line text scrolls (marquee, one loop then a pause) instead of being cut with "…"; short text stays still. */
-void ui_dot(lv_obj_t *label) { one_line(label, LV_LABEL_LONG_SCROLL_CIRCULAR); }
+/* Text conventions: what is playing now (radio / PC track title) may scroll; everything else is laid out to fit and,
+ * if it still doesn't, is cut with "…" (a still label costs nothing to keep on screen). */
+void ui_dot(lv_obj_t *label)
+{
+    lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+    lv_obj_set_height(label, lv_font_get_line_height(lv_obj_get_style_text_font(label, 0)));
+}
 void ui_scroll(lv_obj_t *label) { one_line(label, LV_LABEL_LONG_SCROLL_CIRCULAR); }
+
+void ui_set_text_clean(lv_obj_t *label, const char *txt)
+{
+    /* Text from outside (track titles, stream metadata) can hold emoji or symbols the theme fonts lack, which LVGL
+     * draws as boxes: drop those code points, and the spaces they leave at the start. */
+    const lv_font_t *f = lv_obj_get_style_text_font(label, 0);
+    char out[160];
+    size_t o = 0;
+    uint32_t i = 0;
+    while (txt && txt[i] && o + 5 < sizeof(out)) {
+        uint32_t start = i;
+        uint32_t cp = lv_text_encoded_next(txt, &i);
+        if (cp == ' ' && o == 0) continue;
+        lv_font_glyph_dsc_t g;
+        if (cp < 0x20 || !lv_font_get_glyph_dsc(f, &g, cp, 0) || g.resolved_font == NULL) continue;
+        memcpy(out + o, txt + start, i - start);
+        o += i - start;
+    }
+    out[o] = 0;
+    if (strcmp(lv_label_get_text(label), out) != 0) lv_label_set_text(label, out);
+}
 
 static void seg_draw(lv_event_t *e)
 {

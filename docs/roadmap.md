@@ -79,6 +79,15 @@ chủ chuyển mã luồng nhạc như trên.
 - Có một vùng 1 px ở `x=0` (`0,0-0,26` đến `0,0-0,36`) bị vẽ lại liên tục trên mọi theme: tìm ra object nào.
 - Đồng bộ với giao diện web (mục 1.3 của v0.2.0) để cùng một theme trông và hoạt động giống nhau trên loa và trên web.
 
+### Done in v0.2.2
+- Visible area measured (corner radius ~60 px, left ~3 px hidden); headers, page dots and corner items moved clear of
+  the glass. `tools/ui_shots.py` screenshots every theme x tile (day or `--night`) with the hidden area tinted.
+- Text convention: only what is playing now scrolls (`ui_scroll`: radio and PC track titles); everything else is laid
+  out to fit and cut with "…" (`ui_dot`). Emoji and symbols the fonts lack are dropped from track titles
+  (`ui_set_text_clean`) instead of drawn as boxes.
+- Fixed: PC track title running under the buttons; Swiss weather column scrolling (now "Thời tiết / 28° / Nhiều mây");
+  System tile version/memory line scrolling; Brutal battery box and primary buttons unreadable at night.
+
 ---
 
 ## PC agent UI/UX

@@ -204,10 +204,10 @@ static void pc_tick(lv_timer_t *t)
 {
     bool on = pc_online();
     if (s_fd >= 0 && !on && esp_timer_get_time() - s_last_us > 15000000) s_fd = -1;
-    if (ui_active_tile() != UI_TILE_PC || !s_body) return;
-    static bool was_on = true;
-    if (on != was_on) {
-        was_on = on;
+    if (!s_body) return;
+    /* compare with what the tile shows, not a remembered state: the tile is rebuilt on theme / night changes and
+     * the agent may connect while another tile is on screen */
+    if (on == lv_obj_has_flag(s_body, LV_OBJ_FLAG_HIDDEN)) {
         s_dirty = true;
         if (on) {
             lv_obj_add_flag(s_offline, LV_OBJ_FLAG_HIDDEN);
@@ -217,6 +217,7 @@ static void pc_tick(lv_timer_t *t)
             lv_obj_add_flag(s_body, LV_OBJ_FLAG_HIDDEN);
         }
     }
+    if (ui_active_tile() != UI_TILE_PC) return;
     lv_label_set_text(s_status, on ? s_peer : "");
     if (!on || !s_dirty) return;
     s_dirty = false;

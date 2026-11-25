@@ -303,7 +303,7 @@ static void radio_tick(lv_timer_t *t)
 
 static void radio_build(lv_obj_t *t)
 {
-    s_list = NULL;
+    list_close(); /* the list lives on the top layer, which a rebuild doesn't clear: forgetting it left it stuck */
     s_vol = ui_header(t, "Radio", "");
 
     /* station name: looks tappable (opens the list) */

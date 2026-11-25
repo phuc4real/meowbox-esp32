@@ -310,14 +310,14 @@ Body `{}`. Starts a new kitten (keeps name/fur/diff). → same shape as GET.
 
 ### `GET /api/config/notify`
 ```json
-{"token":"q7Lw2xK9pR4tY8vZ","dur":10,"vol":70,"quiet_low":true,"ntfy":""}
+{"token":"q7Lw2xK9pR4tY8vZ","dur":10,"vol":70,"quiet_low":true}
 ```
 - `token`: 16 chars `[A-Za-z0-9]`, generated at first boot.
 - `dur`: default overlay seconds. `vol`: sound volume 0–100 (radio is ducked while it plays).
-- `quiet_low`: `low` priority makes no sound during night hours. `ntfy`: optional ntfy.sh topic ("" = off).
+- `quiet_low`: `low` priority makes no sound during night hours.
 
 ### `PUT /api/config/notify`
-`{"dur":10,"vol":70,"quiet_low":true,"ntfy":"meowbox-abc"}`, or `{"regen":true}` to create a new token
+`{"dur":10,"vol":70,"quiet_low":true}`, or `{"regen":true}` to create a new token
 (the old one stops working at once). → same shape as GET.
 
 ### `POST /api/notify`
@@ -343,7 +343,7 @@ Last 20, newest first (RAM only):
 ```json
 {"items":[{"id":17,"ts":1763791100,"title":"Build xong","text":"esp32-playground OK","sound":"chime","priority":"normal","src":"api"}]}
 ```
-`src`: `api` | `pc` | `ntfy` | `audio`.
+`src`: `api` | `pc` | `audio`.
 
 ---
 

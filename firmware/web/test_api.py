@@ -146,7 +146,7 @@ try:
     c, j = req("POST", "/api/cat/reset", {}); check("cat reset", c == 200 and j["stats"]["age"] == 0 and j["name"] == "Mun")
     c, j = req("GET", "/api/config/pc"); check("pc get", keys(j, "host", "port", "auto", "st") and keys(j["st"], "on", "name", "ip", "ver", "seen"))
     c, j = req("PUT", "/api/config/pc", {"host": "10.0.0.2", "port": 9000, "auto": False}); check("pc put", j["port"] == 9000)
-    c, n = req("GET", "/api/config/notify"); check("notify cfg", keys(n, "token", "dur", "vol", "quiet_low", "ntfy"))
+    c, n = req("GET", "/api/config/notify"); check("notify cfg", keys(n, "token", "dur", "vol", "quiet_low"))
     c, j = req("PUT", "/api/config/notify", {"dur": 12}); check("notify cfg put", j["dur"] == 12)
     c, j = req("PUT", "/api/config/notify", {"regen": True}); check("token regen", j["token"] != n["token"] and len(j["token"]) == 16)
     T = j["token"]

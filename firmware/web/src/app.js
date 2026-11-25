@@ -313,8 +313,8 @@ sec(t('test'),h('form',{class:'lim',onsubmit:async e=>{e.preventDefault();const 
 fld(t('title'),bind(m,'title',{maxLength:48})),fld(t('text'),bind(m,'text',{required:true,maxLength:200})),
 h('div',{class:'two'},fld(t('sound'),bind(m,'sound',{tag:'select',opts:opt('snd')})),fld(t('prio_'),bind(m,'priority',{tag:'select',opts:opt('pr')}))),
 fld(t('dur'),bind(m,'duration',{type:'number',min:1,max:300})),h('button',0,t('test')))),
-sec(t('nset'),h('div',{class:'lim'},fld(t('dur'),bind(c,'dur',{type:'number',min:1,max:300})),rng(c,'vol',t('vol')),sw(c,'quiet_low',t('quiet')),fld(t('ntfy'),bind(c,'ntfy',{placeholder:'meowbox-…'})),
-btn(t('save'),async()=>{Object.assign(c,await put('/api/config/notify',{dur:c.dur,vol:c.vol,quiet_low:c.quiet_low,ntfy:c.ntfy}));toast(t('saved'))}))),
+sec(t('nset'),h('div',{class:'lim'},fld(t('dur'),bind(c,'dur',{type:'number',min:1,max:300})),rng(c,'vol',t('vol')),sw(c,'quiet_low',t('quiet')),
+btn(t('save'),async()=>{Object.assign(c,await put('/api/config/notify',{dur:c.dur,vol:c.vol,quiet_low:c.quiet_low}));toast(t('saved'))}))),
 sec(t('hist'),hl,btn(t('refresh'),loadH,'lk')),sec(t('ex'),ex)]}
 
 async function pPc(){const c=await api('/api/config/pc'),g=h('div');

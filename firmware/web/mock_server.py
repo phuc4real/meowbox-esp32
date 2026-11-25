@@ -51,7 +51,7 @@ def fresh_state():
         "cat": {"name": "Mướp", "fur": "tabby", "diff": "normal",
                 "stats": {"age": 12, "stage": "kitten", "full": 80, "fun": 65, "clean": 90,
                           "energy": 55, "health": 100, "mood": "happy", "away": False}},
-        "notify": {"token": tok(), "dur": 10, "vol": 70, "quiet_low": True, "ntfy": ""},
+        "notify": {"token": tok(), "dur": 10, "vol": 70, "quiet_low": True},
         "pc": {"host": "192.168.1.10", "port": 8765, "auto": True},
         "update": {"auto": False},
         # firmware update simulation (API.md "Update"): the mock "finds" 0.2.1 on the first check
@@ -545,7 +545,7 @@ class H(BaseHTTPRequestHandler):
             "cat": ("name", "fur", "diff"),
             "pc": ("host", "port", "auto"),
             "update": ("auto",),
-            "notify": ("dur", "vol", "quiet_low", "ntfy"),
+            "notify": ("dur", "vol", "quiet_low"),
         }
         if p.startswith("/api/config/") and p[12:] in simple:
             g = p[12:]

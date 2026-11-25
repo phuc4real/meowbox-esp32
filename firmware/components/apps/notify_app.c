@@ -28,7 +28,7 @@ typedef struct {
     char text[201];
     char sound[8];    /* chime | alert | none */
     char prio[8];     /* low | normal | high */
-    char src[8];      /* api | pc | ntfy | audio */
+    char src[8];      /* api | pc | audio */
     int duration;
 } note_t;
 

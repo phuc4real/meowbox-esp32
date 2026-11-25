@@ -285,7 +285,6 @@
  "nset": "Settings",
  "dur": "Show for (seconds)",
  "quiet": "\"Low\" messages are silent at night",
- "ntfy": "ntfy.sh topic (optional)",
  "test": "Send test",
  "title": "Title",
  "text": "Text",

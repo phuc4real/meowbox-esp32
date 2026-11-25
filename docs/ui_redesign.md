@@ -395,7 +395,7 @@ Cài đặt → Giao diện
 - [x] Đổi theme lúc chạy (dựng lại các tile), lưu `display.theme` (mặc định `swiss`), `night_mode`, `fx`; `GET /api/themes`; cập nhật `web/API.md`
 - [x] Ảnh xem trước theme sinh lúc build vào `storage/web/themes/`
 - [x] Bảng màu mèo theo theme (`neon` cho Cyberpunk, `mono` cho Swiss, `sumi` cho Zen, bảng gốc cho Brutal) trong `tools/cat_sprites`
-- [ ] Đo bằng `LV_USE_SYSMON`: ≥ 25 FPS khi vuốt lúc đang phát radio. Đã đo được: đổi theme 150–180 ms, đổi qua lại 4 theme lúc đang phát radio không underrun. Chưa đo FPS khi vuốt
+- [ ] ≥ 25 FPS khi vuốt lúc đang phát radio. Measured 2026-11-26 (0.2.3): 14-20 FPS (Cyberpunk 12-17), ceiling ~35 FPS at SPI 40 MHz; moved to [backlog.md](backlog.md). Theme change 150-180 ms, no underrun while switching themes during playback
 
 **Xong khi:** đổi qua lại hai theme trên web, loa đổi theo trong chưa tới 0,5 s, ảnh chụp 5 màn của mỗi theme khớp mockup ở mức tối thiểu.
 

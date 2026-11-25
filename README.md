@@ -33,6 +33,7 @@ other projects.
 | [docs/plan.md](docs/plan.md) | original MeowBox feature plan, 0.1.0 (in Vietnamese) |
 | [docs/firmware_v0.2.0.md](docs/firmware_v0.2.0.md) | 0.2.0 plan and status: web, PC agent, GitHub updates, radio, performance (mostly Vietnamese) |
 | [docs/roadmap.md](docs/roadmap.md) | ideas parked for later: MeowBox Cloud, theme UI/UX pass (started in 0.2.2), PC agent UI/UX |
+| [docs/backlog.md](docs/backlog.md) | smaller known work not planned yet: checks on the device, performance, hardware |
 | [docs/perf/](docs/perf/results-0.2.2.md) | memory/CPU measurements under load ([0.2.2](docs/perf/results-0.2.2.md), [0.2.0](docs/perf/results-0.2.0.md)) and the 0.2.0 code review |
 | [docs/ui_redesign.md](docs/ui_redesign.md) | UI review, theme system, per-theme rules (in Vietnamese) |
 | [firmware/README.md](firmware/README.md) | build, flash, use, regenerate assets, partitions |
@@ -88,16 +89,15 @@ python -m esptool --port COM10 -b 921600 write-flash 0 backup\speaker_full_16MB.
 - [x] MeowBox: clock, lunar calendar, weather, alarms, radio, notifications, PC screen, cat, battery log, 4 themes
 - [x] Visible screen area measured (rounded corners of ~60 px, 0.2.2); screens keep clear of them
 - [x] Power saving: screen sleep, mics/amp off and CPU at 80 MHz while asleep (0.2.2)
-- [ ] Run the battery flat once to calibrate the % scale
-- [ ] Night palette for the cat; mini game; ntfy.sh; FPS measurement
+- [x] Night palette for the cat; error log that survives restarts; swipe FPS measured (0.2.3)
 - [x] 0.2.0: web UI embedded in the app, updates from GitHub Releases, steadier radio, PC agent installer
 - [x] Internal RAM while streaming: lowest free 41 KB under the heaviest load tested (was ~18 KB), see
       [docs/perf/results-0.2.0.md](docs/perf/results-0.2.0.md)
 - [x] 0.2.2: screen sleep, hold VOL to stop an alarm, screens fit the rounded glass, text fits instead of
       scrolling, PC agent connects by typed IP only; a whole-firmware review fixed 9 older bugs (radio, alarms, UI);
       heavy-load soak: no hang, no reset, lowest internal RAM 39.5 KB ([docs/perf/results-0.2.2.md](docs/perf/results-0.2.2.md))
-- [ ] 0.2.0 hands-on checklist (buttons, battery, alarms, hotspot, unfamiliar Wi-Fi) and a 24 h run
-- [ ] Find out which "free" GPIOs actually reach pads on the PCB
+- [ ] Open items in [docs/backlog.md](docs/backlog.md): 24 h soak and hands-on checklist, battery calibration,
+      swipe at ≥ 25 FPS, mini game, which "free" GPIOs reach pads
 
 ## Licences
 

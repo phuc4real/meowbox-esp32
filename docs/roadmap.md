@@ -88,6 +88,15 @@ chủ chuyển mã luồng nhạc như trên.
 - Fixed: PC track title running under the buttons; Swiss weather column scrolling (now "Thời tiết / 28° / Nhiều mây");
   System tile version/memory line scrolling; Brutal battery box and primary buttons unreadable at night.
 
+### Done in v0.2.3
+- The "1 px region at x=0 redrawn all the time" was not a redraw: LVGL's `get_max_row()` sends a probe area
+  `(0,0)-(0,rows-1)` through `LV_EVENT_INVALIDATE_AREA` before each refresh, and the redraw counter counted it.
+- Cost of the effects (taskLVGL CPU, 15 s, day): clock tile 2-5 %, `fx` full vs eco differs by ≤ 1.5 points except
+  Cyberpunk (+1.4 clock, +4 cat). The real cost was the cat tile at ~15 % in every theme: its 200 ms tick set styles,
+  size and the hidden flag every time, redrawing the scaled cat. Now it touches LVGL only on change: 4.4-5.6 %.
+- The cat follows night mode with a darker, warmer palette.
+- Swipe FPS measured (see [backlog.md](backlog.md)); the ≥ 25 FPS goal is not met yet.
+
 ---
 
 ## PC agent UI/UX

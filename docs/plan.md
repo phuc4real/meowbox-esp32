@@ -269,7 +269,7 @@ Mỗi giai đoạn kết thúc bằng một bản chạy được trên loa th�
 ### P4 Loa thông báo
 - [x] `/api/notify` (JSON + GET ngắn), token, hàng đợi, lịch sử, overlay, sfx, ưu tiên, giờ đêm
 - [x] `/api/notify/audio`
-- [ ] (tuỳ chọn) ntfy.sh subscribe
+- [ ] ~~(tuỳ chọn) ntfy.sh subscribe~~ dropped 2026-11-26 (not used)
 
 **Xong khi:** `curl` từ PC hoặc điện thoại làm loa kêu và hiện chữ dưới 1 s, kể cả đang phát radio.
 
@@ -285,18 +285,18 @@ Mỗi giai đoạn kết thúc bằng một bản chạy được trên loa th�
 - [x] Vẽ sprite mèo (4 độ tuổi × các hoạt cảnh, vài màu lông), tiếng meo và rừ rừ
 - [x] Mô phỏng chỉ số + bù thời gian khi tắt máy, lưu NVS
 - [x] Tương tác, lớn dần theo ngày chăm tốt, nhắc nhở
-- [ ] Mini game
+- [ ] Mini game: in [backlog.md](backlog.md)
 - [x] Trang web: tên, độ khó, reset
 
 **Xong khi:** nuôi thật 3 ngày thấy hợp lý (không chết quá nhanh, không quá nhàm).
 
 ### P7 Hoàn thiện
 - [x] Đo thời lượng pin (log mỗi phút, phiên dùng pin, ước tính còn lại, `/api/battery`)
-- [ ] Chạy pin tới cạn một lần để chỉnh thang %
+- [ ] Chạy pin tới cạn một lần để chỉnh thang %: in [backlog.md](backlog.md)
 - [x] Tắt màn khi không dùng (`display.sleep_s`, mặc định 5 phút): tắt đèn nền và panel, ngừng vẽ, tắt mic, tắt ampli
   khi im 3 s, CPU 80 MHz khi không phát (DFS)
-- [ ] Light sleep tự động khi màn tắt và không phát (cần đóng I2S và giãn các timer LVGL/touch)
-- [ ] Watchdog, log lỗi lưu lại xem trên web
+- [ ] ~~Light sleep tự động khi màn tắt và không phát~~ dropped 2026-11-26; 0.2.2 has screen sleep with CPU at 80 MHz instead
+- [x] Watchdog, log lỗi lưu lại xem trên web (0.2.3: `GET /api/log`, System page "Error log")
 - [x] Cập nhật docs, README (firmware/README.md, docs/)
 - [x] Hệ thống theme (Swiss, Cyberpunk, Zen, Brutalism): xem [ui_redesign.md](ui_redesign.md)
 
@@ -321,4 +321,4 @@ Mỗi giai đoạn kết thúc bằng một bản chạy được trên loa th�
 - [x] Trang web: **có mật khẩu mặc định** (`meowbox` / `m3owb0x2026`, nhắc đổi); AP cài đặt có mật khẩu `meowbox2026`
 - [x] Ngôn ngữ: tiếng Việt mặc định, có tiếng Anh; nếu tiếng Việt gây vấn đề thì dùng tiếng Anh
 - [x] YouTube: phát qua relay trong PC agent
-- [ ] Danh sách đài radio mặc định fen hay nghe (thêm sau trên web cũng được)
+- [x] Danh sách đài radio mặc định (Radio Paradise, SomaFM Groove Salad, Lofi Girl, VOV3 in `settings.c`)

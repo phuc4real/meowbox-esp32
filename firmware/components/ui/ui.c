@@ -22,6 +22,7 @@ static void *s_ov_arg;
 static volatile bool s_wake_req, s_rebuild_req;
 static volatile int64_t s_force_until;
 static volatile bool s_asleep; /* screen sleep: backlight and panel off, LVGL drawing paused */
+static bool s_built_night;     /* palette the tiles were last built with (set by ui_build_all, boot included) */
 static lv_timer_t *s_ui_tmr;
 static lv_obj_t *s_blocker; /* while asleep: eats the touch that wakes the screen */
 static bool s_bl_hold;      /* just woke: backlight waits for the first fresh frame */
@@ -445,6 +446,7 @@ void ui_build_all(void)
         if (s_builders[i]) s_builders[i](t);
         page_indicator(t, i);
     }
+    s_built_night = s_night;
     ESP_LOGI(TAG, "built theme %s (%s%s)", ui_theme()->id, s_night ? "night" : "day", s_fx ? "" : ", eco");
 }
 
@@ -621,9 +623,7 @@ static void ui_timer(lv_timer_t *tmr)
             int old = s_theme;
             bool old_fx = s_fx, old_en = s_lang_en;
             read_display_settings();
-            static bool built_night;
-            if (old != s_theme || old_fx != s_fx || old_en != s_lang_en || built_night != s_night) {
-                built_night = s_night;
+            if (old != s_theme || old_fx != s_fx || old_en != s_lang_en || s_built_night != s_night) {
                 int64_t t0 = esp_timer_get_time();
                 ui_build_all();
                 ESP_LOGI(TAG, "rebuild took %lld ms", (esp_timer_get_time() - t0) / 1000);

@@ -592,8 +592,10 @@ static void cat_build(lv_obj_t *t)
         s_title = ui_header(t, ui_tr("mèo", "cat"), "");
     } else {
         s_title = ui_label(t, UI_F_SMALL, ui_theme()->btn == THEME_BTN_CUT ? UI_C_ACCENT2 : UI_C_TEXT, "");
-        int lh = lv_font_get_line_height(ui_f(UI_F_SMALL));
-        lv_obj_set_pos(s_title, ui_inset_l(UI_HEAD_Y, UI_HEAD_Y + lh), UI_HEAD_Y);
+        int lh = lv_font_get_line_height(ui_f(UI_F_SMALL)), x = ui_inset_l(UI_HEAD_Y, UI_HEAD_Y + lh);
+        lv_obj_set_pos(s_title, x, UI_HEAD_Y);
+        lv_obj_set_width(s_title, UI_W - x - ui_inset_r(UI_HEAD_Y, UI_HEAD_Y + lh)); /* a long cat name gets "…" */
+        ui_dot(s_title);
     }
 
     /* dark backdrop for "lights off", drawn behind the cat */

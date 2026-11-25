@@ -301,6 +301,19 @@ int ui_inset_r(int y0, int y1)
     return c > UI_SAFE_X + 8 ? c : UI_SAFE_X + 8;
 }
 
+/* Right header label: right-aligned in the room the left one leaves, cut with "…" (text set later, such as a long
+ * cat name, used to run over the left label). */
+static void header_right(lv_obj_t *l, lv_obj_t *r, int y, int lh)
+{
+    lv_obj_update_layout(l);
+    int ir = ui_inset_r(y, y + lh);
+    int w = UI_W - ir - (lv_obj_get_x(l) + lv_obj_get_width(l)) - 12;
+    lv_obj_set_width(r, w > 20 ? w : 20);
+    ui_dot(r);
+    lv_obj_set_style_text_align(r, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_align(r, LV_ALIGN_TOP_RIGHT, -ir, y);
+}
+
 lv_obj_t *ui_header(lv_obj_t *tile, const char *left, const char *right)
 {
     const theme_def_t *t = ui_theme();
@@ -319,7 +332,7 @@ lv_obj_t *ui_header(lv_obj_t *tile, const char *left, const char *right)
         l = ui_label(bar, UI_F_SMALL, UI_C_BG, buf);
         lv_obj_set_pos(l, ui_inset_l(ty, ty + lh), ty);
         r = ui_label(bar, UI_F_SMALL, UI_C_BG, right);
-        lv_obj_align(r, LV_ALIGN_TOP_RIGHT, -ui_inset_r(ty, ty + lh), ty);
+        header_right(l, r, ty, lh);
         return r;
     }
     if (t->btn == THEME_BTN_CUT) snprintf(buf, sizeof(buf), "// %s", left);
@@ -328,7 +341,7 @@ lv_obj_t *ui_header(lv_obj_t *tile, const char *left, const char *right)
     l = ui_label(tile, UI_F_SMALL, lc, buf);
     lv_obj_set_pos(l, ui_inset_l(UI_HEAD_Y, UI_HEAD_Y + lh), UI_HEAD_Y);
     r = ui_label(tile, UI_F_SMALL, UI_C_DIM, right);
-    lv_obj_align(r, LV_ALIGN_TOP_RIGHT, -ui_inset_r(UI_HEAD_Y, UI_HEAD_Y + lh), UI_HEAD_Y);
+    header_right(l, r, UI_HEAD_Y, lh);
     return r;
 }
 

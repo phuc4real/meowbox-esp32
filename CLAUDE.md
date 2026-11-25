@@ -7,11 +7,14 @@ Overview and layout: @README.md. Build, flash, asset generators, partitions: @fi
 
 ## Environment
 
-- ESP-IDF 6.1 is **not** on PATH in a fresh shell. Activate it in the same PowerShell command that uses it:
-  `$env:IDF_TOOLS_PATH='D:\esp\.espressif'; . D:\esp\esp-idf\export.ps1 *> $null; cd firmware; idf.py build`
+- ESP-IDF 6.1 is **not** on PATH in a fresh shell. Activate it in the same PowerShell command that uses it. The
+  default `python` is 3.15 with no packages and IDF's venv is for 3.14, so point both at 3.14 first:
+  `$env:IDF_TOOLS_PATH='D:\esp\.espressif'; $env:IDF_PYTHON_ENV_PATH='D:\esp\.espressif\python_env\idf6.1_py3.14_env'; $env:PATH="C:\Users\phuc\AppData\Local\Python\pythoncore-3.14-64;$env:PATH"; . D:\esp\esp-idf\export.ps1 *> $null; cd firmware; idf.py build`
+- Run repo scripts with `py -3.14` (it has Pillow, pyserial, ruff and the agent's packages).
 - The speaker is on **COM10** (native USB-Serial/JTAG, no buttons needed). COM13 is an unrelated ESP8266.
 - You may build and flash / OTA the speaker without asking (`/flash-speaker`). `backup/` holds the vendor flash
-  dump; never overwrite or delete it.
+  dump; never overwrite or delete it. Drive the running speaker (screenshots, radio, notifications, memory, frozen-UI
+  check) with `/run-meowbox`; before a release, bring the docs up to date with `/release-docs`.
 - `firmware/sdkconfig` is generated and gitignored; put config changes in `firmware/sdkconfig.defaults`
   (an existing `sdkconfig` keeps old values for keys already in it; delete it or run `idf.py reconfigure`).
 
@@ -39,20 +42,22 @@ Commit the regenerated outputs together with their source.
 
 ## Firmware gotchas
 
-- Internal RAM: lowest free ~41 KB while streaming under load (0.2.0, `docs/perf/results-0.2.0.md`); keep it
-  ≥ 40 KB. Put big buffers and task stacks in PSRAM (never for a task that writes flash). After changes that
-  allocate, run `tools/memwatch.py` and look at the lowest `int_free`; `heap_min` in `/api/status` always shows
-  ~7.8 KB from a short dip during boot.
+- Internal RAM: lowest free 39.5 KB under the heaviest soak (0.2.2: five stations, two web sessions, screenshots,
+  notifications, theme rebuilds; 40.8 KB idle; `docs/perf/results-0.2.2.md`); keep it ≥ 40 KB, there is no margin.
+  Put big buffers and task stacks in PSRAM (never for a task that writes flash). After changes that allocate, run
+  `tools/memwatch.py` and look at the lowest `int_free`; `heap_min` in `/api/status` always shows ~7.8 KB from a short
+  dip during boot.
 - When a hardware fact changes, update `hw/ostb_xiaozhi_3st.h` and `docs/pinmap.md` together.
 - Lunar calendar changes: verify with `components/lunar/tests/` (host build of `host_dump.c` vs `lunar_ref.py compare`).
 
 ## Lint
 
-- Python: `python -m ruff check .` (config `ruff.toml`). Don't add new findings; the existing B904s are known.
+- Python: `py -3.14 -m ruff check .` (config `ruff.toml`). Don't add new findings; the existing B904s are known.
 - C: format only the lines you changed (`git clang-format`, config `.clang-format`). Never reformat whole files:
   the code packs short statements on one line on purpose. Generated files are in `.clang-format-ignore`.
-  On this machine it's not on PATH: `git clang-format --binary "$APPDATA/Python/Python314/Scripts/clang-format.exe"`
-  (add `--diff` to preview).
+  On this machine `git clang-format` is not a git command; call the script directly (Git Bash):
+  `"$APPDATA/Python/Python314/Scripts/git-clang-format.exe" --binary "$APPDATA/Python/Python314/Scripts/clang-format.exe" --extensions c,h`
+  (add `--diff` to preview, `main` to check a whole branch). It refuses files with both staged and unstaged changes.
 
 ## Repo conventions
 

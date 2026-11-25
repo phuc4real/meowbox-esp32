@@ -57,7 +57,7 @@ server. API: [web/API.md](web/API.md) "Update".
 
 | Where | What |
 |---|---|
-| Screen | swipe left/right: **Clock → Radio → PC → Cat → System** |
+| Screen | swipe left/right: **Clock → Radio → PC → Cat → System**. Turns off after 5 idle minutes (web: Appearance → "Screen off after", 0 = never); a button, a touch, an alarm or a notification wakes it, and that press does nothing else |
 | Middle button | power only: holding it switches the speaker off (hardware). The firmware can't see it |
 | Volume buttons | click ±5, hold to repeat. During an alarm: click = snooze, hold ~1 s = stop |
 | Cat corner on the clock | tap to open the Cat tile |
@@ -122,7 +122,7 @@ PC screen, media keys, YouTube relay and spoken notifications: see [../pc-agent/
 |---|---|---|---|
 | nvs | 0x9000 | 16 KB | Wi-Fi driver settings and PHY calibration (about 10 of 263 entries used) |
 | otadata | 0xd000 | 8 KB | which app slot boots |
-| ota_0 / ota_1 | 0x20000 / 0x560000 | 5.25 MB each | app with the web UI inside (3.1 MB in 0.2.0; OTA, rollback enabled) |
+| ota_0 / ota_1 | 0x20000 / 0x560000 | 5.25 MB each | app with the web UI inside (3.18 MB in 0.2.2; OTA, rollback enabled) |
 | (free) | 0xaa0000 | 4.4 MB | unallocated, see below |
 | data | 0xf00000 | 1 MB | LittleFS: settings, Wi-Fi list, password hash, cat save, battery log (about 30 KB used, the battery log grows to ~200 KB) |
 

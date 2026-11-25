@@ -373,6 +373,16 @@ know YouTube will play, since a PC firewall blocks speaker → PC, not PC → sp
 **No auth.** → `{"name":"MeowBox-1A2B","host":"meowbox-1a2b","ver":"0.2.0","proto":1,"proto_min":0,"mac":"…"}`.
 Lets the agent check that an IP is a MeowBox, and which one. `mac` is for a DHCP reservation on the router.
 
+### `GET /api/debug`
+Session auth. Memory and per-task numbers, read by `firmware/tools/memwatch.py`:
+```json
+{"up_ms":198000,"int":{"free":47303,"min":7796,"big":32768,"tot":330091},"dma":{...},"psram":{...},
+ "rt_total":198000000,"tasks":[{"name":"taskLVGL","prio":4,"core":1,"stack_free":2300,"stack_ext":false,"rt":559293}]}
+```
+`min` is the lowest free since boot, `big` the largest free block. `stack_free` is the task's lowest free stack in
+bytes, `stack_ext` true when that stack is in PSRAM. `rt` is the raw run-time counter: CPU % = Δrt / Δrt_total
+between two calls (one core = 100 %). Not in `mock_server.py`.
+
 ### `/ws/pc` protocol (agent ↔ speaker)
 - Agent → speaker first message: `{"t":"hello","name":"DESKTOP-MEO","ver":"0.2.0","proto":1,"relay":"http://ip:8765"}`,
   optional `"take":true`. Then `stats` / `media` every second, `notify`.

@@ -6,7 +6,7 @@ Các ý tưởng để dành, chưa xếp vào bản nào. Khi quyết định l
 | Ý tưởng | Khi nào làm | Trạng thái |
 |---|---|---|
 | MeowBox Cloud (Cloudflare Worker) | khi số liệu ở mục 4 của v0.2.0 cho thấy vẫn thiếu băng thông, hoặc cần thông báo khi loa ở ngoài | để dành |
-| Tối ưu lại các theme về UI/UX | sau v0.2.0 | để dành |
+| Tối ưu lại các theme về UI/UX | sau v0.2.0 | started in v0.2.2 (see "Done in v0.2.2" below) |
 | PC agent UI/UX | after v0.2.0 (v0.2.0 ships the agent functionally complete) | parked |
 
 ---

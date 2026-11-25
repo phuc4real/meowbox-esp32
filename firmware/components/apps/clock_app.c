@@ -446,12 +446,13 @@ static lv_obj_t *plain_box(lv_obj_t *parent, int x, int y, int w, int h, ui_colo
 
 static void build_left(lv_obj_t *t) /* Swiss */
 {
+    const int lh = lv_font_get_line_height(ui_f(UI_F_SMALL));
     l_wday = ui_label(t, UI_F_SMALL, UI_C_TEXT, "");
-    lv_obj_set_pos(l_wday, UI_SAFE_X + 6, UI_HEAD_Y);
+    lv_obj_set_pos(l_wday, ui_inset_l(UI_HEAD_Y, UI_HEAD_Y + lh), UI_HEAD_Y);
     l_date = ui_label(t, UI_F_SMALL, UI_C_DIM, "");
     lv_obj_set_pos(l_date, UI_SAFE_X + 6, UI_HEAD_Y + 18);
     l_alarm = ui_label(t, UI_F_SMALL, UI_C_ACCENT, "");
-    lv_obj_align(l_alarm, LV_ALIGN_TOP_RIGHT, -UI_SAFE_X - 6, UI_HEAD_Y);
+    lv_obj_align(l_alarm, LV_ALIGN_TOP_RIGHT, -ui_inset_r(UI_HEAD_Y, UI_HEAD_Y + lh), UI_HEAD_Y);
     l_bat = ui_label(t, UI_F_SMALL, UI_C_DIM, "");
     lv_obj_align(l_bat, LV_ALIGN_TOP_RIGHT, -UI_SAFE_X - 6, UI_HEAD_Y + 18);
     l_time = clock_label(t, UI_C_TEXT);
@@ -479,17 +480,18 @@ static void build_left(lv_obj_t *t) /* Swiss */
     lv_obj_set_pos(l_wx2, 150, 190);
     lv_obj_set_width(l_wx2, 74);
     ui_dot(l_wx2);
-    cat_mini_attach(t, 222, 150, 2);
+    cat_mini_attach(t, 222, 138, 2); /* raised: the bottom-right corner is rounded off */
 }
 
 static void build_center(lv_obj_t *t) /* Cyberpunk */
 {
+    const int lh = lv_font_get_line_height(ui_f(UI_F_SMALL));
     l_net = ui_label(t, UI_F_SMALL, UI_C_OK, "");
-    lv_obj_set_pos(l_net, UI_SAFE_X + 6, UI_HEAD_Y - 2);
+    lv_obj_set_pos(l_net, ui_inset_l(UI_HEAD_Y - 2, UI_HEAD_Y - 2 + lh), UI_HEAD_Y - 2);
     l_alarm = ui_label(t, UI_F_SMALL, UI_C_WARN, "");
     lv_obj_align(l_alarm, LV_ALIGN_TOP_MID, 0, UI_HEAD_Y - 2);
     l_bat = ui_label(t, UI_F_SMALL, UI_C_DIM, "");
-    lv_obj_align(l_bat, LV_ALIGN_TOP_RIGHT, -UI_SAFE_X - 6, UI_HEAD_Y - 2);
+    lv_obj_align(l_bat, LV_ALIGN_TOP_RIGHT, -ui_inset_r(UI_HEAD_Y - 2, UI_HEAD_Y - 2 + lh), UI_HEAD_Y - 2);
     ui_hud_corners(t, 18, 30, UI_W - 36, 86);
     if (ui_theme()->fx_aberration && ui_fx() && !ui_is_night()) {
         l_g1 = clock_label(t, UI_C_ACCENT2);
@@ -511,13 +513,13 @@ static void build_center(lv_obj_t *t) /* Cyberpunk */
     ui_dot(l_lunar);
     l_wx = ui_label(t, UI_F_SMALL, UI_C_DIM, "");
     lv_obj_set_pos(l_wx, UI_SAFE_X + 8, 166);
-    lv_obj_set_width(l_wx, 196);
+    lv_obj_set_width(l_wx, 186);
     ui_dot(l_wx);
     l_term = ui_label(t, UI_F_SMALL, UI_C_DIM, "");
     lv_obj_set_pos(l_term, UI_SAFE_X + 8, 184);
-    lv_obj_set_width(l_term, 196);
+    lv_obj_set_width(l_term, 186);
     ui_dot(l_term);
-    cat_mini_attach(t, 222, 156, 2);
+    cat_mini_attach(t, 212, 146, 2); /* clear of the rounded bottom-right corner */
 }
 
 static void build_enso(lv_obj_t *t) /* Zen */
@@ -550,7 +552,7 @@ static void build_enso(lv_obj_t *t) /* Zen */
     lv_obj_set_pos(l_alarm, UI_SAFE_X + 14, 198);
     cat_mini_attach(t, 196, 158, 2);
     if (ui_f(UI_F_BODY) != &mb_font_20) { /* the Zen font carries the 猫 glyph */
-        lv_obj_t *seal = plain_box(t, 258, 196, 22, 22, UI_C_ACCENT, 0);
+        lv_obj_t *seal = plain_box(t, 254, 190, 22, 22, UI_C_ACCENT, 0);
         lv_obj_t *k = ui_label(seal, UI_F_BODY, UI_C_ON_ACCENT, "猫");
         lv_obj_center(k);
     }
@@ -574,21 +576,21 @@ static void build_block(lv_obj_t *t) /* Brutalism */
     lv_obj_t *col = lv_obj_create(t);
     lv_obj_remove_style_all(col);
     lv_obj_set_pos(col, UI_SAFE_X + 6, 132);
-    lv_obj_set_size(col, 192, LV_SIZE_CONTENT);
+    lv_obj_set_size(col, 186, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_color(col, ui_lc(UI_C_BG), 0);
     lv_obj_set_style_bg_opa(col, LV_OPA_COVER, 0);
     lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
     lv_obj_remove_flag(col, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
     l_date = ui_label(col, UI_F_TITLE, UI_C_TEXT, "");
     l_lunar = ui_label(col, UI_F_SMALL, UI_C_TEXT, "");
-    lv_obj_set_width(l_lunar, 192);
+    lv_obj_set_width(l_lunar, 186);
     ui_dot(l_lunar);
     l_wx = ui_label(col, UI_F_SMALL, UI_C_TEXT, "");
-    lv_obj_set_width(l_wx, 192);
+    lv_obj_set_width(l_wx, 186);
     ui_dot(l_wx);
     l_alarm = ui_label(col, UI_F_SMALL, UI_C_ACCENT2, "");
     lv_obj_set_style_text_decor(l_alarm, LV_TEXT_DECOR_UNDERLINE, 0);
-    lv_obj_t *cb = plain_box(t, 214, 146, 70, 66, UI_C_OK, 2);
+    lv_obj_t *cb = plain_box(t, 210, 138, 70, 66, UI_C_OK, 2); /* clear of the rounded bottom-right corner */
     cat_mini_attach(cb, 2, 0, 2);
 }
 

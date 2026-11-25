@@ -18,11 +18,16 @@
 extern "C" {
 #endif
 
-/* Visible area: the case bezel hides the panel edge (docs/pinmap.md "Visible area") */
+/* Visible area (measured 2026-11-25, docs/pinmap.md "Visible area"): the glass shows the whole 296x240 panel except
+ * ~3 px on the left and four rounded corners of radius ~60 px. UI_SAFE_X/Y are the usual content margins; anything near
+ * the top or bottom edge must also clear the corners: use ui_inset_l()/ui_inset_r(). tools/ui_shots.py draws the
+ * hidden area over screenshots. */
 #define UI_W 296
 #define UI_H 240
 #define UI_SAFE_X 14
 #define UI_SAFE_Y 10
+#define UI_CORNER_R 60
+#define UI_HIDE_L   3
 #define UI_HEAD_Y 12   /* top of the header row */
 #define UI_FOOT_Y 222  /* centre line of the page indicator */
 
@@ -58,6 +63,10 @@ void ui_request_rebuild(void);
 
 /* Themed widgets */
 lv_obj_t *ui_label(lv_obj_t *parent, ui_font_t f, ui_color_t c, const char *txt);
+/* Smallest left x / right margin (from UI_W) so a box spanning rows y0..y1 stays clear of the rounded corners and the
+ * hidden left strip, with 2 px to spare. Never less than UI_SAFE_X + 8, the usual text margin. */
+int ui_inset_l(int y0, int y1);
+int ui_inset_r(int y0, int y1);
 lv_obj_t *ui_button(lv_obj_t *parent, const char *txt, bool primary, int w, int h);
 lv_obj_t *ui_button_label(lv_obj_t *btn);  /* the label inside a ui_button */
 /* Single-line label at its width: text that does not fit scrolls (marquee: one loop, then an 8 s pause). ui_dot and ui_scroll behave the same. */

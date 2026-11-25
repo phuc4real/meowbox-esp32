@@ -93,7 +93,7 @@ Quy tắc:
 
 ### Lưới và khoảng cách (loa)
 
-- **Vùng an toàn:** đo bằng các khung màu ở màn Hệ thống, rồi cập nhật `UI_SAFE_X/Y`. Hiện tạm để 14/10 px. Góc bo: không đặt gì trong ô 24×24 px ở mỗi góc.
+- **Safe area** (measured 2026-11-25, docs/pinmap.md "Visible area"): the edges are usable to the pixel (left ~3 px hidden), but the glass rounds each corner with a radius of ~60 px. Content keeps the `UI_SAFE_X` margin; anything in the top or bottom ~60 px rows uses `ui_inset_l()` / `ui_inset_r()`. Page indicators are centred. Check with `tools/ui_shots.py`.
 - **Nhịp dọc 8 px.** Mỗi màn có 3 vùng: **đầu** (cao 24, tiêu đề + trạng thái) / **thân** / **chân** (cao 44: chấm chỉ trang hoặc hàng nút).
 - **Nút chạm** tối thiểu 44×40 px. Một nút chỉ có icon *hoặc* chữ một dòng, không xếp icon trên chữ trong 40 px.
 
@@ -381,7 +381,7 @@ Cài đặt → Giao diện
 - [x] `theme_t` + `ui_theme()` trong `components/ui`; mọi app lấy màu/font/style từ theme, bỏ màu đặt cứng (`UI_COL_*`, hex rải trong app)
 - [x] Style LVGL dùng chung theo vai trò (nền, chữ chính, chữ phụ, nút, nút chính, thanh chỉ số, đường kẻ), tạo từ theme đang dùng
 - [x] Lưới đầu/thân/chân cho cả 5 màn
-- [ ] Vùng an toàn theo số đo thật (chờ đo bằng khung màu: giữ lâu tiêu đề màn Hệ thống)
+- [x] Safe area from real measurements (2026-11-25: corner radius ~60 px, left 3 px hidden)
 - [x] D6 Đồng hồ: ẩn dòng thời tiết khi chưa có dữ liệu, bỏ số giây
 - [x] D7 Radio: tên đài dạng nút ▾, giữ chỗ dòng tên bài
 - [x] D8 Mèo: bố cục mới, kích thước sprite theo tuổi

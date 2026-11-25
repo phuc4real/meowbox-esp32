@@ -76,4 +76,4 @@ that pulls them at reset.
 | Offset X / Y | 24 / 0 |
 | Invert colour / RGB order | false / RGB |
 | Init table | [`hw/nv3023_init_cmds.h`](../hw/nv3023_init_cmds.h) (25 commands from the vendor firmware) |
-| Visible area | the case bezel and the rounded glass hide the outer edge. MeowBox keeps UI inside 14 px left/right and 10 px top/bottom for now. The exact inset is still to be measured: on the System tile, long-press the title to show 8 nested frames (0–28 px from the edge) |
+| Visible area | measured 2026-11-25 with nested frames every 4 px: the top, bottom and right edges show to the last pixel, the left edge hides ~3 px, and the glass rounds each corner with a radius of ~60 px (row 0 starts showing at x ≈ 57, row 8 at x ≈ 30, row 30 at x ≈ 8). Firmware: `UI_CORNER_R` / `UI_HIDE_L` and `ui_inset_l()` / `ui_inset_r()` in `components/ui/include/ui.h`; `tools/ui_shots.py` tints the hidden area on screenshots of every theme and tile. Quick check on the device: System tile, long-press the title for 8 nested frames (0–28 px from the edge) |

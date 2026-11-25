@@ -85,8 +85,8 @@
 
 /* ---------- Verified on hardware 2026-11-22 (MeowBox P0 test) ----------
  * - Display orientation/colours correct with the values above (RGB order, no inversion).
- * - The case bezel and rounded glass hide the outer edge of the 296x240 area: keep UI inside a
- *   safe margin (see docs/pinmap.md "Visible area"); corners are rounded.
+ * - Visible area (measured 2026-11-25, docs/pinmap.md "Visible area"): all of the 296x240 panel shows except ~3 px
+ *   on the left and four corners rounded by the glass with a radius of ~60 px.
  * - Mics: TDM slots 0 and 2 carry the microphones (noise floor ~35-40 dB on our scale),
  *   slots 1 and 3 are near-silent (slot 1 = playback reference used for AEC).
  * - ADC probe on free pins: GPIO1 ~0, GPIO2 = 4095 (tied high?), GPIO3 ~0.

@@ -589,7 +589,8 @@ static void cat_build(lv_obj_t *t)
         s_title = ui_header(t, ui_tr("mèo", "cat"), "");
     } else {
         s_title = ui_label(t, UI_F_SMALL, ui_theme()->btn == THEME_BTN_CUT ? UI_C_ACCENT2 : UI_C_TEXT, "");
-        lv_obj_set_pos(s_title, UI_SAFE_X + 8, UI_HEAD_Y);
+        int lh = lv_font_get_line_height(ui_f(UI_F_SMALL));
+        lv_obj_set_pos(s_title, ui_inset_l(UI_HEAD_Y, UI_HEAD_Y + lh), UI_HEAD_Y);
     }
 
     /* dark backdrop for "lights off", drawn behind the cat */

@@ -1,5 +1,6 @@
 #include "ui.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -247,31 +248,58 @@ void ui_hud_corners(lv_obj_t *parent, int x, int y, int w, int h)
     }
 }
 
+/* ---------------- visible area ---------------- */
+static int corner_cut(int y0, int y1)
+{
+    int d = y0 < UI_H - 1 - y1 ? y0 : UI_H - 1 - y1; /* rows to the nearer edge */
+    if (d < 0) d = 0;
+    if (d >= UI_CORNER_R) return 0;
+    float dy = (float)(UI_CORNER_R - d);
+    return (int)ceilf(UI_CORNER_R - sqrtf((float)(UI_CORNER_R * UI_CORNER_R) - dy * dy));
+}
+
+int ui_inset_l(int y0, int y1)
+{
+    int c = corner_cut(y0, y1);
+    if (c < UI_HIDE_L) c = UI_HIDE_L;
+    c += 2;
+    return c > UI_SAFE_X + 8 ? c : UI_SAFE_X + 8;
+}
+
+int ui_inset_r(int y0, int y1)
+{
+    int c = corner_cut(y0, y1) + 2;
+    return c > UI_SAFE_X + 8 ? c : UI_SAFE_X + 8;
+}
+
 lv_obj_t *ui_header(lv_obj_t *tile, const char *left, const char *right)
 {
     const theme_def_t *t = ui_theme();
     lv_obj_t *l, *r;
     char buf[64];
-    if (t->btn == THEME_BTN_RAW) { /* Brutalism: black path bar */
+    int lh = lv_font_get_line_height(ui_f(UI_F_SMALL));
+    if (t->btn == THEME_BTN_RAW) { /* Brutalism: black path bar; text low in the bar, clear of the rounded corners */
+        const int bar_h = 26, ty = bar_h - 3 - lh;
         lv_obj_t *bar = lv_obj_create(tile);
         lv_obj_remove_style_all(bar);
-        lv_obj_set_size(bar, UI_W, 20);
+        lv_obj_set_size(bar, UI_W, bar_h);
         lv_obj_set_style_bg_color(bar, ui_lc(UI_C_LINE), 0);
         lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
-        snprintf(buf, sizeof(buf), "meowbox / %s", left);
+        lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
+        snprintf(buf, sizeof(buf), "~/%s", left);
         l = ui_label(bar, UI_F_SMALL, UI_C_BG, buf);
-        lv_obj_align(l, LV_ALIGN_LEFT_MID, UI_SAFE_X + 8, 0);
+        lv_obj_set_pos(l, ui_inset_l(ty, ty + lh), ty);
         r = ui_label(bar, UI_F_SMALL, UI_C_BG, right);
-        lv_obj_align(r, LV_ALIGN_RIGHT_MID, -UI_SAFE_X - 8, 0);
+        lv_obj_align(r, LV_ALIGN_TOP_RIGHT, -ui_inset_r(ty, ty + lh), ty);
         return r;
     }
     if (t->btn == THEME_BTN_CUT) snprintf(buf, sizeof(buf), "// %s", left);
     else snprintf(buf, sizeof(buf), "%s", left);
     ui_color_t lc = t->btn == THEME_BTN_CUT ? UI_C_ACCENT2 : t->btn == THEME_BTN_FILL ? UI_C_TEXT : UI_C_DIM;
     l = ui_label(tile, UI_F_SMALL, lc, buf);
-    lv_obj_set_pos(l, UI_SAFE_X + 8, UI_HEAD_Y);
+    lv_obj_set_pos(l, ui_inset_l(UI_HEAD_Y, UI_HEAD_Y + lh), UI_HEAD_Y);
     r = ui_label(tile, UI_F_SMALL, UI_C_DIM, right);
-    lv_obj_align(r, LV_ALIGN_TOP_RIGHT, -UI_SAFE_X - 8, UI_HEAD_Y);
+    lv_obj_align(r, LV_ALIGN_TOP_RIGHT, -ui_inset_r(UI_HEAD_Y, UI_HEAD_Y + lh), UI_HEAD_Y);
     return r;
 }
 
@@ -323,19 +351,17 @@ static void page_indicator(lv_obj_t *tile, int idx)
         lv_obj_t *l = ui_label(tile, UI_F_SMALL, UI_C_TEXT, buf);
         lv_obj_set_style_bg_color(l, ui_lc(UI_C_BG), 0);
         lv_obj_set_style_bg_opa(l, LV_OPA_COVER, 0);
-        lv_obj_set_pos(l, UI_SAFE_X + 8, UI_FOOT_Y - 8);
+        lv_obj_align(l, LV_ALIGN_TOP_MID, 0, UI_FOOT_Y - lv_font_get_line_height(ui_f(UI_F_SMALL)) / 2);
         return;
     }
     lv_obj_t *row = lv_obj_create(tile);
     lv_obj_remove_style_all(row);
     lv_obj_set_size(row, 80, 6);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(row, t->btn == THEME_BTN_CUT ? LV_FLEX_ALIGN_CENTER : LV_FLEX_ALIGN_START,
-                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(row, t->btn == THEME_BTN_TEXT ? 5 : 3, 0);
     lv_obj_remove_flag(row, LV_OBJ_FLAG_CLICKABLE);
-    if (t->btn == THEME_BTN_CUT) lv_obj_align(row, LV_ALIGN_TOP_MID, 0, UI_FOOT_Y - 3);
-    else lv_obj_set_pos(row, UI_SAFE_X + 8, UI_FOOT_Y - 3);
+    lv_obj_align(row, LV_ALIGN_TOP_MID, 0, UI_FOOT_Y - 3); /* centred: the bottom corners cut the sides */
     for (int i = 0; i < UI_TILE_COUNT; i++) {
         lv_obj_t *d = lv_obj_create(row);
         lv_obj_remove_style_all(d);

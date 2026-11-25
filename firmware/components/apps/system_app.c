@@ -8,6 +8,7 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "esp_heap_caps.h"
 #include "esp_app_desc.h"
 #include "esp_log.h"
@@ -296,6 +297,24 @@ static esp_err_t h_theme(httpd_req_t *req)
 }
 
 /* ---------------- screenshot: GET /api/screenshot[?tile=0..4] -> 24-bit BMP ---------------- */
+/* The snapshot is drawn by the LVGL task (lv_async_call), not on the httpd stack: rendering a whole tile there took
+ * ~4-6 KB of httpd's 8 KB stack (lowest free 1.8 KB in the 0.2.2 soak test). */
+static SemaphoreHandle_t s_snap_sem;
+static lv_draw_buf_t *s_snap; /* handed from the LVGL task to httpd; both under the LVGL lock */
+static bool s_snap_abandoned; /* httpd gave up waiting: the late snapshot frees itself */
+
+static void snap_cb(void *arg)
+{
+    lv_draw_buf_t *b = lv_snapshot_take(lv_screen_active(), LV_COLOR_FORMAT_RGB565);
+    if (s_snap_abandoned) {
+        s_snap_abandoned = false;
+        if (b) lv_draw_buf_destroy(b);
+        return;
+    }
+    s_snap = b;
+    xSemaphoreGive(s_snap_sem);
+}
+
 static esp_err_t h_shot(httpd_req_t *req)
 {
     char q[8];
@@ -307,11 +326,34 @@ static esp_err_t h_shot(httpd_req_t *req)
             vTaskDelay(pdMS_TO_TICKS(700));
         }
     }
+    if (!s_snap_sem) s_snap_sem = xSemaphoreCreateBinary();
+    if (!s_snap_sem || !board_lvgl_lock(1000)) return web_send_err(req, 503, "busy");
+    xSemaphoreTake(s_snap_sem, 0); /* drop a give from a snapshot that came after an earlier timeout */
+    if (s_snap) lv_draw_buf_destroy(s_snap);
+    s_snap = NULL;
+    s_snap_abandoned = false;
+    lv_async_call(snap_cb, NULL);
+    board_lvgl_unlock();
+    if (xSemaphoreTake(s_snap_sem, pdMS_TO_TICKS(3000)) != pdTRUE) {
+        if (board_lvgl_lock(1000)) {
+            if (s_snap) lv_draw_buf_destroy(s_snap); /* it may have landed just now */
+            else s_snap_abandoned = true;
+            s_snap = NULL;
+            board_lvgl_unlock();
+        }
+        return web_send_err(req, 503, "busy");
+    }
     if (!board_lvgl_lock(1000)) return web_send_err(req, 503, "busy");
-    lv_draw_buf_t *snap = lv_snapshot_take(lv_screen_active(), LV_COLOR_FORMAT_RGB565);
+    lv_draw_buf_t *snap = s_snap;
+    s_snap = NULL;
     board_lvgl_unlock();
     if (!snap) return web_send_err(req, 503, "busy");
     const int w = snap->header.w, h = snap->header.h, row = w * 3;
+    uint8_t *line = malloc(row);
+    if (!line) {
+        lv_draw_buf_destroy(snap);
+        return web_send_err(req, 503, "busy");
+    }
     uint8_t hdr[54] = {'B', 'M'};
     uint32_t size = 54 + row * h;
     memcpy(hdr + 2, &size, 4);
@@ -325,7 +367,6 @@ static esp_err_t h_shot(httpd_req_t *req)
     httpd_resp_set_type(req, "image/bmp");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     httpd_resp_send_chunk(req, (const char *)hdr, 54);
-    uint8_t *line = malloc(row);
     for (int y = 0; y < h; y++) {
         const uint16_t *src = (const uint16_t *)(snap->data + y * snap->header.stride);
         for (int x = 0; x < w; x++) {

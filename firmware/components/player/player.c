@@ -592,7 +592,11 @@ static void decode_task(void *arg)
                 in_len += n;
                 vRingbufferReturnItem(s_rb, p);
             } else if (in_len == 0) {
-                if (s_eof) { s_is_mem = false; set_state_gen(cur_gen, PLAYER_STOP); continue; }
+                if (s_eof) {
+                    s_is_mem = false;
+                    set_state_gen(cur_gen, PLAYER_STOP);
+                    continue;
+                }
                 if (s_state == PLAYER_PLAY && !s_is_mem) {
                     s_under++;
                     if (s_lvl < sizeof(PRE_S) - 1) s_lvl++;

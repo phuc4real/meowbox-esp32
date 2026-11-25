@@ -128,7 +128,7 @@ static void weather_cfg_hook(cJSON *doc)
 static bool s_ringing, s_ring_radio;
 static lv_timer_t *s_ring_timer;
 static time_t s_ring_started, s_snooze_at;
-static lv_obj_t *s_ring_ov; /* the alarm's own card */
+static lv_obj_t *s_ring_ov;     /* the alarm's own card */
 static volatile int s_stop_req; /* 1 = stop, 2 = snooze */
 static int s_last_min = -1;
 

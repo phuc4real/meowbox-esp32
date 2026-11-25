@@ -10,7 +10,10 @@ static inline size_t utf8_trim(char *s)
     size_t n = strlen(s);
     size_t i = n;
     int cont = 0;
-    while (i > 0 && cont < 3 && ((unsigned char)s[i - 1] & 0xC0) == 0x80) { i--; cont++; }
+    while (i > 0 && cont < 3 && ((unsigned char)s[i - 1] & 0xC0) == 0x80) {
+        i--;
+        cont++;
+    }
     if (i == 0) return n;
     unsigned char lead = (unsigned char)s[i - 1];
     size_t need = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;

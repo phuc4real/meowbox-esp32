@@ -76,7 +76,7 @@ máy tính phải cùng mạng Wi-Fi với loa.
 | Cài đặt → Giao diện | theme, chế độ đêm, độ sáng ban đêm, hiệu ứng, ngôn ngữ trên loa |
 | Cài đặt → Wi-Fi | các mạng đã lưu, thứ tự ưu tiên, Wi-Fi cài đặt |
 | Cài đặt → Thời tiết | thành phố, bật/tắt thời tiết trên đồng hồ |
-| Cài đặt → Hệ thống | đổi mật khẩu, cập nhật firmware, khởi động lại, xoá dữ liệu, khôi phục cài đặt gốc |
+| Cài đặt → Hệ thống | đổi mật khẩu, cập nhật firmware, khởi động lại, xoá dữ liệu, khôi phục cài đặt gốc, xem **nhật ký lỗi** |
 
 ## 4. Radio
 
@@ -192,6 +192,7 @@ Loa còn chạy bản 0.1.0 thì chưa có nút cập nhật. Tải file `meowbo
 | Radio hay ngắt | xem số liệu ở màn Hệ thống: tốc độ tải thấp hơn bitrate là do mạng. Thử đài bitrate thấp hơn (64 kbps) |
 | YouTube không phát | máy tính phải bật PC agent và đã nối loa. Trong cửa sổ Kết nối loa có bước kiểm tra relay. Mạng Windows đặt là Public thì bấm "Cho phép trên mạng này" |
 | Màn PC trống | agent chưa chạy hoặc đang nối loa khác: xem icon con mèo ở khay hệ thống |
+| Loa tự khởi động lại, hoặc màn bị đứng một lúc | **Cài đặt → Hệ thống → Nhật ký lỗi**: lý do khởi động lại lần trước và các lỗi ngay trước đó (mất khi rút điện). Gửi kèm phần này khi báo lỗi |
 
 Hai nút ở **Cài đặt → Hệ thống**, phải đăng nhập mới dùng được. Bấm xong, trang web hỏi lại một lần nữa rồi mới làm:
 

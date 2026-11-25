@@ -110,6 +110,7 @@ PC screen, media keys, YouTube relay and spoken notifications: see [../pc-agent/
 | `components/ui` | tileview shell, theme engine (`theme.h`, generated `themes_gen.c`), themed widgets, overlay cards, backlight / night mode |
 | `themes/` | one JSON per UI theme (colours, fonts, shapes, effects, cat palette, web fonts) |
 | `components/apps` | clock, radio, notify, pc, cat, battery, system, update (tiles + their web endpoints) |
+| `components/diag` | error log kept across restarts in RTC memory, reset reason, last 10 starts, frozen-UI check (`GET /api/log`) |
 | `components/lunar` | Vietnamese lunar calendar (tested against 1900–2199) |
 | `components/fonts` | LVGL fonts with Vietnamese glyphs: base Be Vietnam Pro + 4 per theme (generated) |
 | `components/cat_sprites` | pixel-art cat (generated, see `tools/cat_sprites`) |
@@ -122,7 +123,7 @@ PC screen, media keys, YouTube relay and spoken notifications: see [../pc-agent/
 |---|---|---|---|
 | nvs | 0x9000 | 16 KB | Wi-Fi driver settings and PHY calibration (about 10 of 263 entries used) |
 | otadata | 0xd000 | 8 KB | which app slot boots |
-| ota_0 / ota_1 | 0x20000 / 0x560000 | 5.25 MB each | app with the web UI inside (3.18 MB in 0.2.2; OTA, rollback enabled) |
+| ota_0 / ota_1 | 0x20000 / 0x560000 | 5.25 MB each | app with the web UI inside (3.19 MB in 0.2.3; OTA, rollback enabled) |
 | (free) | 0xaa0000 | 4.4 MB | unallocated, see below |
 | data | 0xf00000 | 1 MB | LittleFS: settings, Wi-Fi list, password hash, cat save, battery log (about 30 KB used, the battery log grows to ~200 KB) |
 

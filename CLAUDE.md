@@ -15,6 +15,8 @@ Overview and layout: @README.md. Build, flash, asset generators, partitions: @fi
 - You may build and flash / OTA the speaker without asking (`/flash-speaker`). `backup/` holds the vendor flash
   dump; never overwrite or delete it. Drive the running speaker (screenshots, radio, notifications, memory, frozen-UI
   check) with `/run-meowbox`; before a release, bring the docs up to date with `/release-docs`.
+- After an update over the air the speaker boots from `ota_1`; `idf.py app-flash` writes `ota_0` and changes nothing
+  (check `build` in `/api/status`). Use `idf.py flash`, which also resets `otadata` to boot `ota_0`.
 - `firmware/sdkconfig` is generated and gitignored; put config changes in `firmware/sdkconfig.defaults`
   (an existing `sdkconfig` keeps old values for keys already in it; delete it or run `idf.py reconfigure`).
 

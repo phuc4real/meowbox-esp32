@@ -331,10 +331,7 @@ static struct {
     int dark, scale, x;
 } s_shown;
 
-static void shown_reset(void)
-{
-    memset(&s_shown, 0xFF, sizeof(s_shown)); /* -1: nothing shown yet */
-}
+static void shown_reset(void) { memset(&s_shown, 0xFF, sizeof(s_shown)); /* -1: nothing shown yet */ }
 
 static void set_hidden(lv_obj_t *o, bool hidden)
 {

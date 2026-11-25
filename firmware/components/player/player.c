@@ -65,6 +65,16 @@ static void set_state(player_state_t st)
 
 static bool alive(uint32_t gen) { return gen == s_gen; }
 
+/* State change from a worker task (fetch / decode): only if its session is still current. Checked and set under
+ * s_lock, the lock player_play/player_stop hold while they start a new session: a plain alive() check followed by
+ * set_state() let a decode pass that was waiting on the ring buffer overwrite a fresh STOP with BUF. */
+static void set_state_gen(uint32_t gen, player_state_t st)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    if (gen == s_gen) set_state(st);
+    xSemaphoreGive(s_lock);
+}
+
 static void set_err(uint32_t gen, const char *fmt, int v)
 {
     if (!alive(gen)) return;
@@ -391,7 +401,7 @@ static void fetch_task(void *arg)
     uint32_t gen = (uint32_t)(uintptr_t)arg;
     char *url = heap_caps_malloc(URL_MAX, MALLOC_CAP_SPIRAM);
     if (!url) {
-        if (alive(gen)) set_state(PLAYER_ERR);
+        set_state_gen(gen, PLAYER_ERR);
         vTaskDeleteWithCaps(NULL);
         return;
     }
@@ -455,7 +465,7 @@ static void fetch_task(void *arg)
         for (int i = 0; i < wait / 100 && alive(gen); i++) vTaskDelay(pdMS_TO_TICKS(100));
         ESP_LOGI(TAG, "reconnecting (%d)", retries);
     }
-    if (alive(gen) && !s_eof) set_state(PLAYER_ERR);
+    if (!s_eof) set_state_gen(gen, PLAYER_ERR);
     free(url);
     vTaskDeleteWithCaps(NULL);
 }
@@ -554,7 +564,7 @@ static void decode_task(void *arg)
             if (avail < pre_bytes() && !s_eof) { vTaskDelay(pdMS_TO_TICKS(50)); continue; }
             if (s_fmt == FMT_UNKNOWN) { vTaskDelay(pdMS_TO_TICKS(50)); continue; }
             s_clean_since = esp_timer_get_time();
-            set_state(PLAYER_PLAY);
+            set_state_gen(cur_gen, PLAYER_PLAY);
         }
         if (!dec) {
             esp_audio_simple_dec_cfg_t cfg = {
@@ -566,7 +576,7 @@ static void decode_task(void *arg)
             if (esp_audio_simple_dec_open(&cfg, &dec) != ESP_AUDIO_ERR_OK) {
                 ESP_LOGE(TAG, "decoder open failed (fmt %d)", s_fmt);
                 snprintf(s_err, sizeof(s_err), "decode");
-                set_state(PLAYER_ERR);
+                set_state_gen(cur_gen, PLAYER_ERR);
                 continue;
             }
         }
@@ -580,13 +590,13 @@ static void decode_task(void *arg)
                 in_len += n;
                 vRingbufferReturnItem(s_rb, p);
             } else if (in_len == 0) {
-                if (s_eof) { s_is_mem = false; set_state(PLAYER_STOP); continue; }
+                if (s_eof) { s_is_mem = false; set_state_gen(cur_gen, PLAYER_STOP); continue; }
                 if (s_state == PLAYER_PLAY && !s_is_mem) {
                     s_under++;
                     if (s_lvl < sizeof(PRE_S) - 1) s_lvl++;
                     ESP_LOGW(TAG, "underrun %u, prebuffer now %d s", s_under, PRE_S[s_lvl]);
                 } else ESP_LOGW(TAG, "underrun");
-                set_state(PLAYER_BUF);
+                set_state_gen(cur_gen, PLAYER_BUF);
                 continue;
             }
         }
@@ -671,8 +681,8 @@ esp_err_t player_play_mem(uint8_t *data, size_t len, const char *name)
     s_eof = false;
     s_is_mem = true;
     uint32_t gen = s_gen;
-    xSemaphoreGive(s_lock);
     set_state(PLAYER_BUF);
+    xSemaphoreGive(s_lock);
     if (xTaskCreatePinnedToCore(mem_task, "memplay", 3072, (void *)(uintptr_t)gen, 5, NULL, 0) != pdPASS) {
         set_state(PLAYER_ERR);
         return ESP_ERR_NO_MEM;
@@ -718,8 +728,8 @@ esp_err_t player_play(const char *url, const char *name, int id)
     s_hls = strstr(url, ".m3u8") != NULL;
     s_err[0] = 0;
     uint32_t gen = s_gen;
-    xSemaphoreGive(s_lock);
     set_state(PLAYER_BUF);
+    xSemaphoreGive(s_lock);
     ESP_LOGI(TAG, "play %s (%s)", url, name ? name : "");
     /* stack in PSRAM: fetch only does network I/O, never writes flash (a PSRAM stack must not) */
     if (xTaskCreatePinnedToCoreWithCaps(fetch_task, "fetch", 8192, (void *)(uintptr_t)gen, 5, NULL, 0, MALLOC_CAP_SPIRAM) != pdPASS) {
@@ -737,8 +747,8 @@ void player_stop(void)
     rb_flush();
     s_title[0] = 0;
     s_is_mem = false;
-    xSemaphoreGive(s_lock);
     set_state(PLAYER_STOP);
+    xSemaphoreGive(s_lock);
 }
 
 player_state_t player_state(void) { return s_state; }

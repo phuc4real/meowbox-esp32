@@ -10,6 +10,7 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "esp_heap_caps.h"
+#include "esp_timer.h"
 #include "esp_app_desc.h"
 #include "esp_log.h"
 #include "ui.h"
@@ -19,6 +20,7 @@
 #include "settings.h"
 #include "audio_hw.h"
 #include "audio_sfx.h"
+#include "diag.h"
 
 static lv_obj_t *s_net, *s_addr, *s_bat, *s_mem, *s_bar[AUDIO_MIC_CHANNELS], *s_frames;
 static volatile int s_mic_db[AUDIO_MIC_CHANNELS];
@@ -496,12 +498,68 @@ static esp_err_t h_shot(httpd_req_t *req)
     return httpd_resp_send_chunk(req, NULL, 0);
 }
 
+/* GET /api/log: why the speaker last restarted, the error/warning lines before that and since (diag component) */
+static void add_lines(cJSON *r, const char *key, const char *text)
+{
+    cJSON *a = cJSON_AddArrayToObject(r, key);
+    while (text && *text) {
+        const char *e = strchr(text, '\n');
+        size_t n = e ? (size_t)(e - text) : strlen(text);
+        if (n) {
+            char *l = strndup(text, n);
+            if (l) {
+                cJSON_AddItemToArray(a, cJSON_CreateString(l));
+                free(l);
+            }
+        }
+        text = e ? e + 1 : NULL;
+    }
+}
+
+static esp_err_t h_log(httpd_req_t *req)
+{
+    cJSON *r = cJSON_CreateObject();
+    cJSON_AddNumberToObject(r, "boot", diag_boot_no());
+    cJSON_AddStringToObject(r, "reason", diag_reason());
+    cJSON_AddNumberToObject(r, "up_s", (double)(esp_timer_get_time() / 1000000));
+    diag_prev_t p = diag_prev();
+    if (p.valid) {
+        cJSON *o = cJSON_AddObjectToObject(r, "prev");
+        cJSON_AddNumberToObject(o, "up_s", p.up_s);
+        cJSON_AddNumberToObject(o, "int_free", p.int_free);
+        cJSON_AddNumberToObject(o, "int_min", p.int_min);
+    } else {
+        cJSON_AddNullToObject(r, "prev");
+    }
+    add_lines(r, "prev_log", diag_prev_log());
+    char *cur = heap_caps_malloc(2100, MALLOC_CAP_SPIRAM);
+    if (cur) diag_log(cur, 2100);
+    add_lines(r, "log", cur);
+    free(cur);
+    cJSON *boots = NULL;
+    FILE *f = fopen(diag_boots_path(), "r");
+    if (f) {
+        char *b = heap_caps_malloc(1536, MALLOC_CAP_SPIRAM);
+        if (b) {
+            size_t n = fread(b, 1, 1535, f);
+            b[n] = 0;
+            boots = cJSON_Parse(b);
+            free(b);
+        }
+        fclose(f);
+    }
+    cJSON_AddItemToObject(r, "boots", cJSON_IsArray(boots) ? boots : cJSON_CreateArray());
+    if (boots && !cJSON_IsArray(boots)) cJSON_Delete(boots);
+    return web_send_json(req, r);
+}
+
 void system_app_init(void)
 {
     ui_register_builder(UI_TILE_SYSTEM, system_build);
     lv_timer_create(setup_tick, 500, NULL);
     web_register("/api/screenshot", HTTP_GET, h_shot, WEB_AUTH_SESSION);
     web_register("/api/wifi/portal", HTTP_GET, portal_state, WEB_AUTH_TOKEN);
+    web_register("/api/log", HTTP_GET, h_log, WEB_AUTH_SESSION);
     web_register("/api/wifi/portal", HTTP_POST, h_portal_post, WEB_AUTH_TOKEN);
     web_register("/api/themes", HTTP_GET, h_themes, WEB_AUTH_SESSION);
     web_register("/api/theme", HTTP_GET, h_theme, WEB_AUTH_NONE);

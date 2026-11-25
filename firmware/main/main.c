@@ -19,6 +19,7 @@
 #include "net.h"
 #include "ui.h"
 #include "apps.h"
+#include "diag.h"
 #include "player.h"
 
 static const char *TAG = "meowbox";
@@ -117,6 +118,7 @@ static void init_pm(void)
 
 static void on_sleep_tick(bool asleep)
 {
+    diag_ui_alive(); /* runs on every UI tick: the frozen-screen check counts these */
     player_state_t ps = player_state();
     bool low = asleep && ps != PLAYER_PLAY && ps != PLAYER_BUF;
     audio_hw_power_save(low);
@@ -140,10 +142,12 @@ static void init_nvs(void)
 
 void app_main(void)
 {
+    diag_init(); /* first: reset reason, the previous boot's error log, then capture this boot's */
     ESP_LOGI(TAG, "MeowBox %s starting", esp_app_get_description()->version);
     init_nvs();
     init_pm();
     ESP_ERROR_CHECK(settings_init());
+    diag_boot_record();
     ESP_ERROR_CHECK(board_init());
 
     if (audio_hw_init(board_i2c(), SAMPLE_RATE) == ESP_OK) {

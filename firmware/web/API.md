@@ -383,6 +383,24 @@ Session auth. Memory and per-task numbers, read by `firmware/tools/memwatch.py`:
 bytes, `stack_ext` true when that stack is in PSRAM. `rt` is the raw run-time counter: CPU % = Δrt / Δrt_total
 between two calls (one core = 100 %). Not in `mock_server.py`.
 
+### `GET /api/log`
+Session auth. Why the speaker last started, and its error/warning log lines (System page, "Error log"):
+```json
+{"boot":7,"reason":"task_wdt","up_s":95,
+ "prev":{"up_s":18234,"int_free":41210,"int_min":39480},
+ "prev_log":["W (18201345) player: underrun 1, prebuffer now 4 s","E (18233977) task_wdt: ..."],
+ "log":["W (912) lcd_panel.nv3023: ..."],
+ "boots":[{"n":7,"reason":"task_wdt","up_s":0,"int_min":0},{"n":6,"reason":"sw","up_s":18234,"int_min":39480}]}
+```
+- `reason`: `power_on` | `sw` (restart, update) | `panic` | `task_wdt` | `int_wdt` | `wdt` | `brownout` | `usb` (reset by
+  the USB serial port, e.g. flashing) | `ext` | `deepsleep` | `unknown`.
+- `prev_log` / `prev`: every `E`/`W` log line of the previous run (the newest ~2 KB) and its last uptime / internal RAM
+  snapshot (taken every 2 s). Kept in RTC memory, so they survive a restart, crash or watchdog reset but not a power
+  off: then `prev` is `null` and `prev_log` empty. A UI task that gets no CPU for 10 s logs
+  `E diag: UI task got no CPU for N s (screen frozen)`.
+- `log`: the same for the current run. `boots`: the last 10 starts, newest first, stored in `/data/boots.json`; `up_s` /
+  `int_min` of an entry are filled in at the next start (0 for the current one).
+
 ### `/ws/pc` protocol (agent ↔ speaker)
 - Agent → speaker first message: `{"t":"hello","name":"DESKTOP-MEO","ver":"0.2.0","proto":1,"relay":"http://ip:8765"}`,
   optional `"take":true`. Then `stats` / `media` every second, `notify`.

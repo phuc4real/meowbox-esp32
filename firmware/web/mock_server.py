@@ -387,6 +387,15 @@ class H(BaseHTTPRequestHandler):
             return self.send_json(status())
         if key == ("GET", "/api/themes"):
             return self.send_json({"themes": THEMES, "current": S["display"]["theme"]})
+        if key == ("GET", "/api/log"):
+            return self.send_json({
+                "boot": 7, "reason": "task_wdt", "up_s": int(time.time() - BOOT),
+                "prev": {"up_s": 18234, "int_free": 41210, "int_min": 39480},
+                "prev_log": ["W (18201345) player: underrun 1, prebuffer now 4 s",
+                             "E (18233977) task_wdt: Task watchdog got triggered."],
+                "log": ["W (912) lcd_panel.nv3023: The 3Ah command has been used"],
+                "boots": [{"n": 7, "reason": "task_wdt", "up_s": 0, "int_min": 0},
+                          {"n": 6, "reason": "sw", "up_s": 18234, "int_min": 39480}]})
         if key == ("GET", "/api/screenshot"):
             if NO_SHOT:
                 raise Err(404, "not_found")

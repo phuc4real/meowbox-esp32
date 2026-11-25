@@ -34,9 +34,9 @@ static int s_brightness = -1;
 static board_btn_cb_t s_btn_cb;
 static void *s_btn_arg;
 static button_handle_t s_btn[BOARD_BTN_COUNT];
-static const int s_btn_gpio[BOARD_BTN_COUNT] = {OSTB_BTN_MAIN, OSTB_BTN_VOL_UP, OSTB_BTN_VOL_DOWN};
-static const int s_btn_active[BOARD_BTN_COUNT] = {OSTB_BTN_MAIN_ACTIVE, 0, 0};
-static const char *s_btn_names[BOARD_BTN_COUNT] = {"MAIN", "VOL+", "VOL-"};
+static const int s_btn_gpio[BOARD_BTN_COUNT] = {OSTB_BTN_VOL_UP, OSTB_BTN_VOL_DOWN};
+static const int s_btn_active[BOARD_BTN_COUNT] = {0, 0};
+static const char *s_btn_names[BOARD_BTN_COUNT] = {"VOL+", "VOL-"};
 
 static adc_oneshot_unit_handle_t s_adc[2];
 

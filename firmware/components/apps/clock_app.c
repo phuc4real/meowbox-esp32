@@ -160,7 +160,7 @@ static void start_ring(int h, int m, int station)
     snprintf(t, sizeof(t), "%02d:%02d", h, m);
     ui_overlay_show(LV_SYMBOL_BELL, ui_tr("Báo thức", "Alarm"), t, UI_C_ALERT, 0, ring_dismissed, NULL);
     lv_obj_t *hint = ui_label(lv_layer_top(), UI_F_SMALL, UI_C_DIM,
-                              ui_tr("Chạm để báo lại, nút giữa để tắt", "Tap to snooze, middle button to stop"));
+                              ui_tr("Chạm: báo lại · Giữ VOL: tắt", "Tap: snooze · Hold VOL: stop"));
     lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -UI_SAFE_Y - 4);
     lv_obj_set_user_data(hint, HINT_TAG);
     ui_force_bright(300);

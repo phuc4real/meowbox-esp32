@@ -48,7 +48,7 @@ other projects.
 | Display | NV3023 SPI TFT 296×240, CST816S touch (I2C 0x15) |
 | I2C / I2S | SDA 12, SCL 11 / MCLK 5, BCLK 15, WS 16, DOUT 6, DIN 7 |
 | LCD | MOSI 10, SCLK 9, CS 14, DC 8, RST 18, backlight 13 |
-| Buttons | volume up 40, volume down 39 (active low), middle button 1 (active high, long press = power off) |
+| Buttons | volume up 40, volume down 39 (active low); the middle button is a hardware power switch, not wired to the ESP32 |
 | Power | charge detect 47, battery voltage on 17 (ADC2 CH6) |
 | USB | native USB-Serial/JTAG; flashing needs no buttons |
 

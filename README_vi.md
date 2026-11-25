@@ -39,8 +39,8 @@ Vuốt trái/phải để đổi màn: **Đồng hồ → Radio → Máy tính �
 
 | Nút | Bấm | Ghi chú |
 |---|---|---|
-| Nút giữa | tắt báo thức, đóng thông báo, phát/dừng radio | bấm đúp: về màn Đồng hồ. **Giữ lâu: tắt nguồn** |
-| VOL+ / VOL− | tăng/giảm âm lượng 5 nấc, giữ để tăng/giảm liên tục | lúc báo thức kêu: báo lại sau vài phút |
+| Nút giữa | chỉ là nút nguồn | **giữ lâu: tắt nguồn**. Bấm nhanh không làm gì |
+| VOL+ / VOL− | tăng/giảm âm lượng 5 nấc, giữ để tăng/giảm liên tục | lúc báo thức kêu: bấm = báo lại, giữ khoảng 1 giây = tắt |
 | VOL+ và VOL− cùng lúc, giữ 3 giây | mở Wi-Fi cài đặt | |
 
 - **Đồng hồ**: giờ, ngày dương và âm lịch, thời tiết. Chạm vào góc có con mèo để sang màn Mèo.
@@ -82,7 +82,7 @@ máy tính phải cùng mạng Wi-Fi với loa.
   danh sách. Có link stream sẵn thì dùng "Thêm đài bằng link".
 - **Loại đài loa phát được**: MP3, AAC, HLS (`.m3u8`, ví dụ VOV), danh sách `.pls`/`.m3u`. Link YouTube (video,
   playlist, live) cần máy tính bật PC agent (mục 7).
-- Đài phát theo thứ tự trong danh sách. Bấm nút giữa trên loa thì phát lại đài gần nhất.
+- Đài phát theo thứ tự trong danh sách.
 - **Hẹn giờ tắt**: 15, 30, 60, 90 phút hoặc tự chọn. Hết giờ thì radio tắt.
 - **Wi-Fi yếu hoặc lạ** (quán cà phê, khách sạn):
   - loa tự tắt tiết kiệm điện Wi-Fi trong lúc phát;
@@ -97,8 +97,8 @@ máy tính phải cùng mạng Wi-Fi với loa.
 - Mỗi báo thức có giờ, các ngày trong tuần, âm thanh và số phút báo lại.
 - Âm thanh là chuông có sẵn, hoặc một đài radio trong danh sách. Đài không phát được thì loa tự dùng chuông.
 - Lúc báo thức kêu:
-  - bấm nút giữa để tắt;
-  - bấm VOL+ hoặc VOL− để báo lại sau số phút đã đặt.
+  - giữ VOL+ hoặc VOL− khoảng 1 giây để tắt;
+  - bấm VOL+ hoặc VOL−, hoặc chạm màn hình, để báo lại sau số phút đã đặt.
 
 ## 6. Thông báo
 

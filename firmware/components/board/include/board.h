@@ -16,8 +16,8 @@ extern "C" {
 #endif
 
 typedef enum {
-    BOARD_BTN_MAIN = 0,   /* middle (power) button, GPIO1 */
-    BOARD_BTN_VOL_UP,
+    /* no middle button: it is a hardware power switch, not wired to the ESP32 */
+    BOARD_BTN_VOL_UP = 0,
     BOARD_BTN_VOL_DOWN,
     BOARD_BTN_COUNT,
 } board_btn_t;

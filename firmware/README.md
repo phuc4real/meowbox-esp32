@@ -58,8 +58,8 @@ server. API: [web/API.md](web/API.md) "Update".
 | Where | What |
 |---|---|
 | Screen | swipe left/right: **Clock → Radio → PC → Cat → System** |
-| Middle button (GPIO1) | click: stop alarm / close notification / play-stop radio · double click: back to the clock. Holding it powers off (hardware) |
-| Volume buttons | click ±5, hold to repeat. During an alarm: snooze |
+| Middle button | power only: holding it switches the speaker off (hardware). The firmware can't see it |
+| Volume buttons | click ±5, hold to repeat. During an alarm: click = snooze, hold ~1 s = stop |
 | Cat corner on the clock | tap to open the Cat tile |
 | System tile | long-press the title to show the safe-area calibration frames |
 | Web | `http://meowbox-xxxx.local` (or the IP on the System tile), `meowbox` / `m3owb0x2026`; change the password |

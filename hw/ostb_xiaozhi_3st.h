@@ -70,10 +70,8 @@
 
 /* ---------- Buttons (active low) ---------- */
 #define OSTB_BTN_BOOT            0       /* strapping pin; no button reaches it from outside the case */
-#define OSTB_BTN_MAIN            1       /* middle (power) button, ACTIVE HIGH. Verified 2026-11-22.
-                                          * Short press = pulse on GPIO1. Holding it powers the speaker
-                                          * off in hardware, so do not rely on long presses. */
-#define OSTB_BTN_MAIN_ACTIVE     1
+/* The middle button is a hardware power switch (long press = off) and does NOT reach any ESP32 GPIO: re-checked
+ * 2026-11-25 by logging every readable GPIO while pressing it (the 2026-11-22 "GPIO1 pulse" was wrong). */
 #define OSTB_BTN_VOL_UP          40      /* verified 2026-11-22 */
 #define OSTB_BTN_VOL_DOWN        39
 

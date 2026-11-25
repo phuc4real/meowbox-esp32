@@ -25,8 +25,8 @@ static const char *TAG = "meowbox";
 
 #define SAMPLE_RATE 44100
 
-/* Holding VOL+ and VOL- together for 3 s opens the Wi-Fi setup hotspot (the middle button can't be
- * held: that powers the speaker off in hardware). Volume is frozen while both are down. */
+/* Holding VOL+ and VOL- together for 3 s opens the Wi-Fi setup hotspot (the middle button is a hardware power switch
+ * the firmware can't read). Volume is frozen while both are down. */
 #define COMBO_HOLD_US (3 * 1000000LL)
 static bool s_vol_down[2];
 static bool s_combo;          /* both were down at some point; stays set until both are released */
@@ -35,7 +35,6 @@ static bool s_combo_fired;
 
 static bool vol_combo(board_btn_t b, board_btn_ev_t ev)
 {
-    if (b == BOARD_BTN_MAIN) return false;
     int i = b == BOARD_BTN_VOL_UP ? 0 : 1;
     if (ev == BOARD_BTN_EV_DOWN || ev == BOARD_BTN_EV_UP) {
         s_vol_down[i] = ev == BOARD_BTN_EV_DOWN;
@@ -56,10 +55,13 @@ static bool vol_combo(board_btn_t b, board_btn_ev_t ev)
 
 /* A press that wakes the sleeping screen only wakes it: its click/hold does nothing else. */
 static bool s_wake_press[BOARD_BTN_COUNT];
+/* A press that stopped or snoozed the alarm: its later hold events don't change the volume. */
+static bool s_alarm_press[BOARD_BTN_COUNT];
 
 static void on_button(board_btn_t b, board_btn_ev_t ev, void *arg)
 {
     if (ev == BOARD_BTN_EV_DOWN) {
+        s_alarm_press[b] = false;
         s_wake_press[b] = ui_asleep() && !clock_alarm_ringing();
         ui_wake();
     }
@@ -67,25 +69,13 @@ static void on_button(board_btn_t b, board_btn_ev_t ev, void *arg)
     if (ev == BOARD_BTN_EV_DOWN || ev == BOARD_BTN_EV_UP) return;
     if (s_wake_press[b]) return;
 
-    if (b == BOARD_BTN_MAIN) {
-        /* middle button: holding it powers off in hardware, so only short/double presses */
-        if (ev == BOARD_BTN_EV_CLICK) {
-            if (clock_alarm_ringing()) { clock_alarm_stop(false); return; }
-            if (ui_overlay_visible() && board_lvgl_lock(100)) {
-                ui_overlay_hide();
-                board_lvgl_unlock();
-                return;
-            }
-            radio_toggle();
-        } else if (ev == BOARD_BTN_EV_DOUBLE) {
-            if (board_lvgl_lock(100)) {
-                ui_show_tile(UI_TILE_CLOCK, true);
-                board_lvgl_unlock();
-            }
-        }
+    /* alarm ringing: click = snooze, hold = stop (the middle button is only a power switch, the ESP32 can't see it) */
+    if (clock_alarm_ringing() && (ev == BOARD_BTN_EV_CLICK || ev == BOARD_BTN_EV_LONG)) {
+        clock_alarm_stop(ev == BOARD_BTN_EV_CLICK);
+        s_alarm_press[b] = true;
         return;
     }
-    if (clock_alarm_ringing()) { clock_alarm_stop(true); return; }
+    if (s_alarm_press[b]) return; /* the rest of that hold: no volume change */
     int vol = audio_hw_get_volume();
     int step = (ev == BOARD_BTN_EV_CLICK || ev == BOARD_BTN_EV_LONG_HOLD) ? 5 : 0;
     if (!step) return;

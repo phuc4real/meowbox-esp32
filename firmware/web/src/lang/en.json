@@ -149,7 +149,7 @@
  "tagPh": "e.g. news, pop, lofi",
  "added": "Added",
  "preview": "Preview",
- "radioHint": "Stations play in list order. The middle button on the speaker plays the last station.",
+ "radioHint": "Stations play in list order.",
  "ytAdd": "Add from YouTube",
  "ytSave": "Save as station",
  "ytHint": "YouTube plays through the PC agent: the PC must be on and the agent running.",

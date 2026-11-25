@@ -120,11 +120,9 @@ Firmware hiện khoảng 2.8 MB (kèm font của 4 theme), còn trống gần m�
 | Vuốt trái / phải | đổi màn: Đồng hồ ↔ Radio ↔ PC ↔ Mèo ↔ Hệ thống |
 | Chạm | thao tác trên màn hiện tại (nút, danh sách); chạm mèo ở góc đồng hồ để mở màn Mèo |
 | Nút GPIO40 / 39 | âm lượng +/− 5 (giữ để chỉnh liên tục) |
-| Nút giữa (GPIO1) bấm | tắt báo thức · đóng thông báo · phát/dừng radio |
-| Nút giữa bấm 2 lần | về màn Đồng hồ |
-| Nút giữa giữ lâu | **tắt nguồn** (phần cứng, firmware không chặn được) |
+| Nút giữa giữ lâu | **tắt nguồn** (phần cứng; nút này không nối vào ESP32, firmware không đọc được) |
 | Cài Wi-Fi | nút "Wi-Fi" trên màn Hệ thống, giữ cùng lúc VOL+ và VOL− 3 giây, trang Wi-Fi trên web, hoặc `agent.py wifi-setup` mở SoftAP `MeowBox-XXXX` (mật khẩu `meowbox2026`). Tự tắt 10 giây sau khi nối mạng, hoặc 10 phút không ai vào |
-| Báo thức kêu | chạm màn hình = báo lại 5 phút, nút âm lượng = báo lại, nút giữa = tắt |
+| Báo thức kêu | chạm màn hình hoặc bấm nút âm lượng = báo lại 5 phút, giữ nút âm lượng ~1 giây = tắt |
 
 Sau 60 s không thao tác: giảm độ sáng. Ban đêm (giờ cấu hình): chế độ đêm theo theme đang dùng.
 

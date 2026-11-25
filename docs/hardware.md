@@ -19,7 +19,7 @@ below was found from the device itself (boot log, disassembly, probing). See
 | Display | TFT, **NV3023** controller | SPI, 296 × 240 landscape, RGB565; the case bezel hides the outer edge |
 | Touch | **Hynitron CST816S** | I2C `0x15`, polled (INT not wired), coordinates already in screen space |
 | Backlight | PWM on GPIO13 | active high |
-| Buttons | volume up GPIO40, volume down GPIO39 (active low); middle button GPIO1 (active high) | holding the middle button powers off in hardware |
+| Buttons | volume up GPIO40, volume down GPIO39 (active low) | the middle button is a hardware power switch (hold = off), not wired to the ESP32 |
 | Battery | Li-ion cell with charger | charge detect GPIO47, voltage on GPIO17 (ADC2 CH6, 1:2 divider assumed) |
 | USB | native USB-Serial/JTAG (VID `303A`, PID `1001`) | appears as a COM port; flashing needs no buttons |
 
@@ -33,7 +33,7 @@ firmware can be flashed**. A full flash backup of the vendor state should be kep
                      USB-C (native USB, GPIO19/20)
                                │
                      ┌─────────┴──────────┐
- middle btn GPIO1 ───┤                    ├──── GPIO13 PWM ──► backlight
+                     │                    ├──── GPIO13 PWM ──► backlight
    vol+   GPIO40 ────┤                    │
    vol−   GPIO39 ────┤     ESP32-S3       ├──── SPI3: MOSI10 SCLK9 CS14 DC8 RST18 ──► NV3023 TFT
  charging GPIO47 ────┤  16 MB flash       │
@@ -61,8 +61,8 @@ firmware can be flashed**. A full flash backup of the vendor state should be kep
 
 ## Power
 
-- The middle button is wired to a hardware power latch: a long press switches the speaker off, a short
-  press only pulses GPIO1, which firmware can read.
+- The middle button is wired only to a hardware power latch: a long press switches the speaker off. A short press
+  reaches no ESP32 GPIO, so the firmware can't use it (checked 2026-11-25).
 - Battery voltage = calibrated ADC reading on GPIO17 × 2. Measured 4.21 V while charging. The divider
   ratio has not been checked with a multimeter yet.
 - The ADC → % table (1970 = 0 % … 2430 = 100 %) comes from the vendor firmware and still needs a real

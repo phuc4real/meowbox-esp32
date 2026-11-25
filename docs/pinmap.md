@@ -31,7 +31,7 @@ Machine-readable version: [`hw/ostb_xiaozhi_3st.h`](../hw/ostb_xiaozhi_3st.h).
 | LCD backlight | **13** | LEDC PWM 25 kHz, active high | FW, **HW ✔** |
 | Volume up | **40** | active low | FW, **HW ✔** |
 | Volume down | **39** | active low | FW, **HW ✔** |
-| Middle (power) button | **1** | **active high**; idle 0, ~100–150 ms pulse on a short press; a long press powers off in hardware | **HW ✔** (found by watching all free GPIOs) |
+| Middle (power) button | none | hardware power switch only (long press = off); **not wired to any ESP32 GPIO**. Re-checked 2026-11-25 by logging every readable GPIO while pressing it; the earlier "GPIO1 pulse" was wrong | **HW ✔** |
 | BOOT | **0** | strapping pin; no button reaches it from outside the case | chip |
 | Charge detect | **47** | input, high = charging | FW, **HW ✔** |
 | Battery voltage | **17** (ADC2 CH6) | 12 dB attenuation; raw 2461 on USB, 2430 on battery when full | **HW ✔** (divider ratio assumed 1:2) |
@@ -43,8 +43,8 @@ Machine-readable version: [`hw/ostb_xiaozhi_3st.h`](../hw/ostb_xiaozhi_3st.h).
 | GPIO | Use | | GPIO | Use |
 |---|---|---|---|---|
 | 0 | BOOT (strapping, no button outside) | | 21 | free* |
-| 1 | middle button (active high) | | 38 | free* |
-| 2 | free* (reads 4095 on the ADC: pulled high?) | | 39 | volume down |
+| 1 | free* (idle 0) | | 38 | free* |
+| 2 | free*, pulled high; probably the touch INT (pulses low every ~10 ms during a touch, unconfirmed) | | 39 | volume down |
 | 3 | free* (strapping, JTAG select) | | 40 | volume up |
 | 4 | speaker amp enable | | 41 | free* |
 | 5 | I2S MCLK | | 42 | free* |

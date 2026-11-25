@@ -19,6 +19,11 @@ static ui_overlay_cb_t s_ov_cb;
 static void *s_ov_arg;
 static volatile bool s_wake_req, s_rebuild_req;
 static volatile int64_t s_force_until;
+static volatile bool s_asleep; /* screen sleep: backlight and panel off, LVGL drawing paused */
+static lv_timer_t *s_ui_tmr;
+static lv_obj_t *s_blocker; /* while asleep: eats the touch that wakes the screen */
+static bool s_bl_hold;      /* just woke: backlight waits for the first fresh frame */
+static ui_sleep_hook_t s_sleep_hook;
 static bool s_lang_en, s_night, s_fx = true;
 static int s_theme = 0;
 
@@ -490,6 +495,60 @@ static bool compute_night(void)
     return from <= to ? (h >= from && h < to) : (h >= from || h < to);
 }
 
+/* ---------------- screen sleep ---------------- */
+bool ui_asleep(void) { return s_asleep; }
+void ui_set_sleep_hook(ui_sleep_hook_t hook) { s_sleep_hook = hook; }
+
+static void blocker_event(lv_event_t *e)
+{
+    lv_event_code_t c = lv_event_get_code(e);
+    if ((c == LV_EVENT_RELEASED || c == LV_EVENT_PRESS_LOST) && !s_asleep && s_blocker) {
+        lv_obj_delete_async(s_blocker);
+        s_blocker = NULL;
+    }
+}
+
+static void apply_brightness(void);
+static void backlight_on(lv_timer_t *t)
+{
+    s_bl_hold = false;
+    apply_brightness();
+}
+
+static void set_asleep(bool asleep)
+{
+    lv_timer_t *refr = lv_display_get_refr_timer(board_display());
+    s_asleep = asleep;
+    if (asleep) {
+        board_set_brightness(0);
+        if (refr) lv_timer_pause(refr);
+        board_lcd_on(false);
+        if (!s_blocker) {
+            s_blocker = lv_obj_create(lv_layer_top());
+            lv_obj_remove_style_all(s_blocker);
+            lv_obj_set_size(s_blocker, LV_PCT(100), LV_PCT(100));
+            lv_obj_add_flag(s_blocker, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_add_event_cb(s_blocker, blocker_event, LV_EVENT_ALL, NULL);
+        }
+        lv_timer_set_period(s_ui_tmr, 100); /* react to a button or touch quickly */
+        ESP_LOGI(TAG, "screen sleep");
+    } else {
+        board_lcd_on(true);
+        if (refr) lv_timer_resume(refr);
+        lv_obj_invalidate(lv_screen_active());
+        if (s_blocker && !lv_obj_has_state(s_blocker, LV_STATE_PRESSED)) { /* else it goes on release */
+            lv_obj_delete(s_blocker);
+            s_blocker = NULL;
+        }
+        lv_timer_set_period(s_ui_tmr, 500);
+        /* backlight once the first fresh frame is out, not over the old picture */
+        s_bl_hold = true;
+        lv_timer_t *t = lv_timer_create(backlight_on, 60, NULL);
+        lv_timer_set_repeat_count(t, 1);
+        ESP_LOGI(TAG, "screen wake");
+    }
+}
+
 static void on_settings(const char *group, void *arg)
 {
     if (strcmp(group, "display") == 0) s_rebuild_req = true; /* applied in the UI timer (LVGL context) */
@@ -518,6 +577,17 @@ static void ui_timer(lv_timer_t *tmr)
             }
         }
     }
+    uint32_t idle_ms = lv_display_get_inactive_time(NULL);
+    int sleep_s = settings_get_int("display", "sleep_s", 300);
+    bool want = sleep_s > 0 && idle_ms > (uint32_t)sleep_s * 1000 && !s_ov && esp_timer_get_time() >= s_force_until;
+    if (want != s_asleep) set_asleep(want);
+    if (s_sleep_hook) s_sleep_hook(s_asleep);
+    apply_brightness();
+}
+
+static void apply_brightness(void)
+{
+    if (s_asleep || s_bl_hold) return;
     uint32_t idle_ms = lv_display_get_inactive_time(NULL);
     int idle_s = settings_get_int("display", "idle_s", 60);
     int bri = settings_get_int("display", "bri", 80);
@@ -570,7 +640,7 @@ void ui_init(void)
         lv_obj_add_event_cb(s_tiles[i], tile_bg_draw, LV_EVENT_DRAW_MAIN_END, NULL);
     }
     settings_on_change(on_settings, NULL);
-    lv_timer_create(ui_timer, 500, NULL);
+    s_ui_tmr = lv_timer_create(ui_timer, 500, NULL);
     lv_display_add_event_cb(lv_display_get_default(), inv_cb, LV_EVENT_INVALIDATE_AREA, NULL);
     lv_timer_create(inv_report, 10000, NULL);
     ESP_LOGI(TAG, "ui ready, theme %s", ui_theme()->id);

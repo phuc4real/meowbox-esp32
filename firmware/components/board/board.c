@@ -88,6 +88,11 @@ void board_set_brightness(int percent)
 
 int board_get_brightness(void) { return s_brightness; }
 
+void board_lcd_on(bool on)
+{
+    if (s_panel) esp_lcd_panel_disp_on_off(s_panel, on);
+}
+
 /* ---------------- LCD + LVGL ---------------- */
 static esp_err_t init_lcd(void)
 {

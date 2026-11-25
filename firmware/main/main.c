@@ -10,6 +10,7 @@
 #include "esp_timer.h"
 #include "esp_app_desc.h"
 #include "esp_ota_ops.h"
+#include "esp_pm.h"
 #include "nvs_flash.h"
 #include "board.h"
 #include "audio_hw.h"
@@ -18,6 +19,7 @@
 #include "net.h"
 #include "ui.h"
 #include "apps.h"
+#include "player.h"
 
 static const char *TAG = "meowbox";
 
@@ -52,11 +54,18 @@ static bool vol_combo(board_btn_t b, board_btn_ev_t ev)
     return true;
 }
 
+/* A press that wakes the sleeping screen only wakes it: its click/hold does nothing else. */
+static bool s_wake_press[BOARD_BTN_COUNT];
+
 static void on_button(board_btn_t b, board_btn_ev_t ev, void *arg)
 {
-    if (ev == BOARD_BTN_EV_DOWN) ui_wake();
+    if (ev == BOARD_BTN_EV_DOWN) {
+        s_wake_press[b] = ui_asleep() && !clock_alarm_ringing();
+        ui_wake();
+    }
     if (vol_combo(b, ev)) return;
     if (ev == BOARD_BTN_EV_DOWN || ev == BOARD_BTN_EV_UP) return;
+    if (s_wake_press[b]) return;
 
     if (b == BOARD_BTN_MAIN) {
         /* middle button: holding it powers off in hardware, so only short/double presses */
@@ -100,6 +109,36 @@ static void status_hook(cJSON *r)
     cJSON_ReplaceItemInObject(r, "pc", cJSON_CreateBool(pc_online()));
 }
 
+/* ---- power: CPU at 240 MHz while the screen is on or audio plays, 80 MHz while the screen sleeps (DFS) ---- */
+static esp_pm_lock_handle_t s_cpu_lock;
+static bool s_low_power;
+
+static void init_pm(void)
+{
+    esp_pm_config_t pm = {.max_freq_mhz = 240, .min_freq_mhz = 80, .light_sleep_enable = false};
+    esp_err_t r = esp_pm_configure(&pm);
+    if (r == ESP_OK) r = esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "awake", &s_cpu_lock);
+    if (r == ESP_OK) r = esp_pm_lock_acquire(s_cpu_lock);
+    if (r != ESP_OK) {
+        ESP_LOGW(TAG, "power management off (%s)", esp_err_to_name(r));
+        s_cpu_lock = NULL;
+    }
+}
+
+static void on_sleep_tick(bool asleep)
+{
+    player_state_t ps = player_state();
+    bool low = asleep && ps != PLAYER_PLAY && ps != PLAYER_BUF;
+    audio_hw_power_save(low);
+    if (low == s_low_power) return;
+    s_low_power = low;
+    if (s_cpu_lock) {
+        if (low) esp_pm_lock_release(s_cpu_lock);
+        else esp_pm_lock_acquire(s_cpu_lock);
+    }
+    ESP_LOGI(TAG, "low power %s", low ? "on" : "off");
+}
+
 static void init_nvs(void)
 {
     esp_err_t r = nvs_flash_init();
@@ -113,6 +152,7 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "MeowBox %s starting", esp_app_get_description()->version);
     init_nvs();
+    init_pm();
     ESP_ERROR_CHECK(settings_init());
     ESP_ERROR_CHECK(board_init());
 
@@ -138,6 +178,7 @@ void app_main(void)
     system_app_init();
     update_app_init();
     ui_build_all();
+    ui_set_sleep_hook(on_sleep_tick);
     board_lvgl_unlock();
     board_set_button_cb(on_button, NULL);
 

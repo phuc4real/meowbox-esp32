@@ -295,7 +295,9 @@ Mỗi giai đoạn kết thúc bằng một bản chạy được trên loa th�
 ### P7 Hoàn thiện
 - [x] Đo thời lượng pin (log mỗi phút, phiên dùng pin, ước tính còn lại, `/api/battery`)
 - [ ] Chạy pin tới cạn một lần để chỉnh thang %
-- [ ] Tiết kiệm điện (tắt màn, light sleep khi không phát)
+- [x] Tắt màn khi không dùng (`display.sleep_s`, mặc định 5 phút): tắt đèn nền và panel, ngừng vẽ, tắt mic, tắt ampli
+  khi im 3 s, CPU 80 MHz khi không phát (DFS)
+- [ ] Light sleep tự động khi màn tắt và không phát (cần đóng I2S và giãn các timer LVGL/touch)
 - [ ] Watchdog, log lỗi lưu lại xem trên web
 - [x] Cập nhật docs, README (firmware/README.md, docs/)
 - [x] Hệ thống theme (Swiss, Cyberpunk, Zen, Brutalism): xem [ui_redesign.md](ui_redesign.md)

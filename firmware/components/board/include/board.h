@@ -48,6 +48,8 @@ void board_lvgl_unlock(void);
 
 void board_set_brightness(int percent); /* 0..100 */
 int board_get_brightness(void);
+/* Panel display on/off (screen sleep). Call with LVGL drawing paused (or from the LVGL task). */
+void board_lcd_on(bool on);
 
 void board_set_button_cb(board_btn_cb_t cb, void *arg);
 

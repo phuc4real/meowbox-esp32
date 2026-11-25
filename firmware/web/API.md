@@ -238,11 +238,15 @@ The UI looks the city up itself at `https://geocoding-api.open-meteo.com/v1/sear
 
 ### `GET /api/config/display`
 ```json
-{"bri":80,"idle_bri":20,"idle_s":60,"h24":true,
+{"bri":80,"idle_bri":20,"idle_s":60,"sleep_s":300,"h24":true,
  "night":true,"night_mode":"auto","n_from":22,"n_to":7,"n_bri":5,
  "lang":"vi","tz":"ICT-7","theme":"swiss","fx":"full"}
 ```
 - `bri`, `idle_bri`, `n_bri`: 0–100. `idle_s`: dim after this many seconds without touch (0 = never).
+- `sleep_s`: screen sleep after this many seconds without touch or a button (default 300, 0 = never). Backlight and
+  panel off, drawing paused, mics off, amplifier off after 3 s of silence, CPU at 80 MHz unless audio plays. Wi-Fi,
+  alarms, notifications and playback keep running; a card (alarm, notification) wakes the screen. The press or touch
+  that wakes it does nothing else.
 - `theme`: id of a theme from `GET /api/themes`. Default **`"swiss"`**, factory reset → `"swiss"`. Unknown id → `400 bad_value`.
   The speaker rebuilds its screens with the new theme at once. Stored in NVS group `display`, key `theme`.
 - `night_mode`: `auto` (default: night from hour `n_from` to `n_to`, 0–23, may wrap midnight) | `on` (always) | `off`.

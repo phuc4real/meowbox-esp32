@@ -80,6 +80,14 @@ void ui_wake(void);
 void ui_force_bright(int seconds);
 bool ui_is_night(void);
 
+/* Screen sleep: after display.sleep_s seconds without input (0 = never) and with no overlay card, the backlight and
+ * panel go off and LVGL stops drawing; Wi-Fi, audio and app timers keep running. Input, ui_wake() or a card wakes it
+ * (within 100 ms); the touch that wakes it does not reach the UI. */
+bool ui_asleep(void); /* thread-safe */
+/* Called from the LVGL task every UI tick (100-500 ms) with the current state, e.g. to save power while asleep. */
+typedef void (*ui_sleep_hook_t)(bool asleep);
+void ui_set_sleep_hook(ui_sleep_hook_t hook);
+
 #ifdef __cplusplus
 }
 #endif

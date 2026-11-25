@@ -45,7 +45,7 @@ def fresh_state():
             {"on": True, "h": 6, "m": 30, "days": 31, "snd": "chime", "st": 0}]},
         "weather": {"on": True, "name": "Hà Nội", "lat": 21.0245, "lon": 105.8412, "unit": "c",
                     "now": {"t": 24.5, "code": 3, "hi": 28, "lo": 20, "at": int(time.time())}},
-        "display": {"bri": 80, "idle_bri": 20, "idle_s": 60, "h24": True, "night": True,
+        "display": {"bri": 80, "idle_bri": 20, "idle_s": 60, "sleep_s": 300, "h24": True, "night": True,
                     "n_from": 22, "n_to": 7, "n_bri": 5, "lang": "vi", "tz": "ICT-7",
                     "theme": DEFAULT_THEME, "night_mode": "auto", "fx": "full"},
         "cat": {"name": "Mướp", "fur": "tabby", "diff": "normal",
@@ -532,7 +532,7 @@ class H(BaseHTTPRequestHandler):
         # simple groups
         simple = {
             "weather": ("on", "name", "lat", "lon", "unit"),
-            "display": ("bri", "idle_bri", "idle_s", "h24", "night", "n_from", "n_to", "n_bri", "lang", "theme", "night_mode", "fx"),
+            "display": ("bri", "idle_bri", "idle_s", "sleep_s", "h24", "night", "n_from", "n_to", "n_bri", "lang", "theme", "night_mode", "fx"),
             "cat": ("name", "fur", "diff"),
             "pc": ("host", "port", "auto"),
             "update": ("auto",),

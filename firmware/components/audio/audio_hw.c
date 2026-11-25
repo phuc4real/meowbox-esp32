@@ -5,8 +5,11 @@
 #include <stdlib.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_check.h"
+#include "esp_timer.h"
+#include "driver/gpio.h"
 #include "driver/i2s_std.h"
 #include "driver/i2s_tdm.h"
 #include "esp_codec_dev.h"
@@ -21,6 +24,13 @@ static SemaphoreHandle_t s_lock;
 static int s_rate;
 static int s_volume = 60;
 static bool s_mic_on;
+
+/* Speaker amplifier (PA) power save, used while the screen sleeps: off after AMP_IDLE_US without output, back on
+ * (with a short settle) by the next audio_hw_write(). esp_codec_dev turned it on when the output was opened. */
+#define AMP_IDLE_US   (3 * 1000000LL)
+#define AMP_SETTLE_MS 10
+static volatile bool s_amp_on = true;
+static volatile int64_t s_last_write;
 
 static esp_err_t create_i2s(int rate)
 {
@@ -122,6 +132,12 @@ int audio_hw_sample_rate(void) { return s_rate; }
 esp_err_t audio_hw_write(const int16_t *pcm, size_t samples)
 {
     if (!s_out) return ESP_ERR_INVALID_STATE;
+    s_last_write = esp_timer_get_time();
+    if (!s_amp_on) {
+        gpio_set_level(OSTB_PA_ENABLE, 1);
+        s_amp_on = true;
+        vTaskDelay(pdMS_TO_TICKS(AMP_SETTLE_MS));
+    }
     return esp_codec_dev_write(s_out, (void *)pcm, samples * sizeof(int16_t)) == ESP_CODEC_DEV_OK ? ESP_OK : ESP_FAIL;
 }
 
@@ -134,6 +150,19 @@ void audio_hw_set_volume(int volume)
 }
 
 int audio_hw_get_volume(void) { return s_volume; }
+
+void audio_hw_power_save(bool on)
+{
+    if (!s_out) return;
+    if (on && s_amp_on && esp_timer_get_time() - s_last_write > AMP_IDLE_US) {
+        gpio_set_level(OSTB_PA_ENABLE, 0);
+        s_amp_on = false;
+        ESP_LOGI(TAG, "amplifier off (idle)");
+    } else if (!on && !s_amp_on) {
+        gpio_set_level(OSTB_PA_ENABLE, 1);
+        s_amp_on = true;
+    }
+}
 
 void audio_hw_set_mute(bool mute)
 {

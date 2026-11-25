@@ -284,7 +284,7 @@ const w={v:ls('webT')=='swiss'?'swiss':'device'},ws=bind(w,'v',{tag:'select',opt
 fxSec.append(fld(t('fx'),fx,t('fxHint')));
 draw();
 return[sec(t('theme'),grid,h('a',{class:'btn ghost',href:SHOT,target:'_blank',rel:'noopener'},t('shot'))),
-sec(t('screen'),h('div',{class:'lim'},rng(c,'bri',t('bri')),rng(c,'idle_bri',t('idleBri')),fld(t('idleS'),bind(c,'idle_s',{type:'number',min:0,max:3600})),sw(c,'h24',t('h24')),
+sec(t('screen'),h('div',{class:'lim'},rng(c,'bri',t('bri')),rng(c,'idle_bri',t('idleBri')),fld(t('idleS'),bind(c,'idle_s',{type:'number',min:0,max:3600})),fld(t('sleepS'),bind(c,'sleep_s',{type:'number',min:0,max:3600}),t('sleepHint')),sw(c,'h24',t('h24')),
 fld(t('devLang'),bind(c,'lang',{tag:'select',opts:[['vi','Tiếng Việt'],['en','English']]})),fld(t('tz'),h('input',{value:t('tzV'),readOnly:true})),btn(t('save'),save))),
 sec(t('night'),h('div',{class:'lim'},fld(t('night'),bind(c,'night_mode',{tag:'select',opts:opt('nm')})),h('div',{class:'two'},fld(t('from'),bind(c,'n_from',{tag:'select',opts:hours()})),fld(t('to'),bind(c,'n_to',{tag:'select',opts:hours()}))),
 rng(c,'n_bri',t('nBri')),btn(t('save'),save))),

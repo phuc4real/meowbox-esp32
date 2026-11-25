@@ -192,6 +192,8 @@
  "bri": "Brightness",
  "idleBri": "Idle brightness",
  "idleS": "Dim after (seconds, 0 = never)",
+ "sleepS": "Screen off after (seconds, 0 = never)",
+ "sleepHint": "The screen turns off to save battery; Wi-Fi, alarms, notifications and music keep running. Press a button or touch to wake it.",
  "h24": "24-hour clock",
  "night": "Night mode",
  "from": "From",

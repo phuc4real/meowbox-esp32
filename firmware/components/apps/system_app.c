@@ -26,10 +26,20 @@ static void mic_task(void *arg)
 {
     const int frames = 441;
     int16_t *buf = heap_caps_malloc(frames * AUDIO_MIC_CHANNELS * sizeof(int16_t), MALLOC_CAP_INTERNAL);
-    if (!buf || audio_hw_mic_enable(true) != ESP_OK) vTaskDelete(NULL);
+    if (!buf) vTaskDelete(NULL);
     float acc[AUDIO_MIC_CHANNELS] = {0};
     int blocks = 0;
+    bool on = false;
     while (1) {
+        bool want = !ui_asleep(); /* the mics only feed the level bars: off while the screen sleeps */
+        if (want != on && audio_hw_mic_enable(want) == ESP_OK) {
+            on = want;
+            for (int c = 0; c < AUDIO_MIC_CHANNELS && !on; c++) s_mic_db[c] = 0;
+        }
+        if (!on) {
+            vTaskDelay(pdMS_TO_TICKS(250));
+            continue;
+        }
         if (audio_hw_mic_read(buf, frames) != ESP_OK) {
             vTaskDelay(pdMS_TO_TICKS(20));
             continue;

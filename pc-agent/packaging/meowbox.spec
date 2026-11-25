@@ -29,7 +29,6 @@ hidden = stdlib + (
     + collect_submodules("winrt.windows.media.speechsynthesis")
     + collect_submodules("winrt.windows.storage.streams")
     + collect_submodules("winrt.windows.foundation")
-    + collect_submodules("zeroconf")
     + ["pystray._win32", "pycaw.pycaw", "comtypes.stream", "PIL.ImageTk"]
 )
 

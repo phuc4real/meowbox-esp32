@@ -264,6 +264,10 @@ Dòng trạng thái đổi theo `AgentState`:
 ```
 
 **Bước 1: Tìm loa**
+
+> Since agent 0.2.2 step 1 is only the IP box: no `discover_all()`, no list. Managed PCs (Sophos and the
+> like) flag or block LAN discovery, so the agent connects only to the typed IP or the last working one. See 2.8.
+
 - Mở cửa sổ là chạy `discover_all()` luôn. Tìm thấy loa nào thì thêm dòng đó vào danh sách ngay. Chỉ có một loa thì
   chọn sẵn. Loa có firmware quá cũ (lệch `proto`) thì vẫn hiện nhưng ghi "cần cập nhật firmware".
 - Ô nhập IP luôn hiện, không giấu trong nút. Ghi rõ IP lấy ở đâu: tile Hệ thống trên màn hình loa, hoặc màn hình
@@ -287,10 +291,10 @@ Dòng trạng thái đổi theo `AgentState`:
 - Thử từ phía loa: agent gọi `POST /api/pc/relay_test`, loa tự `GET http://<relay>/yt/ping` rồi báo kết quả.
   Firewall chặn chiều kết nối vào PC, nên chỉ cách này mới biết chắc YouTube phát được.
 - Rule firewall chỉ thêm khi cần: `relay_test` lỗi **và** chưa có rule cho loại mạng đang dùng. Hay gặp nhất là
-  Windows xếp mạng mới vào loại **Public** (`Get-NetConnectionProfile` của card mạng nối với loa), trong khi bộ cài
-  chỉ mở cho Private. Lúc đó mới hiện nút "Cho phép trên mạng này". Nút này hỏi quyền admin (UAC), thêm rule cho
-  `MeowBoxAgent.exe`, cổng relay, đúng profile đang thiếu, rồi chạy lại `relay_test`. Không tự đổi loại mạng của
-  Windows.
+  Windows xếp mạng mới vào loại **Public** (category trong Network List Manager của card mạng nối với loa; agent
+  không gọi PowerShell vì phần mềm diệt virus như Sophos có thể chặn), trong khi bộ cài chỉ mở cho Private. Lúc đó mới hiện nút
+  "Cho phép trên mạng này". Nút này hỏi quyền admin (UAC), chạy `netsh` thêm rule cho `MeowBoxAgent.exe`, cổng relay,
+  đúng profile đang thiếu, rồi chạy lại `relay_test`. Không tự đổi loại mạng của Windows.
 - Ngoài cửa sổ này: đang chạy mà loa không gọi được relay khi phát YouTube thì tray hiện toast, kèm đúng nút đó.
 - Xong thì lưu `speaker`, `token`, `last_host`, rồi báo cho `ws_loop` nối lại ngay.
 
@@ -334,6 +338,11 @@ Dòng trạng thái đổi theo `AgentState`:
 - `web/API.md`, `mock_server.py` và `test_api.py` cập nhật theo các endpoint và trường mới.
 
 ### 2.8 Mạng chặn mDNS
+
+> Since agent 0.2.2 the agent does no discovery at all (no mDNS, no UDP broadcast/announcements): it tries
+> `host` (typed) then `last_host` with `/api/ping` and checks the name. The firmware still answers mDNS and UDP 8766 and
+> still announces on 8767; nothing in the agent listens any more.
+
 Mạng chặn mDNS thì các máy vẫn nối được với nhau, chỉ là không tự tìm thấy nhau. Agent tìm loa theo thứ tự:
 1. `last_host`, `host`: như hiện tại, check tên qua `/api/ping`.
 2. mDNS `_meowbox._tcp`, 3 s.

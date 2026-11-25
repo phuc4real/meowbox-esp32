@@ -55,7 +55,6 @@ def setup_logging(verbose: bool = False, to_file: bool = False) -> Path | None:
         h = logging.StreamHandler()
     h.setFormatter(fmt)
     root.addHandler(h)
-    logging.getLogger("zeroconf").setLevel(logging.WARNING)
     return logfile
 
 
@@ -70,8 +69,8 @@ class AgentState:
     host: str = ""               # "ip:port" in use or being tried
     name: str = ""               # speaker name (MeowBox-1A2B)
     ver: str = ""                # speaker firmware version
-    how: str = ""                # mdns | broadcast | last | manual
-    searching: str = ""          # what the search is doing right now ("", "mdns", "broadcast", "ip 1.2.3.4")
+    how: str = ""                # last | manual (which saved IP answered)
+    searching: str = ""          # IP being tried right now ("", "start", "ip 1.2.3.4")
     error: str = ""              # token | port | not_found | busy | proto_agent | proto_speaker | ""
     busy_with: str = ""          # PC holding the speaker when error == busy
     retry_in: int = 0            # seconds until the next attempt

@@ -1,26 +1,22 @@
 """Mock MeowBox for testing the PC agent without hardware.
 
-  python mock_speaker.py [--port 8080] [--token test] [--name MeowBox-MOCK] [--no-mdns] [--no-udp] [--proto 1]
+  python mock_speaker.py [--port 8080] [--token test] [--name MeowBox-MOCK] [--proto 1]
   curl "http://127.0.0.1:8080/mock/cmd?cmd=vol_up"   -> sends a media_cmd to the connected agent
 
-Like the firmware (docs/firmware_v0.2.0.md, 2.4-2.8): GET /api/ping, mDNS _meowbox._tcp with the name as instance,
-UDP "MEOWBOX?" on 8766 (only one mock can bind it), one agent at a time (another hello gets {"t":"busy"} unless it
-says "take":true), POST /api/pc/relay_test. Two mocks on different ports + --name test choosing a speaker.
+Like the firmware (docs/firmware_v0.2.0.md, 2.4-2.8): GET /api/ping, one agent at a time (another hello gets
+{"t":"busy"} unless it says "take":true), POST /api/pc/relay_test. The agent finds no speaker by itself: give it the
+mock's address (`--host 127.0.0.1:8080`). Two mocks on different ports + --name test the speaker-name check.
+No mDNS / UDP discovery: the agent doesn't use them.
 """
 import argparse
 import asyncio
 import json
-import socket
 import sys
 import time
 from pathlib import Path
 
 import aiohttp
 from aiohttp import WSMsgType, web
-from zeroconf import IPVersion, ServiceInfo
-from zeroconf.asyncio import AsyncZeroconf
-
-UDP_PORT = 8766
 current: dict = {"ws": None, "name": "", "relay": ""}
 
 
@@ -121,52 +117,6 @@ async def mock_cmd(req: web.Request) -> web.Response:
     return web.json_response({"sent": cmd, "agent": current["name"]})
 
 
-def local_ips() -> list[str]:
-    ips = {a[4][0] for a in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)}
-    return sorted(ips | {"127.0.0.1"})
-
-
-async def start_mdns(app: web.Application):
-    azc = AsyncZeroconf(ip_version=IPVersion.V4Only)
-    nm = app["name"]
-    info = ServiceInfo("_meowbox._tcp.local.", f"{nm}._meowbox._tcp.local.", port=app["port"],
-                       parsed_addresses=local_ips(), server=f"{nm.lower()}.local.",
-                       properties={"ver": "mock", "proto": str(app["proto"])})
-    await azc.async_register_service(info)
-    print(f"[mdns] advertising {nm} on {local_ips()}:{app['port']}", flush=True)
-    yield
-    await azc.async_unregister_service(info)
-    await azc.async_close()
-
-
-class Udp(asyncio.DatagramProtocol):
-    def __init__(self, app):
-        self.app = app
-
-    def connection_made(self, transport):
-        self.t = transport
-
-    def datagram_received(self, data, addr):
-        if data.startswith(b"MEOWBOX?"):
-            ip = socket.gethostbyname(socket.gethostname())
-            msg = {"name": self.app["name"], "ip": f"{ip}:{self.app['port']}", "ver": "mock", "proto": self.app["proto"]}
-            self.t.sendto(json.dumps(msg).encode(), addr)
-            print(f"[udp] answered {addr[0]}", flush=True)
-
-
-async def start_udp(app: web.Application):
-    loop = asyncio.get_running_loop()
-    try:
-        tr, _ = await loop.create_datagram_endpoint(lambda: Udp(app), local_addr=("0.0.0.0", UDP_PORT))
-        print(f"[udp] discovery on {UDP_PORT}", flush=True)
-    except OSError as e:
-        tr = None
-        print(f"[udp] port {UDP_PORT} busy ({e}), no broadcast answers from this mock", flush=True)
-    yield
-    if tr:
-        tr.close()
-
-
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser()
@@ -176,8 +126,6 @@ def main() -> None:
     ap.add_argument("--proto", type=int, default=1, help="protocol the mock speaks")
     ap.add_argument("--proto-min", type=int, default=0, help="oldest agent protocol accepted")
     ap.add_argument("--quiet", action="store_true", help="don't print stats messages")
-    ap.add_argument("--no-mdns", action="store_true")
-    ap.add_argument("--no-udp", action="store_true")
     ap.add_argument("--audio-dir", default=".")
     a = ap.parse_args()
     app = web.Application()
@@ -187,10 +135,6 @@ def main() -> None:
                     web.get("/api/notify", notify), web.get("/api/notify/history", notify_history),
                     web.post("/api/notify/audio", notify_audio), web.post("/api/pc/relay_test", relay_test),
                     web.get("/mock/cmd", mock_cmd)])
-    if not a.no_mdns:
-        app.cleanup_ctx.append(start_mdns)
-    if not a.no_udp:
-        app.cleanup_ctx.append(start_udp)
     web.run_app(app, port=a.port, print=lambda s: print(s, flush=True))
 
 

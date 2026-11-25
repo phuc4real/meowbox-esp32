@@ -1,4 +1,4 @@
-"""'Connect speaker' window (docs/firmware_v0.2.0.md, 2.2): 1 find the speaker, 2 notify token, 3 YouTube relay check.
+"""'Connect speaker' window (docs/firmware_v0.2.0.md, 2.2): 1 speaker IP, 2 notify token, 3 YouTube relay check.
 
 Runs on the tkinter (main) thread as a Toplevel of the tray's hidden root. Network work happens in worker threads and
 comes back through root.after(). On Finish it saves speaker/token/last_host and asks the core to reconnect now.
@@ -14,21 +14,19 @@ from tkinter import ttk
 
 from . import CONFIG_PATH
 from .config import save_config
-from .discovery import Speaker, discover_all, explain_failure, ping_detail
+from .discovery import Speaker, explain_failure, ping_detail
 from .winutil import allow_relay_on_this_network, local_ip_towards, network_category, wifi_name
 
 WIFI_HELP = "https://github.com/phuc4real/meowbox-esp32#readme"
 
 T = {
     "title": "Kết nối loa MeowBox",
-    "steps": ["1 Tìm loa", "2 Token", "3 Kiểm tra"],
-    "found": "Loa tìm thấy trong mạng:",
-    "rescan": "Quét lại",
-    "scanning": "Đang tìm loa (mDNS và broadcast)…",
-    "none": "Chưa thấy loa nào.",
-    "ip": "Không thấy loa? Nhập IP hiện trên màn hình loa (tile Hệ thống):",
+    "steps": ["1 IP loa", "2 Token", "3 Kiểm tra"],
+    "ip": "Nhập IP hiện trên màn hình loa (tile Hệ thống), vd 192.168.1.50:",
+    "ip_tip": "Agent không tự dò loa trong mạng. Loa đổi IP thì nhập lại ở đây; nên đặt IP cố định cho loa "
+              "trên router (DHCP reservation).",
     "try": "Thử",
-    "ok_ip": "✓ {name}",
+    "ok_ip": "✓ {name} (firmware {ver})",
     "not_meowbox": "IP này không phải MeowBox (hoặc loa đang chạy firmware cũ).",
     "no_answer": "Không nối được tới IP này.",
     "bad_address": "IP không hợp lệ.",
@@ -61,7 +59,6 @@ class ConnectDialog:
     def __init__(self, root: tk.Tk, cfg: dict, state, core, on_done=None):
         self.cfg, self.state, self.core, self.on_done = cfg, state, core, on_done
         self.sel: Speaker | None = None
-        self.speakers: dict[str, Speaker] = {}
         self.win = tk.Toplevel(root)
         self.win.title(T["title"])
         try:  # the cat instead of the Tk feather
@@ -146,9 +143,7 @@ class ConnectDialog:
     def save(self, reconnect: bool):
         if self.sel:
             self.cfg["speaker"] = self.sel.name
-            self.cfg["last_host"] = self.sel.host
-            if self.sel.how == "ping":
-                self.cfg["host"] = self.sel.host
+            self.cfg["last_host"] = self.cfg["host"] = self.sel.host
         self.cfg["token"] = self.token.get().strip()
         save_config(self.cfg, getattr(self.core, "cfg_path", None) or CONFIG_PATH)
         if reconnect and self.core:
@@ -163,61 +158,29 @@ class ConnectDialog:
 
     # -- step 1
     def page_find(self):
-        ttk.Label(self.body, text=T["found"]).pack(anchor="w")
-        row = ttk.Frame(self.body)
-        row.pack(fill="x")
-        self.tree = ttk.Treeview(row, columns=("ip", "ver", "how"), height=4, selectmode="browse")
-        for c, w, t in (("#0", 160, "Loa"), ("ip", 150, "IP"), ("ver", 70, "Phiên bản"), ("how", 80, "Tìm bằng")):
-            self.tree.column(c, width=w, stretch=False)
-            self.tree.heading(c, text=t)
-        self.tree.pack(side="left", fill="x", expand=True)
-        self.tree.bind("<<TreeviewSelect>>", self.pick)
-        ttk.Button(row, text=T["rescan"], command=self.scan).pack(side="left", padx=(8, 0), anchor="n")
-        self.scan_lbl = ttk.Label(self.body, foreground="#666")
-        self.scan_lbl.pack(anchor="w", pady=(2, 8))
         ttk.Label(self.body, text=T["ip"]).pack(anchor="w")
-        r2 = ttk.Frame(self.body)
-        r2.pack(fill="x", pady=4)
-        self.ip = tk.StringVar(value=self.cfg.get("host") or "")
-        e = ttk.Entry(r2, textvariable=self.ip, width=22)
+        r = ttk.Frame(self.body)
+        r.pack(fill="x", pady=4)
+        ip = self.sel.host if self.sel else self.cfg.get("last_host") or self.cfg.get("host") or ""
+        self.ip = tk.StringVar(value=ip)
+        e = ttk.Entry(r, textvariable=self.ip, width=22)
         e.pack(side="left")
         e.bind("<Return>", lambda _e: self.try_ip())
-        ttk.Button(r2, text=T["try"], command=self.try_ip).pack(side="left", padx=6)
-        self.ip_lbl = ttk.Label(r2)
-        self.ip_lbl.pack(side="left")
+        e.focus_set()
+        ttk.Button(r, text=T["try"], command=self.try_ip).pack(side="left", padx=6)
+        self.ip_lbl = ttk.Label(self.body)
+        self.ip_lbl.pack(anchor="w", pady=(4, 0))
+        ttk.Label(self.body, text=T["ip_tip"], foreground="#666", wraplength=520, justify="left").pack(anchor="w", pady=(8, 0))
         self.reasons = ttk.Label(self.body, foreground="#555", wraplength=520, justify="left")
-        self.speakers.clear()
-        for sp in ([self.sel] if self.sel else []):
-            self.add(sp)
-        self.scan()
+        self.ip.trace_add("write", lambda *_: self.ip_edited())
+        if self.ip.get().strip():
+            self.try_ip()
 
-    def add(self, sp: Speaker):
-        if sp.name in self.speakers:
-            return
-        self.speakers[sp.name] = sp
-        label = {"mdns": "mDNS", "broadcast": "broadcast", "ping": "IP"}.get(sp.how, sp.how)
-        self.tree.insert("", "end", iid=sp.name, text=sp.name, values=(sp.host, sp.ver or "?", label))
-        if len(self.speakers) == 1 or sp.name == self.cfg.get("speaker"):
-            self.tree.selection_set(sp.name)
-
-    def pick(self, _e=None):
-        s = self.tree.selection()
-        self.sel = self.speakers.get(s[0]) if s else None
-
-    def scan(self):
-        self.scan_lbl.config(text=T["scanning"])
-        found = []
-
-        def work():
-            return discover_all(3.0, lambda sp: (found.append(sp), self.ui(lambda sp=sp: self.add(sp))))
-
-        def done(r):
-            if not self.speakers:
-                self.scan_lbl.config(text=T["none"])
-                self.show_reasons()
-            else:
-                self.scan_lbl.config(text="")
-        self.bg(work, done)
+    def ip_edited(self):
+        """A different IP than the one checked: check again before Next."""
+        if self.sel and self.ip.get().strip() != self.sel.host:
+            self.sel = None
+            self.ip_lbl.config(text="")
 
     def try_ip(self):
         host = self.ip.get().strip()
@@ -225,10 +188,12 @@ class ConnectDialog:
 
         def done(r):
             sp, err = r if isinstance(r, tuple) else (None, "no_answer")
+            if self.step != 0 or self.ip.get().strip() != host:
+                return  # left the page or edited the IP while checking
             if sp:
-                self.ip_lbl.config(text=T["ok_ip"].format(name=sp.name), foreground="#080")
-                self.add(sp)
-                self.tree.selection_set(sp.name)
+                self.sel = sp
+                self.ip_lbl.config(text=T["ok_ip"].format(name=sp.name, ver=sp.ver or "?"), foreground="#080")
+                self.reasons.pack_forget()
             else:
                 if err == "no_answer":
                     err = explain_failure(host)

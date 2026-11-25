@@ -1,6 +1,5 @@
 aiohttp>=3.9
 psutil>=5.9
-zeroconf>=0.130
 pycaw>=20240316
 comtypes>=1.4
 winrt-runtime>=2.0

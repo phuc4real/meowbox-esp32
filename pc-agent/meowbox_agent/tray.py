@@ -39,7 +39,7 @@ def cat_icon(size: int = 64, dot=None) -> Image.Image:
 
 def status_line(st: AgentState, cfg: dict) -> tuple[str, tuple]:
     want = st.name or cfg.get("speaker") or "MeowBox"
-    how = {"mdns": "mDNS", "broadcast": "broadcast", "last": "IP lần trước", "manual": "IP nhập tay"}.get(st.how, st.how)
+    how = {"last": "IP lần trước", "manual": "IP nhập tay"}.get(st.how, st.how)
     if st.connected:
         return f"● Đã kết nối {st.name} · {st.ip()} ({how})", GREEN
     if st.error == "busy":
@@ -49,12 +49,14 @@ def status_line(st: AgentState, cfg: dict) -> tuple[str, tuple]:
     if st.error == "port":
         return f"✕ Cổng relay {cfg.get('relay_port')} đang bị app khác dùng: mở 'Kết nối loa…'", RED
     if st.searching:
-        step = {"mdns": "mDNS", "broadcast": "broadcast", "start": "…"}.get(st.searching, st.searching)
-        return f"○ Đang tìm loa: {step}", GREY
+        step = {"start": "…"}.get(st.searching, st.searching)
+        return f"○ Đang nối loa: {step}", GREY
     if st.error == "not_found":
         retry = f" (thử lại sau {st.retry_in} s)" if st.retry_in else ""
-        return f"✕ Không thấy {want} trên mạng này, mở 'Kết nối loa…' để nhập IP{retry}", RED
-    return "○ Đang tìm loa…", GREY
+        if not (cfg.get("last_host") or cfg.get("host")):
+            return "✕ Chưa có IP loa: mở 'Kết nối loa…' để nhập", RED
+        return f"✕ Không nối được {want}, mở 'Kết nối loa…' để kiểm tra IP{retry}", RED
+    return "○ Đang nối loa…", GREY
 
 
 class TrayApp:
@@ -86,7 +88,7 @@ class TrayApp:
             sep,
             item("Kết nối loa…", lambda: ui(self.open_dialog)),
             item("Cài đặt…", lambda: ui(self.open_settings)),
-            item("Tìm lại loa ngay", lambda: self.core.reconnect_now()),
+            item("Nối lại loa ngay", lambda: self.core.reconnect_now()),
             item("Chạy cùng Windows", self.toggle_autostart, checked=lambda _i: autostart_enabled()),
             item("Mở thư mục log", lambda: os.startfile(APP_DIR)),
             sep,

@@ -127,11 +127,12 @@ curl -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" \
 1. Tải `MeowBoxAgent-Setup-x.y.z.exe` ở
    [Releases](https://github.com/phuc4real/meowbox-esp32/releases/latest) rồi chạy.
    Windows có thể báo "Unknown publisher": bấm *More info → Run anyway*.
-2. Cài xong, icon con mèo hiện ở khay hệ thống và cửa sổ **Kết nối loa** tự mở. Cửa sổ này tìm loa, cho dán token,
-   rồi kiểm tra loa có gọi được máy tính không.
+2. Cài xong, icon con mèo hiện ở khay hệ thống và cửa sổ **Kết nối loa** tự mở. Nhập IP của loa (xem ở tile Hệ thống
+   trên màn hình loa), dán token, rồi kiểm tra loa có gọi được máy tính không. Loa đổi IP thì mở lại
+   **Kết nối loa** trong menu và nhập IP mới.
 3. Ý nghĩa chấm trên icon:
    - xanh: đã nối loa;
-   - xám: đang tìm loa;
+   - xám: đang nối loa;
    - đỏ: có lỗi, di chuột vào icon để xem lỗi gì.
 
 Agent gửi số liệu máy và bài đang phát lên màn Máy tính, nhận lệnh ⏮ ⏯ ⏭ và âm lượng từ loa, và làm relay cho

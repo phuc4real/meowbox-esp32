@@ -51,7 +51,7 @@ Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; Value
   Tasks: addpath; Check: NeedsAddPath(ExpandConstant('{app}'))
 
 [Run]
-; firewall: the relay (speaker -> PC TCP), mDNS answers and the speakers' UDP announcements, Private networks only.
+; firewall: the relay (speaker -> PC TCP), Private networks only. The agent does no mDNS / UDP discovery.
 ; A Public network gets its own rule from the agent's "Connect speaker" window, only if the relay test fails there.
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""MeowBox Agent"""; Flags: runhidden
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""MeowBox Agent"" dir=in action=allow program=""{app}\MeowBoxAgent.exe"" profile=private enable=yes"; Flags: runhidden
@@ -65,7 +65,8 @@ Filename: "{app}\MeowBoxAgent.exe"; Description: "Start MeowBox Agent"; Flags: n
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM MeowBoxAgent.exe /T"; Flags: runhidden; RunOnceId: "kill"
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""MeowBox Agent"""; Flags: runhidden; RunOnceId: "fw"
-Filename: "powershell.exe"; Parameters: "-NoProfile -Command ""Get-NetFirewallRule -DisplayName 'MeowBox Agent relay*' -ErrorAction SilentlyContinue | Remove-NetFirewallRule"""; Flags: runhidden; RunOnceId: "fwpublic"
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""MeowBox Agent relay (Public)"""; Flags: runhidden; RunOnceId: "fwpublic"
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""MeowBox Agent relay (Private)"""; Flags: runhidden; RunOnceId: "fwprivate"
 
 [Code]
 function NeedsAddPath(Dir: string): Boolean;

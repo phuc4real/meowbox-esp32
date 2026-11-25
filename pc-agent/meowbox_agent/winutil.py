@@ -2,6 +2,7 @@
 import ctypes
 import logging
 import os
+import re
 import subprocess
 import sys
 import winreg
@@ -49,22 +50,19 @@ def set_autostart(on: bool) -> None:
                 pass
 
 
-def _ps(cmd: str, timeout: float = 10) -> str:
-    try:
-        return subprocess.run(["powershell", "-NoProfile", "-Command", cmd], capture_output=True, text=True,
-                              timeout=timeout, creationflags=NOWIN).stdout.strip()
-    except Exception:  # noqa: BLE001
-        return ""
-
+# No PowerShell here: endpoint protection (Sophos Intercept X "BrowserAncestorPowershell") blocks powershell.exe
+# when the agent was started by an installer downloaded in a browser. Use COM (netlist.py) and netsh instead.
 
 def network_category(local_ip: str) -> str:
     """Public | Private | DomainAuthenticated for the adapter that has local_ip ('' if unknown)."""
     if not local_ip:
         return ""
-    idx = _ps(f"(Get-NetIPAddress -IPAddress '{local_ip}' -ErrorAction SilentlyContinue).InterfaceIndex")
-    if not idx.isdigit():
-        return ""
-    return _ps(f"(Get-NetConnectionProfile -InterfaceIndex {idx} -ErrorAction SilentlyContinue).NetworkCategory")
+    import psutil
+
+    from .netlist import connections
+
+    aliases = {name for name, addrs in psutil.net_if_addrs().items() if any(a.address == local_ip for a in addrs)}
+    return next((cat for alias, _, cat in connections() if alias in aliases), "")
 
 
 def wifi_name() -> str:
@@ -76,19 +74,18 @@ def wifi_name() -> str:
         k, _, v = line.partition(":")
         if k.strip() == "SSID" and v.strip():
             return v.strip()
-    return _ps("(Get-NetConnectionProfile | Where-Object { $_.InterfaceAlias -match 'Wi-?Fi|WLAN|Wireless' } "
-               "| Select-Object -First 1).Name")
+    from .netlist import connections
+
+    return next((name for alias, name, _ in connections() if re.search(r"Wi-?Fi|WLAN|Wireless", alias, re.I)), "")
 
 
 def allow_relay_on_this_network(port: int, profile: str) -> bool:
-    """Firewall rule for the relay on one profile (Public/Private), via an elevated PowerShell (UAC prompt).
+    """Firewall rule for the relay on one profile (Public/Private), via an elevated netsh (UAC prompt).
     Only offered when relay_test failed and that profile has no rule (docs/firmware_v0.2.0.md, 2.2 step 3)."""
-    exe = sys.executable
-    prog = f"-Program '{exe}' " if getattr(sys, "frozen", False) else ""
-    cmd = (f"New-NetFirewallRule -DisplayName 'MeowBox Agent relay ({profile})' -Direction Inbound -Action Allow "
-           f"-Protocol TCP -LocalPort {port} {prog}-Profile {profile}")
-    r = ctypes.windll.shell32.ShellExecuteW(None, "runas", "powershell.exe",
-                                            f'-NoProfile -WindowStyle Hidden -Command "{cmd}"', None, 0)
+    prog = f' program="{sys.executable}"' if getattr(sys, "frozen", False) else ""
+    args = (f'advfirewall firewall add rule name="MeowBox Agent relay ({profile})" dir=in action=allow protocol=TCP '
+            f"localport={port} profile={profile.lower()}{prog}")
+    r = ctypes.windll.shell32.ShellExecuteW(None, "runas", "netsh.exe", args, None, 0)
     return r > 32
 
 

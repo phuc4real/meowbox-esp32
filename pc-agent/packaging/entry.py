@@ -1,7 +1,7 @@
 """Entry point for both executables built by meowbox.spec.
 
 MeowBoxAgent.exe (windowed): no arguments -> tray app; arguments -> CLI (output goes to the log).
-meowbox.exe (console): the CLI (`meowbox notify "Build xong"`, `meowbox say ...`, `meowbox discover`).
+meowbox.exe (console): the CLI (`meowbox notify "Build xong"`, `meowbox say ...`, `meowbox config --set-host IP`).
 """
 import sys
 

@@ -2,13 +2,13 @@
 
 Layout (docs/firmware_v0.2.0.md, 2.9):
   config.py          agent.json (+ AgentState shared by the asyncio core and the tray/dialogs)
-  discovery.py       find speakers: last IP / saved IP, mDNS _meowbox._tcp, UDP broadcast, /api/ping checks
+  discovery.py       reach the speaker at the last / typed IP (/api/ping); no mDNS or broadcast
   relay.py           YouTube relay (yt-dlp + ffmpeg -> MP3), only serves the connected speaker
   core.py            stats, media (SMTC), the WebSocket link, TTS, yt-dlp self-update
   tray.py            tray icon + menu (pystray), runs the core in a thread
   connect_dialog.py  "Connect speaker" window (tkinter)
   update.py          checks GitHub Releases for a newer agent
-  cli.py             command line: run / tray / notify / say / wifi-setup / config / discover
+  cli.py             command line: run / tray / notify / say / wifi-setup / config / tools
 """
 import os
 import sys

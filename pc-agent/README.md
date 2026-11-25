@@ -16,26 +16,27 @@ Tải `MeowBoxAgent-Setup-x.y.z.exe` ở [Releases](https://github.com/phuc4real
 Không cần Python. Bộ cài:
 
 - cài vào `Program Files\MeowBox Agent` (hỏi quyền admin), có shortcut ở Start Menu;
-- mở tường lửa cho agent trên mạng **Private** (relay, mDNS, gói thông báo của loa);
+- mở tường lửa cho agent trên mạng **Private** (relay YouTube);
 - tùy chọn: chạy cùng Windows (mặc định bật), thêm `meowbox.exe` vào PATH;
 - tải yt-dlp bản mới nhất về `%LOCALAPPDATA%\MeowBox\bin` (không đóng gói kèm, để luôn cập nhật được);
 - gỡ bản cũ chạy bằng Python (task "MeowBox Agent" trong Task Scheduler, shortcut Startup), giữ cấu hình cũ.
 
 Cài xong agent chạy luôn, hiện icon con mèo ở khay hệ thống, và lần đầu tự mở cửa sổ **Kết nối loa**:
 
-1. **Tìm loa**: loa trong mạng tự hiện (mDNS và broadcast). Không thấy thì nhập IP hiện trên tile Hệ thống của loa.
+1. **IP loa**: nhập IP hiện trên tile Hệ thống của loa, bấm Thử (agent gọi `/api/ping`).
 2. **Token**: dán token ở trang Thông báo của loa (cần cho `notify`, `say`, `wifi-setup`; có thể bỏ qua).
 3. **Kiểm tra**: loa thử gọi relay trên máy này. Lỗi trên mạng Windows xếp là Public thì có nút
    "Cho phép trên mạng này" (hỏi quyền admin, chỉ thêm rule cho đúng loại mạng đó).
 
-Chấm trên icon: xanh = đã nối loa, xám = đang tìm, đỏ = lỗi (di chuột vào icon để xem). Menu chuột phải có
-mở trang cài đặt của loa, gửi thông báo thử, tạm dừng gửi số liệu, kết nối loa, tìm lại ngay, chạy cùng Windows,
+Chấm trên icon: xanh = đã nối loa, xám = đang nối, đỏ = lỗi (di chuột vào icon để xem). Menu chuột phải có
+mở trang cài đặt của loa, gửi thông báo thử, tạm dừng gửi số liệu, kết nối loa, nối lại ngay, chạy cùng Windows,
 thư mục log. Loa đang nối với PC khác thì có "Giành quyền nối loa". Có agent mới trên GitHub thì menu hiện
 "Có bản x.y.z".
 
-Agent tìm loa theo thứ tự: IP lần trước, IP nhập tay, mDNS `_meowbox._tcp`, rồi UDP (hỏi `MEOWBOX?` cổng 8766 và
-nghe gói thông báo loa phát mỗi 2 giây ở cổng 8767). Nó nhớ loa theo **tên** (`MeowBox-1A2B`), nên nhà có hai loa không
-nối nhầm, loa đổi IP vẫn tìm ra. Mỗi lúc một loa chỉ nhận một PC.
+Agent không dò loa trong mạng (không mDNS, không UDP broadcast): phần mềm bảo mật ở máy công ty hay chặn hoặc báo
+động kiểu quét này. Nó chỉ nối tới IP đã nhập (`host`) hoặc IP lần trước nối được (`last_host`), và kiểm tra **tên**
+loa (`MeowBox-1A2B`) qua `/api/ping` để nhà có hai loa không nối nhầm. Loa đổi IP thì nhập lại trong **Kết nối loa**
+(hoặc `meowbox config --set-host IP`); nên đặt IP cố định cho loa trên router. Mỗi lúc một loa chỉ nhận một PC.
 
 Cấu hình: `%APPDATA%\MeowBox\agent.json`. Log: `%APPDATA%\MeowBox\agent.log` (xoay vòng 1 MB × 3).
 
@@ -60,7 +61,7 @@ meowbox notify "Build xong" "esp32-playground OK" --sound chime --priority high
 meowbox say "Build xong rồi nha"            # TTS Windows → WAV → /api/notify/audio
 meowbox say "test" --save test.wav           # chỉ lưu file, không gửi
 meowbox wifi-setup [on|off|status]           # Wi-Fi cài đặt MeowBox-XXXX (mật khẩu meowbox2026)
-meowbox discover                             # liệt kê loa tìm được
+meowbox config --set-host 192.168.1.50      # IP loa (tile Hệ thống)
 meowbox config --token <token> --speaker MeowBox-1A2B
 meowbox run                                  # agent không có icon (như bản cũ), --no-relay, --no-update
 ```
@@ -111,13 +112,12 @@ Ra `packaging\build\MeowBoxAgent-Setup-<version>.exe` (~20 MB, không kèm yt-dl
 ## Test không cần loa (mock)
 
 `mock_speaker.py` giả làm loa: `/ws/pc` (một PC mỗi lúc, `busy`, `take`), `/api/ping`, `/api/notify*`,
-`/api/pc/relay_test`, mDNS và UDP như firmware.
+`/api/pc/relay_test` như firmware (không có mDNS/UDP vì agent không dùng).
 
 ```powershell
 python mock_speaker.py --port 8081 --name MeowBox-AAAA
-python mock_speaker.py --port 8082 --name MeowBox-BBBB --no-udp     # loa thứ hai, chỉ mDNS
-python agent.py discover
-python agent.py --config test.json config --token test --speaker MeowBox-AAAA
+python mock_speaker.py --port 8082 --name MeowBox-BBBB     # loa thứ hai: test kiểm tra tên loa
+python agent.py --config test.json config --set-host 127.0.0.1:8081 --token test --speaker MeowBox-AAAA
 python agent.py --config test.json run
 curl "http://127.0.0.1:8081/mock/cmd?cmd=vol_up"     # loa giả gửi media_cmd cho agent
 ```

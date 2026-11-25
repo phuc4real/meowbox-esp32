@@ -15,7 +15,7 @@ def _host(cfg: dict) -> str:
 
     sp = find_speaker(cfg)
     if not sp:
-        raise SystemExit("Không tìm thấy loa. Dùng --host IP hoặc: meowbox config --set-host IP")
+        raise SystemExit("Không nối được loa. Dùng --host IP hoặc: meowbox config --set-host IP")
     return sp.host
 
 
@@ -62,12 +62,11 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--save", type=Path, help="chỉ lưu WAV ra file, không gửi")
     w = sub.add_parser("wifi-setup", help="bật/tắt Wi-Fi cài đặt MeowBox-XXXX trên loa (tự tắt sau 10 phút không ai vào)")
     w.add_argument("action", nargs="?", choices=["on", "off", "status"], default="on")
-    sub.add_parser("discover", help="liệt kê các loa tìm được qua mDNS và broadcast")
     tl = sub.add_parser("tools", help="yt-dlp dùng cho YouTube relay: xem phiên bản / tải bản mới nhất")
     tl.add_argument("action", nargs="?", choices=["status", "update"], default="status")
     c = sub.add_parser("config", help="xem/sửa cấu hình")
-    c.add_argument("--set-host", dest="set_host", metavar="HOST", help="IP[:port] loa, '' = tự tìm")
-    c.add_argument("--speaker", help="tên loa sẽ dùng, vd MeowBox-1A2B ('' = loa đầu tiên tìm thấy)")
+    c.add_argument("--set-host", dest="set_host", metavar="HOST", help="IP[:port] loa (IP hiện trên tile Hệ thống của loa)")
+    c.add_argument("--speaker", help="chỉ nối nếu loa ở IP đó có tên này, vd MeowBox-1A2B ('' = loa nào cũng được)")
     c.add_argument("--token")
     c.add_argument("--relay-port", type=int)
     args, extra = ap.parse_known_args(argv)
@@ -114,12 +113,6 @@ def main(argv: list[str] | None = None) -> None:
                 raise SystemExit(f"yt-dlp: {e}") from None
         else:
             print(f"yt-dlp: {ytdlp_version() or 'chưa cài'} ({YTDLP}), mới nhất trên GitHub: {ytdlp_latest() or '?'}")
-    elif args.cmd == "discover":
-        from .discovery import discover_all
-
-        found = discover_all(3.0, lambda sp: print(f"{sp.name:<14} {sp.host:<21} v{sp.ver or '?':<8} ({sp.how})"))
-        if not found:
-            print("Không tìm thấy loa nào (mạng chặn mDNS và broadcast?). Nhập IP hiện trên màn hình loa.")
     elif args.cmd == "notify":
         body = {"title": args.title, "text": args.text, "sound": args.sound,
                 "priority": args.priority, "duration": args.duration}

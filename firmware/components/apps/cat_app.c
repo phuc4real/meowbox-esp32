@@ -579,7 +579,8 @@ static void cat_tick(lv_timer_t *t)
 
 static void cat_build(lv_obj_t *t)
 {
-    s_cat_spr.img = s_prop.img = s_mini.img = NULL;
+    /* not s_mini: it belongs to the clock tile, built (and attached via cat_mini_attach) before this one */
+    s_cat_spr.img = s_prop.img = NULL;
     for (int i = 0; i < 3; i++) s_poop[i].img = NULL;
     spr_alloc(&s_cat_spr, CAT_SPRITE_W, CAT_SPRITE_H);
     spr_alloc(&s_prop, CAT_PROP_W, CAT_PROP_H);

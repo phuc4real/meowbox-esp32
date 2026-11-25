@@ -78,9 +78,15 @@ static void show_next(lv_timer_t *t)
     xSemaphoreTake(s_lock, portMAX_DELAY);
     if (!s_qn) {
         xSemaphoreGive(s_lock);
-        if (s_resume_radio && !player_is_mem() && player_state() == PLAYER_STOP) {
-            s_resume_radio = false;
-            radio_play_id(0);
+        if (s_resume_radio) { /* radio was on before an audio notification */
+            player_state_t ps = player_state();
+            bool busy = ps == PLAYER_PLAY || ps == PLAYER_BUF;
+            if (!busy) { /* the clip ended or failed (ERR used to leave this flag set for a later stop to fire) */
+                s_resume_radio = false;
+                radio_play_id(0);
+            } else if (!player_is_mem()) {
+                s_resume_radio = false; /* another stream took over */
+            }
         }
         return;
     }

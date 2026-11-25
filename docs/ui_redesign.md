@@ -403,7 +403,7 @@ Cài đặt → Giao diện
 - [x] ~~Font chữ số pixel~~ thay bằng font giờ riêng cho từng theme (`mb_*_clock`)
 - [x] Mèo nhỏ ở góc màn Đồng hồ, chạm để mở màn Mèo
 - [x] D10 chế độ đêm dùng biến thể `night` của theme (đã kiểm tra cả 4 theme)
-- [ ] Palette mèo riêng cho ban đêm (hiện mèo vẫn giữ màu ban ngày)
+- [x] Night palette for the cat (0.2.3): a darker, warmer copy of the day palette, computed at runtime
 
 ### R5: web
 - [x] Dùng `themes.css` sinh từ theme, `data-theme` theo loa; font tự host

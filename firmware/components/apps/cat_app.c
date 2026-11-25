@@ -277,7 +277,9 @@ static void spr_set(spr_t *s, const uint8_t *idx, const uint16_t *pal, bool flip
     }
 }
 
-static const uint16_t *cur_palette(void)
+static bool s_force_redraw;
+
+static const uint16_t *day_palette(void)
 {
     const char *tp = ui_theme()->cat_palette;
     const uint16_t *p = (tp && strcmp(tp, "fur") != 0) ? cat_theme_palette(tp) : NULL;
@@ -285,6 +287,29 @@ static const uint16_t *cur_palette(void)
     char fur[12];
     settings_get_str("cat", "fur", fur, sizeof(fur), "tabby");
     return cat_palette(cat_fur_from_name(fur));
+}
+
+/* Night mode dims the whole UI and drops blue light; the cat follows with a darker, warmer copy of its palette
+ * (every fur and theme palette, no extra generated tables). */
+static const uint16_t *cur_palette(void)
+{
+    static uint16_t night[16];
+    static const uint16_t *night_of;
+    const uint16_t *p = day_palette();
+    if (!ui_is_night()) return p;
+    if (night_of != p) {
+        for (int i = 0; i < 16; i++) {
+            uint16_t c = p[i];
+            int r = (c >> 11) & 0x1F, g = (c >> 5) & 0x3F, b = c & 0x1F;
+            r = r * 62 / 100; /* about 60 % brightness, blue cut harder than red */
+            g = g * 55 / 100;
+            b = b * 40 / 100;
+            night[i] = (uint16_t)((r << 11) | (g << 5) | b);
+        }
+        night_of = p;
+        s_force_redraw = true; /* same pointer as before (night[]) but new colours */
+    }
+    return night;
 }
 
 /* ---------------- UI ---------------- */
@@ -295,7 +320,6 @@ static uint32_t s_anim_until_ms;
 static int s_action; /* 1 eat, 2 play, 3 bath, 4 pet */
 static int s_cat_x = 0, s_walk_dir = 0;
 static uint32_t s_pet_strokes;
-static bool s_force_redraw;
 
 static uint32_t now_ms(void) { return lv_tick_get(); }
 

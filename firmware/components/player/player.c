@@ -503,6 +503,8 @@ static void decode_task(void *arg)
     esp_audio_simple_dec_info_t info = {0};
     uint32_t rx_hist[5] = {0}, rx_last = 0;
     int64_t tick = 0, last_log = 0;
+    bool want_more = false; /* the decoder asked for more input than half a buffer */
+    int idle_loops = 0;     /* passes without consuming or producing anything */
 
     while (1) {
         int64_t now = esp_timer_get_time();
@@ -540,6 +542,7 @@ static void decode_task(void *arg)
             rx_last = s_rx;
             memset(rx_hist, 0, sizeof(rx_hist));
             in_len = 0;
+            want_more = false;
             pos = 0;
             last = 0;
             memset(&info, 0, sizeof(info));
@@ -569,7 +572,7 @@ static void decode_task(void *arg)
         }
         if (s_hold) { vTaskDelay(pdMS_TO_TICKS(20)); continue; }
         /* top up input */
-        if (in_len < IN_CAP / 2) {
+        if (in_len < IN_CAP / 2 || (want_more && in_len < IN_CAP)) {
             size_t n = 0;
             uint8_t *p = xRingbufferReceiveUpTo(s_rb, &n, pdMS_TO_TICKS(100), IN_CAP - in_len);
             if (p) {
@@ -616,6 +619,16 @@ static void decode_task(void *arg)
             }
         } else if (r == ESP_AUDIO_ERR_DATA_LACK && in_len >= IN_CAP - 16) {
             in_len = 0; /* garbage that never decodes */
+        }
+        /* DATA_LACK with nothing consumed: top up next pass even above half full. Without this an AAC stream could
+         * leave 4-8 KB that never decodes and the loop spun at priority 7, starving the UI task on this core. */
+        bool progress = raw.consumed > 0 || o.decoded_size > 0;
+        want_more = !progress && r == ESP_AUDIO_ERR_DATA_LACK;
+        if (progress) {
+            idle_loops = 0;
+        } else if (++idle_loops >= 8) { /* safety net: never hog the core */
+            idle_loops = 0;
+            vTaskDelay(1);
         }
     }
 }

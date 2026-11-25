@@ -90,14 +90,26 @@ static size_t pre_bytes(void)
     return b > RB_SIZE * 7 / 10 ? RB_SIZE * 7 / 10 : b;
 }
 
+/* Session check and send under s_lock, the lock player_play / player_stop flush the ring under: a blocking send
+ * started before a flush used to land after it, putting a few KB of the old stream in front of the new one (an
+ * audio notification then failed with "Not a WAV file" halfway through). */
 static void rb_put(uint32_t gen, const uint8_t *d, size_t n)
 {
-    while (n && alive(gen)) {
+    while (n) {
         size_t chunk = n > 4096 ? 4096 : n;
-        if (xRingbufferSend(s_rb, d, chunk, pdMS_TO_TICKS(200)) == pdTRUE) {
+        xSemaphoreTake(s_lock, portMAX_DELAY);
+        if (!alive(gen)) {
+            xSemaphoreGive(s_lock);
+            return;
+        }
+        BaseType_t ok = xRingbufferSend(s_rb, d, chunk, 0);
+        xSemaphoreGive(s_lock);
+        if (ok == pdTRUE) {
             s_rx += chunk;
             d += chunk;
             n -= chunk;
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(20)); /* ring full: let the decoder catch up */
         }
     }
 }
@@ -398,13 +410,28 @@ static void hls_loop(uint32_t gen, const char *playlist_url)
 }
 
 /* ---------------- fetch task (one per session) ---------------- */
+static volatile int s_fetch_n; /* fetch tasks alive; an old one leaves at its next alive() check */
+
+static void fetch_exit(void)
+{
+    __atomic_sub_fetch(&s_fetch_n, 1, __ATOMIC_SEQ_CST);
+    vTaskDeleteWithCaps(NULL);
+}
+
 static void fetch_task(void *arg)
 {
     uint32_t gen = (uint32_t)(uintptr_t)arg;
+    /* one connection at a time: rapid stop/play used to run several TLS handshakes at once on core 0, long enough
+     * to trip the idle task watchdog */
+    while (__atomic_load_n(&s_fetch_n, __ATOMIC_SEQ_CST) > 1 && alive(gen)) vTaskDelay(pdMS_TO_TICKS(50));
+    if (!alive(gen)) {
+        fetch_exit();
+        return;
+    }
     char *url = heap_caps_malloc(URL_MAX, MALLOC_CAP_SPIRAM);
     if (!url) {
         set_state_gen(gen, PLAYER_ERR);
-        vTaskDeleteWithCaps(NULL);
+        fetch_exit();
         return;
     }
     xSemaphoreTake(s_lock, portMAX_DELAY);
@@ -469,7 +496,7 @@ static void fetch_task(void *arg)
     }
     if (!s_eof) set_state_gen(gen, PLAYER_ERR);
     free(url);
-    vTaskDeleteWithCaps(NULL);
+    fetch_exit();
 }
 
 /* ---------------- decode task (persistent) ---------------- */
@@ -738,7 +765,9 @@ esp_err_t player_play(const char *url, const char *name, int id)
     xSemaphoreGive(s_lock);
     ESP_LOGI(TAG, "play %s (%s)", url, name ? name : "");
     /* stack in PSRAM: fetch only does network I/O, never writes flash (a PSRAM stack must not) */
+    __atomic_add_fetch(&s_fetch_n, 1, __ATOMIC_SEQ_CST);
     if (xTaskCreatePinnedToCoreWithCaps(fetch_task, "fetch", 8192, (void *)(uintptr_t)gen, 5, NULL, 0, MALLOC_CAP_SPIRAM) != pdPASS) {
+        __atomic_sub_fetch(&s_fetch_n, 1, __ATOMIC_SEQ_CST);
         set_state(PLAYER_ERR);
         return ESP_ERR_NO_MEM;
     }

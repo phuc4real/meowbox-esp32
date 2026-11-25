@@ -128,6 +128,7 @@ static void weather_cfg_hook(cJSON *doc)
 static bool s_ringing, s_ring_radio;
 static lv_timer_t *s_ring_timer;
 static time_t s_ring_started, s_snooze_at;
+static lv_obj_t *s_ring_ov; /* the alarm's own card */
 static volatile int s_stop_req; /* 1 = stop, 2 = snooze */
 static int s_last_min = -1;
 
@@ -147,6 +148,7 @@ static void ring_tick(lv_timer_t *t)
 
 static void ring_dismissed(bool tapped, void *arg)
 {
+    s_ring_ov = NULL; /* already closed: a later card may reuse its address */
     if (s_ringing) s_stop_req = tapped ? 2 : 1;
 }
 
@@ -158,7 +160,9 @@ static void start_ring(int h, int m, int station)
     s_ring_started = time(NULL);
     char t[32];
     snprintf(t, sizeof(t), "%02d:%02d", h, m);
-    ui_overlay_show(LV_SYMBOL_BELL, ui_tr("Báo thức", "Alarm"), t, UI_C_ALERT, 0, ring_dismissed, NULL);
+    if (ui_overlay_visible()) ui_overlay_hide(); /* the alarm wins over any other card */
+    s_ring_ov = ui_overlay_show(LV_SYMBOL_BELL, ui_tr("Báo thức", "Alarm"), t, UI_C_ALERT, 0, ring_dismissed, NULL);
+    ui_overlay_set_sticky();
     lv_obj_t *hint = ui_label(lv_layer_top(), UI_F_SMALL, UI_C_DIM,
                               ui_tr("Chạm: báo lại · Giữ VOL: tắt", "Tap: snooze · Hold VOL: stop"));
     lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -UI_SAFE_Y - 4);
@@ -185,7 +189,8 @@ static void finish_ring(bool snooze)
         lv_obj_t *c = lv_obj_get_child(top, i);
         if (lv_obj_get_user_data(c) == HINT_TAG) lv_obj_delete(c);
     }
-    if (ui_overlay_visible()) ui_overlay_hide();
+    ui_overlay_hide_if(s_ring_ov); /* only our own card, never one shown since */
+    s_ring_ov = NULL;
     if (snooze) {
         s_snooze_at = time(NULL) + settings_get_int("alarms", "snooze", 5) * 60;
         ESP_LOGI(TAG, "snoozed");

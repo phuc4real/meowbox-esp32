@@ -82,9 +82,14 @@ void ui_hud_corners(lv_obj_t *parent, int x, int y, int w, int h);
 
 /* Overlay card on top of everything. icon may be NULL. duration_s 0 = until dismissed. */
 typedef void (*ui_overlay_cb_t)(bool tapped, void *arg);
-void ui_overlay_show(const char *icon, const char *title, const char *text, ui_color_t accent, int duration_s,
-                     ui_overlay_cb_t on_dismiss, void *arg);
+/* Returns the card's overlay object, or NULL if a sticky card is showing (then nothing is shown). */
+lv_obj_t *ui_overlay_show(const char *icon, const char *title, const char *text, ui_color_t accent, int duration_s,
+                          ui_overlay_cb_t on_dismiss, void *arg);
 void ui_overlay_hide(void);
+/* The card on screen stays until it is tapped, times out or is hidden: later ui_overlay_show() calls are refused. */
+void ui_overlay_set_sticky(void);
+/* Hide the card only if it is still this one (from ui_overlay_show). */
+void ui_overlay_hide_if(lv_obj_t *ov);
 bool ui_overlay_visible(void);
 
 /* Backlight: call on any user activity (buttons). Thread-safe. */

@@ -18,6 +18,7 @@ static ui_builder_t s_builders[UI_TILE_COUNT];
 static lv_obj_t *s_ov;
 static lv_timer_t *s_ov_timer;
 static ui_overlay_cb_t s_ov_cb;
+static bool s_ov_sticky; /* the current card refuses to be replaced (ui_overlay_set_sticky) */
 static void *s_ov_arg;
 static volatile bool s_wake_req, s_rebuild_req;
 static volatile int64_t s_force_until;
@@ -460,6 +461,7 @@ static void ov_close(bool tapped)
     }
     lv_obj_delete(s_ov);
     s_ov = NULL;
+    s_ov_sticky = false;
     ui_overlay_cb_t cb = s_ov_cb;
     s_ov_cb = NULL;
     if (cb) cb(tapped, s_ov_arg);
@@ -469,11 +471,17 @@ static void ov_clicked(lv_event_t *e) { ov_close(true); }
 static void ov_timeout(lv_timer_t *t) { s_ov_timer = NULL; ov_close(false); }
 void ui_overlay_hide(void) { ov_close(false); }
 bool ui_overlay_visible(void) { return s_ov != NULL; }
+void ui_overlay_set_sticky(void) { s_ov_sticky = s_ov != NULL; }
+void ui_overlay_hide_if(lv_obj_t *ov)
+{
+    if (ov && ov == s_ov) ov_close(false);
+}
 
-void ui_overlay_show(const char *icon, const char *title, const char *text, ui_color_t accent, int duration_s,
-                     ui_overlay_cb_t on_dismiss, void *arg)
+lv_obj_t *ui_overlay_show(const char *icon, const char *title, const char *text, ui_color_t accent, int duration_s,
+                          ui_overlay_cb_t on_dismiss, void *arg)
 {
     const theme_def_t *t = ui_theme();
+    if (s_ov && s_ov_sticky) return NULL; /* a ringing alarm keeps its card (and its tap-to-snooze) */
     if (s_ov) {
         s_ov_cb = NULL;
         ov_close(false);
@@ -524,6 +532,7 @@ void ui_overlay_show(const char *icon, const char *title, const char *text, ui_c
         lv_timer_set_repeat_count(s_ov_timer, 1);
     }
     ui_wake();
+    return s_ov;
 }
 
 /* ---------------- backlight, night, theme changes ---------------- */

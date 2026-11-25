@@ -323,9 +323,31 @@ static uint32_t s_pet_strokes;
 
 static uint32_t now_ms(void) { return lv_tick_get(); }
 
+/* The cat tile runs a 200 ms tick. Setting a style, size or the hidden flag invalidates even when nothing changes,
+ * which redrew the play area with the scaled cat ~5 times a second while it sat still (~15 % of a core, 0.2.2
+ * measurement). Everything below only touches LVGL when the value really changed; cat_build() resets the cache. */
+static struct {
+    int bar[4], bar_col[4], lbl_alert[4];
+    int dark, scale, x;
+} s_shown;
+
+static void shown_reset(void)
+{
+    memset(&s_shown, 0xFF, sizeof(s_shown)); /* -1: nothing shown yet */
+}
+
+static void set_hidden(lv_obj_t *o, bool hidden)
+{
+    if (o && lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN) != hidden) {
+        if (hidden) lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
 static void say(const char *vi, const char *en)
 {
-    if (s_msg) lv_label_set_text(s_msg, ui_tr(vi, en));
+    const char *t = ui_tr(vi, en);
+    if (s_msg && strcmp(lv_label_get_text(s_msg), t)) lv_label_set_text(s_msg, t);
 }
 
 static int cat_scale(void) { return stage() == CAT_AGE_KITTEN ? 4 : 3; }
@@ -389,7 +411,7 @@ static void show_prop(cat_prop_t p, bool on)
 {
     if (!s_prop.img) return;
     if (!on) {
-        lv_obj_add_flag(s_prop.img, LV_OBJ_FLAG_HIDDEN);
+        set_hidden(s_prop.img, true);
         return;
     }
     static int last = -1;
@@ -397,7 +419,7 @@ static void show_prop(cat_prop_t p, bool on)
         last = p;
         spr_set(&s_prop, cat_prop(p), cur_palette(), false);
     }
-    lv_obj_remove_flag(s_prop.img, LV_OBJ_FLAG_HIDDEN);
+    set_hidden(s_prop.img, false);
 }
 
 static void start_action(int a)
@@ -494,11 +516,22 @@ static void update_bars(void)
     double v[4] = {s_cat.full, s_cat.fun, s_cat.clean, s_cat.energy};
     for (int i = 0; i < 4; i++) {
         if (!s_bars[i]) continue;
-        lv_bar_set_value(s_bars[i], (int)v[i], LV_ANIM_OFF);
+        int val = (int)v[i];
+        if (val != s_shown.bar[i]) {
+            lv_bar_set_value(s_bars[i], val, LV_ANIM_OFF);
+            s_shown.bar[i] = val;
+        }
         ui_color_t c = v[i] < 20 ? UI_C_ALERT : v[i] < 45 ? UI_C_WARN : UI_C_OK;
         if (ui_theme()->btn == THEME_BTN_FILL) c = v[i] < 20 ? UI_C_ALERT : UI_C_TEXT;
-        lv_obj_set_style_bg_color(s_bars[i], ui_lc(c), LV_PART_INDICATOR);
-        lv_obj_set_style_text_color(s_bar_lbl[i], ui_lc(v[i] < 20 ? UI_C_ALERT : UI_C_TEXT), 0);
+        if ((int)c != s_shown.bar_col[i]) {
+            lv_obj_set_style_bg_color(s_bars[i], ui_lc(c), LV_PART_INDICATOR);
+            s_shown.bar_col[i] = c;
+        }
+        int alert = v[i] < 20;
+        if (alert != s_shown.lbl_alert[i]) {
+            lv_obj_set_style_text_color(s_bar_lbl[i], ui_lc(alert ? UI_C_ALERT : UI_C_TEXT), 0);
+            s_shown.lbl_alert[i] = alert;
+        }
     }
 }
 
@@ -540,14 +573,12 @@ static void cat_tick(lv_timer_t *t)
     update_bars();
 
     /* lights off: the play area turns dark and shows a few stars */
-    lv_obj_set_style_bg_opa(s_dark, s_cat.lights_off ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
-    if (s_cat.lights_off) lv_obj_remove_flag(s_stars, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_add_flag(s_stars, LV_OBJ_FLAG_HIDDEN);
-
-    for (int i = 0; i < 3; i++) {
-        if (i < s_cat.poops && !s_cat.away) lv_obj_remove_flag(s_poop[i].img, LV_OBJ_FLAG_HIDDEN);
-        else lv_obj_add_flag(s_poop[i].img, LV_OBJ_FLAG_HIDDEN);
+    if ((int)s_cat.lights_off != s_shown.dark) {
+        lv_obj_set_style_bg_opa(s_dark, s_cat.lights_off ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+        s_shown.dark = s_cat.lights_off;
     }
+    set_hidden(s_stars, !s_cat.lights_off);
+    for (int i = 0; i < 3; i++) set_hidden(s_poop[i].img, !(i < s_cat.poops && !s_cat.away));
 
     uint32_t phase = ms / 400;
     bool acting = s_action && ms < s_anim_until_ms;
@@ -557,12 +588,12 @@ static void cat_tick(lv_timer_t *t)
         save();
     }
     if (s_cat.away) {
-        lv_obj_add_flag(s_cat_spr.img, LV_OBJ_FLAG_HIDDEN);
+        set_hidden(s_cat_spr.img, true);
         show_prop(CAT_PROP_PAW, true);
         say("Mèo đã bỏ đi rồi…", "The cat has left…");
         return;
     }
-    lv_obj_remove_flag(s_cat_spr.img, LV_OBJ_FLAG_HIDDEN);
+    set_hidden(s_cat_spr.img, false);
     if (acting) {
         switch (s_action) {
         case 1: s_pose = phase % 2 ? CAT_POSE_EAT1 : CAT_POSE_EAT2; show_prop(CAT_PROP_FISH, (phase / 2) % 2); break;
@@ -597,9 +628,13 @@ static void cat_tick(lv_timer_t *t)
         else if (s_cat.poops) say("Có gì đó cần dọn…", "Something needs cleaning…");
     }
     int sc = cat_scale();
-    lv_image_set_scale(s_cat_spr.img, 256 * sc);
-    lv_obj_set_size(s_cat_spr.img, CAT_SPRITE_W * sc, CAT_SPRITE_H * sc);
-    lv_obj_set_pos(s_cat_spr.img, 86 - CAT_SPRITE_W * sc / 2 + s_cat_x, 132 - CAT_SPRITE_H * sc);
+    if (sc != s_shown.scale || s_cat_x != s_shown.x) {
+        lv_image_set_scale(s_cat_spr.img, 256 * sc);
+        lv_obj_set_size(s_cat_spr.img, CAT_SPRITE_W * sc, CAT_SPRITE_H * sc);
+        lv_obj_set_pos(s_cat_spr.img, 86 - CAT_SPRITE_W * sc / 2 + s_cat_x, 132 - CAT_SPRITE_H * sc);
+        s_shown.scale = sc;
+        s_shown.x = s_cat_x;
+    }
     apply_pose();
 }
 
@@ -608,6 +643,7 @@ static void cat_build(lv_obj_t *t)
     /* not s_mini: it belongs to the clock tile, built (and attached via cat_mini_attach) before this one */
     s_cat_spr.img = s_prop.img = NULL;
     for (int i = 0; i < 3; i++) s_poop[i].img = NULL;
+    shown_reset();
     spr_alloc(&s_cat_spr, CAT_SPRITE_W, CAT_SPRITE_H);
     spr_alloc(&s_prop, CAT_PROP_W, CAT_PROP_H);
     for (int i = 0; i < 3; i++) spr_alloc(&s_poop[i], CAT_PROP_W, CAT_PROP_H);

@@ -11,6 +11,7 @@ import pystray
 from PIL import Image, ImageDraw
 
 from . import APP_DIR, CONFIG_PATH, REPO, __version__
+from .coding import hooks_installed, install_hooks, uninstall_hooks
 from .config import AgentState, load_config, save_config, setup_logging
 from .core import Core
 from .update import RELEASES_PAGE, latest_version, newer_than_running
@@ -85,6 +86,7 @@ class TrayApp:
             item("Mở trang cài đặt MeowBox", lambda: ui(self.open_web), default=True),
             item("Gửi thông báo thử", lambda: threading.Thread(target=self.test_notify, daemon=True).start()),
             item("Tạm dừng gửi số liệu", self.toggle_pause, checked=lambda _i: bool(self.cfg.get("paused"))),
+            item("Meow Coding (Claude Code)", self.toggle_coding, checked=lambda _i: hooks_installed()),
             sep,
             item("Kết nối loa…", lambda: ui(self.open_dialog)),
             item("Cài đặt…", lambda: ui(self.open_settings)),
@@ -153,6 +155,20 @@ class TrayApp:
     def toggle_pause(self):
         self.cfg["paused"] = not self.cfg.get("paused")
         save_config(self.cfg)
+        self.icon.update_menu()
+
+    def toggle_coding(self):
+        """Add / remove MeowBox's hooks and status line in ~/.claude/settings.json (new Claude Code sessions pick them up)."""
+        try:
+            if hooks_installed():
+                uninstall_hooks()
+                self.icon.notify("Mèo thôi canh Claude Code rồi (đã gỡ hook)", "MeowBox")
+            else:
+                install_hooks(int(self.cfg.get("coding_port") or 8767))
+                self.icon.notify("Mèo vào vị trí! Mở phiên Claude Code mới để mèo code cùng sen", "MeowBox")
+        except (OSError, ValueError) as e:
+            log.warning("Claude Code settings: %s", e)
+            self.icon.notify(f"Không sửa được ~/.claude/settings.json: {e}", "MeowBox")
         self.icon.update_menu()
 
     def toggle_autostart(self):

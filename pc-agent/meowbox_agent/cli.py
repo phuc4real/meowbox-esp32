@@ -64,6 +64,8 @@ def main(argv: list[str] | None = None) -> None:
     w.add_argument("action", nargs="?", choices=["on", "off", "status"], default="on")
     tl = sub.add_parser("tools", help="yt-dlp dùng cho YouTube relay: xem phiên bản / tải bản mới nhất")
     tl.add_argument("action", nargs="?", choices=["status", "update"], default="status")
+    mc = sub.add_parser("coding", help="Meow Coding: bật/gỡ hook Claude Code để mèo trên loa hiện phiên đang code")
+    mc.add_argument("action", nargs="?", choices=["install", "uninstall", "status"], default="status")
     c = sub.add_parser("config", help="xem/sửa cấu hình")
     c.add_argument("--set-host", dest="set_host", metavar="HOST", help="IP[:port] loa (IP hiện trên tile Hệ thống của loa)")
     c.add_argument("--speaker", help="chỉ nối nếu loa ở IP đó có tên này, vd MeowBox-1A2B ('' = loa nào cũng được)")
@@ -91,6 +93,16 @@ def main(argv: list[str] | None = None) -> None:
                 cfg[k] = v
         save_config(cfg, args.config)
         print(args.config, json.dumps(cfg, indent=2, ensure_ascii=False), sep="\n")
+        return
+    if args.cmd == "coding":
+        from .coding import CLAUDE_SETTINGS, hooks_installed, install_hooks, uninstall_hooks
+
+        if args.action == "install":
+            install_hooks(int(cfg.get("coding_port") or 8767))
+        elif args.action == "uninstall":
+            uninstall_hooks()
+        print(f"{CLAUDE_SETTINGS}: hook MeowBox {'đã bật' if hooks_installed() else 'chưa bật'}"
+              f" (http://127.0.0.1:{cfg.get('coding_port') or 8767}/hook)")
         return
     if args.host:
         cfg["host"], cfg["last_host"], cfg["speaker"] = args.host, "", ""

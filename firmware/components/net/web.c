@@ -577,7 +577,7 @@ static esp_err_t h_reboot(httpd_req_t *req)
 }
 
 /* POST /api/factory_reset {"confirm":true,"scope":"all"|"data"}.
- * "data": battery log, cat save and the like go at the next boot; settings, Wi-Fi, stations, alarms, password stay.
+ * "data": battery log, update outcome and the like go at the next boot; settings, Wi-Fi, stations, alarms, password stay.
  * "all" (default): /data is formatted, and the networks xiaozhi left in NVS are dropped too, or the next boot would
  * import them again instead of opening the setup hotspot. */
 static esp_err_t h_factory(httpd_req_t *req)

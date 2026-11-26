@@ -286,25 +286,34 @@ shows it, refreshing every 5 s while the tab is visible; on `404` it shows a pla
 
 ---
 
-## Cat
+## Cat (Meow Coding)
+
+The cat tile shows the AI coding agents running on the PC (Claude Code), reported by the PC agent over `/ws/pc`
+(`coding` message below). The virtual pet of 0.2.x is gone: its save `/data/cat.json` is deleted at boot.
 
 ### `GET /api/config/cat`
 ```json
-{"name":"Mướp","fur":"tabby","diff":"normal","clap":true,
- "stats":{"age":12,"stage":"kitten","full":80,"fun":65,"clean":90,"energy":55,"health":100,"mood":"happy","away":false}}
+{"name":"Mướp","fur":"tabby","clap":true,"show":true,"snd":true,
+ "st":{"pc":true,"s":[{"id":"085ba2bd","ag":"claude","name":"Meow Coding cho loa","dir":"meowbox","br":"main",
+   "st":"work","act":"edit","for":42,"tok":4975388,"usd":17.12,"ctx":36,"model":"Opus 5.5"}],
+   "lim":{"h5":23,"h5r":1764230400,"d7":41,"d7r":1764460800}}}
 ```
-- `fur`: `tabby` (mướp) | `black` | `white` | `calico` (tam thể) | `gray`.
-- `diff`: `easy` | `normal` | `hard`.
+- `fur`: `tabby` (mướp) | `orange` | `black` | `white` | `calico` (tam thể) | `gray`.
 - `clap`: the cat jumps when the mics hear a clap while its tile is on screen (default `true`). Only the loudness
   is measured; nothing is recorded. Sounds the speaker plays itself are ignored.
-- `stats` is read-only: `age` in days, `stage` = `kitten` | `junior` | `adult` | `senior`, values 0–100,
-  `mood` = `happy` | `sad` | `hungry` | `sick` | `sleep`, `away` = the cat left (needs reset).
+- `show`: when a session starts waiting for the user, wake the screen and open the cat tile (default `true`).
+- `snd`: a chime when a session starts waiting, a meow (not in night mode) when a session finishes (default `true`).
+- `st` is read-only: `pc` = agent connected; `s` = the sessions, most urgent first (at most 4), empty when the agent
+  is gone or sent nothing for 75 s. Per session: `st` = `wait` (a permission prompt or a question) | `work` | `err` |
+  `done` | `idle`, `for` = seconds in that state, `act` = the kind of tool call: `read` | `image` | `edit` |
+  `write` | `bash` | `search` | `web` | `agent` | `plan` | `ask` | `skill` | `compact` | `tool` (anything else), `""`
+  while thinking. The speaker and the web page word it ("Đang đọc file"); no file names or commands leave the PC. `tok` = tokens processed (input + output + cache), `usd` = cost estimated at API list prices,
+  `ctx` = context window used in % (absent until known), `model` = `Opus 5.5`... `lim` (absent for API-key use or
+  before Claude Code's status line has run): the Claude plan's usage limits in %, `h5` = 5-hour window, `d7` = weekly,
+  `h5r` / `d7r` = when they reset (epoch seconds). The tile shows `5h 23%` where it used to show the cost.
 
 ### `PUT /api/config/cat`
-`{"name":"Mun","fur":"black","diff":"easy","clap":false}` (`name` ≤ 16 bytes) → same shape as GET.
-
-### `POST /api/cat/reset`
-Body `{}`. Starts a new kitten (keeps name/fur/diff). → same shape as GET.
+`{"name":"Mun","fur":"black","clap":false,"show":true,"snd":false}` (`name` ≤ 16 bytes) → same shape as GET.
 
 ---
 
@@ -405,7 +414,15 @@ Session auth. Why the speaker last started, and its error/warning log lines (Sys
 
 ### `/ws/pc` protocol (agent ↔ speaker)
 - Agent → speaker first message: `{"t":"hello","name":"DESKTOP-MEO","ver":"0.2.0","proto":1,"relay":"http://ip:8765"}`,
-  optional `"take":true`. Then `stats` / `media` every second, `notify`.
+  optional `"take":true`. Then `stats` / `media` every second, `notify`, `coding`.
+- `coding` (Meow Coding, agent 0.2.4+): `{"t":"coding","s":[{"id":"085ba2bd","ag":"claude","name":"…","dir":"meowbox",
+  "br":"main","st":"work","act":"edit","for":42,"tok":4975388,"usd":17.12,"ctx":36,"model":"Opus 5.5"}]}`, sent
+  when the list changes (at most once a second) and every 30 s. Fields as in `GET /api/config/cat`; `ctx` is left out
+  until known; `lim` as in `GET /api/config/cat`, sent once Claude Code's status line has reported it. Firmware before
+  0.2.4 ignores it. The agent learns the sessions from Claude Code's hooks
+  (background `curl` to `http://127.0.0.1:8767/hook`, installed by `meowbox coding install` or the tray menu) and reads each
+  session's transcript for tokens, context and title. The plan's usage limits and the exact context use come from
+  Claude Code's status line (`curl ... http://127.0.0.1:8767/status`, also installed when no status line is set).
 - Speaker → agent: `media_cmd`; `{"t":"busy","pc":"OTHER-PC"}` then close (one PC at a time: another PC is connected,
   or this one was taken over; a hello with `take:true` takes over, the same PC name reconnecting is let in);
   `{"t":"proto","need":N,"have":M}` then close when the agent's `proto` is below the firmware's minimum.
@@ -467,11 +484,11 @@ Body `{}` → `{"ok":true}`, reboots after ~1 s.
 ### `POST /api/factory_reset`
 Body `{"confirm":true,"scope":"all"}` → `{"ok":true}`, then the speaker reboots. Without `confirm:true`, or with
 another `scope` → `400 bad_value`.
-- `scope` `"all"` (default, **Factory reset** on the web page): formats `/data` (Wi-Fi list, stations, alarms, cat,
-  battery log, password, token, every setting) and drops the networks the vendor firmware left in NVS. The speaker
+- `scope` `"all"` (default, **Factory reset** on the web page): formats `/data` (Wi-Fi list, stations, alarms, cat
+  settings, battery log, password, token, every setting) and drops the networks the vendor firmware left in NVS. The speaker
   comes back in setup mode (SoftAP portal), login `meowbox` / `m3owb0x2026`.
 - `scope` `"data"` (**Clear data**): at the next boot deletes everything in `/data` except the configuration
-  (`cfg/`, `auth.json`, `wifi.json`): battery log and sessions, cat save (a new cat starts), update outcome. The
+  (`cfg/`, `auth.json`, `wifi.json`): battery log and sessions, update outcome. The
   notification history is in RAM and goes with the reboot. Settings, Wi-Fi, stations, alarms, password and token stay.
 
 ---

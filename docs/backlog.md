@@ -5,7 +5,8 @@ release's notes and delete it here. Bigger product ideas (MeowBox Cloud, PC agen
 live in [roadmap.md](roadmap.md).
 
 ## Features
-- **Mini game with the cat.** Nothing exists yet (the cat tile has feed / play / bath / lights only).
+- **Meow Coding: answer from the speaker.** Allow / Deny a Claude Code permission prompt by touching the cat tile
+  (a blocking `PermissionRequest` hook in the agent and a message back from the speaker). The tile only shows it now.
 
 ## Memory
 - **Internal RAM back to ≥ 40 KB free at the lowest.** The goal in CLAUDE.md is 40 KB; the heaviest soak measured

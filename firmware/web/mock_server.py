@@ -48,9 +48,7 @@ def fresh_state():
         "display": {"bri": 80, "idle_bri": 20, "idle_s": 60, "sleep_s": 300, "h24": True, "night": True,
                     "n_from": 22, "n_to": 7, "n_bri": 5, "lang": "vi", "tz": "ICT-7",
                     "theme": DEFAULT_THEME, "night_mode": "auto", "fx": "full"},
-        "cat": {"name": "Mướp", "fur": "tabby", "diff": "normal", "clap": True,
-                "stats": {"age": 12, "stage": "kitten", "full": 80, "fun": 65, "clean": 90,
-                          "energy": 55, "health": 100, "mood": "happy", "away": False}},
+        "cat": {"name": "Mướp", "fur": "tabby", "clap": True, "show": True, "snd": True},
         "notify": {"token": tok(), "dur": 10, "vol": 70, "quiet_low": True},
         "pc": {"host": "192.168.1.10", "port": 8765, "auto": True},
         "update": {"auto": False},
@@ -135,6 +133,20 @@ def upd_out():
 def wifi_out():
     w = S["wifi"]
     return {"cur": w["cur"], "max": w["max"], "nets": [{"ssid": n["ssid"]} for n in w["nets"]]}
+
+
+def cat_out():
+    """GET /api/config/cat: settings + the Meow Coding sessions the PC agent reported (st, read-only)."""
+    t = int(time.time())
+    ss = [
+        {"id": "085ba2bd", "ag": "claude", "name": "Meow Coding cho loa", "dir": "meowbox", "br": "main",
+         "st": ("work", "wait", "work", "done")[t // 20 % 4], "act": "edit", "for": t % 20,
+         "tok": 4_975_388, "usd": 17.12, "ctx": 36, "model": "Opus 5.5"},
+        {"id": "5f1c09aa", "ag": "claude", "name": "Fix login redirect", "dir": "shop-web", "br": "fix/login",
+         "st": "idle", "act": "", "for": 840, "tok": 812_400, "usd": 1.94, "ctx": 12, "model": "Sonnet 5.5"},
+    ]
+    lim = {"h5": 23, "h5r": t - t % 3600 + 7200, "d7": 41, "d7r": t - t % 86400 + 3 * 86400}
+    return {**S["cat"], "st": {"pc": True, "s": ss, "lim": lim}}
 
 
 def pc_out():
@@ -542,14 +554,14 @@ class H(BaseHTTPRequestHandler):
         simple = {
             "weather": ("on", "name", "lat", "lon", "unit"),
             "display": ("bri", "idle_bri", "idle_s", "sleep_s", "h24", "night", "n_from", "n_to", "n_bri", "lang", "theme", "night_mode", "fx"),
-            "cat": ("name", "fur", "diff", "clap"),
+            "cat": ("name", "fur", "clap", "show", "snd"),
             "pc": ("host", "port", "auto"),
             "update": ("auto",),
             "notify": ("dur", "vol", "quiet_low"),
         }
         if p.startswith("/api/config/") and p[12:] in simple:
             g = p[12:]
-            out = pc_out if g == "pc" else (lambda: S[g])
+            out = pc_out if g == "pc" else cat_out if g == "cat" else (lambda: S[g])
             if m == "GET":
                 return self.send_json(out())
             if m == "PUT":
@@ -561,8 +573,8 @@ class H(BaseHTTPRequestHandler):
                 merge(tmp, b, simple[g])
                 if g == "cat":
                     need(tmp["fur"] in ("tabby", "orange", "black", "white", "calico", "gray") and
-                         tmp["diff"] in ("easy", "normal", "hard") and 0 < len(tmp["name"].encode()) <= 16 and
-                         isinstance(tmp["clap"], bool))
+                         0 < len(tmp["name"].encode()) <= 16 and
+                         all(isinstance(tmp[k], bool) for k in ("clap", "show", "snd")))
                 if g == "display":
                     need(tmp["lang"] in ("vi", "en") and 0 <= tmp["n_from"] <= 23 and 0 <= tmp["n_to"] <= 23)
                     need(tmp["theme"] in THEME_IDS and tmp["night_mode"] in ("auto", "on", "off") and tmp["fx"] in ("full", "eco"))
@@ -579,10 +591,6 @@ class H(BaseHTTPRequestHandler):
                     need(0 < tmp["port"] < 65536)
                 S[g] = tmp
                 return self.send_json(out())
-        if key == ("POST", "/api/cat/reset"):
-            S["cat"]["stats"] = {"age": 0, "stage": "kitten", "full": 70, "fun": 70, "clean": 100,
-                                 "energy": 80, "health": 100, "mood": "happy", "away": False}
-            return self.send_json(S["cat"])
 
         # system
         if key == ("POST", "/api/ota"):
@@ -625,10 +633,8 @@ class H(BaseHTTPRequestHandler):
         if key == ("POST", "/api/factory_reset"):
             b = self.body()
             need(b.get("confirm") is True and b.get("scope", "all") in ("all", "data"))
-            if b.get("scope") == "data":  # history and the cat go, configuration stays (the speaker reboots)
-                fresh = fresh_state()
-                S["hist"] = fresh["hist"]
-                S["cat"]["stats"] = fresh["cat"]["stats"]
+            if b.get("scope") == "data":  # history goes, configuration stays (the speaker reboots)
+                S["hist"] = fresh_state()["hist"]
             else:
                 S.clear()
                 S.update(fresh_state())

@@ -20,6 +20,7 @@ import psutil
 from pathlib import Path
 
 from . import CONFIG_PATH, PROTO, __version__
+from .coding import DEFAULT_PORT as CODING_PORT, Tracker, start_server as start_coding
 from .config import AgentState, pc_name, save_config
 from .discovery import find_speaker
 from .relay import NOWIN, kill_all, start_relay
@@ -253,6 +254,7 @@ class Core:
         self._ws = None
         self._stopping = False
         self.extra_allowed: set[str] = set()  # IP being tested by the connect dialog (relay_test)
+        self.coding = Tracker()  # Meow Coding: Claude Code sessions, fed by its hooks
 
     # -- thread control
     def start(self) -> None:
@@ -306,6 +308,11 @@ class Core:
 
     async def _main(self) -> None:
         self._wake = asyncio.Event()
+        cport = int(self.cfg.get("coding_port") or CODING_PORT)
+        try:
+            await start_coding(self.coding, cport)
+        except OSError as e:
+            log.error("Meow Coding port %d busy: %s", cport, e)
         port = int(self.cfg.get("relay_port") or 8765) if self.relay_wanted else 0
         if port:
             try:
@@ -379,7 +386,17 @@ class Core:
 
         async def sender():
             last, last_t = None, 0.0
+            code_last, code_t = None, 0.0
             while True:
+                await asyncio.to_thread(self.coding.refresh_usage)
+                cs, lim = self.coding.snapshot(), self.coding.limits_msg()
+                ckey = ([{k: v for k, v in x.items() if k != "for"} for x in cs], lim)
+                if ckey != code_last or time.monotonic() - code_t >= 30:
+                    msg = {"t": "coding", "s": cs}
+                    if lim:
+                        msg["lim"] = lim
+                    await ws.send_str(compact(msg))
+                    code_last, code_t = ckey, time.monotonic()
                 if not self.cfg.get("paused"):
                     await ws.send_str(compact(await stats.sample(http)))
                 m = await media.read()

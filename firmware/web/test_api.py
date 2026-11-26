@@ -141,9 +141,11 @@ try:
     c, (ct, raw) = req("GET", "/api/screenshot")
     w, hh = struct.unpack("<ii", raw[18:26]) if len(raw) > 26 else (0, 0)
     check("screenshot BMP 296x240", c == 200 and ct == "image/bmp" and raw[:2] == b"BM" and (w, abs(hh)) == (296, 240))
-    c, j = req("GET", "/api/config/cat"); check("cat get", keys(j, "name", "fur", "diff", "clap", "stats") and keys(j["stats"], "age", "stage", "full", "fun", "clean", "energy", "health", "mood", "away"))
-    c, j = req("PUT", "/api/config/cat", {"name": "Mun", "fur": "black", "diff": "hard", "clap": False}); check("cat put", j["fur"] == "black" and j["clap"] is False)
-    c, j = req("POST", "/api/cat/reset", {}); check("cat reset", c == 200 and j["stats"]["age"] == 0 and j["name"] == "Mun")
+    c, j = req("GET", "/api/config/cat"); check("cat get", keys(j, "name", "fur", "clap", "show", "snd", "st") and keys(j["st"], "pc", "s"))
+    check("cat sessions", all(keys(x, "id", "ag", "name", "dir", "st", "act", "for", "tok", "usd", "model") and
+                              x["st"] in ("work", "wait", "done", "err", "idle") for x in j["st"]["s"]) and
+          ("lim" not in j["st"] or all(isinstance(v, int) for v in j["st"]["lim"].values())))
+    c, j = req("PUT", "/api/config/cat", {"name": "Mun", "fur": "black", "clap": False, "show": False, "snd": True}); check("cat put", j["fur"] == "black" and j["clap"] is False and j["show"] is False and "st" in j)
     c, j = req("GET", "/api/config/pc"); check("pc get", keys(j, "host", "port", "auto", "st") and keys(j["st"], "on", "name", "ip", "ver", "seen"))
     c, j = req("PUT", "/api/config/pc", {"host": "10.0.0.2", "port": 9000, "auto": False}); check("pc put", j["port"] == 9000)
     c, n = req("GET", "/api/config/notify"); check("notify cfg", keys(n, "token", "dur", "vol", "quiet_low"))

@@ -1,14 +1,16 @@
-/* Virtual cat (P6). Simulation runs in real time (also while the speaker is off, caught up from the RTC/SNTP
- * clock at boot). State lives in /data/cat.json; name/fur/difficulty in settings group "cat". */
+/* Meow Coding (cat tile): the cat codes along with the AI coding agents running on the PC. The PC agent sends
+ * {"t":"coding","s":[...]} over /ws/pc (pc_app.c -> cat_coding_update); this tile shows the most important session
+ * (waiting for you > working > error > done > idle) with the cat at a laptop, plus tokens, context and an estimated
+ * cost, and lists the others. Name/fur/clap/auto-show/sounds live in settings group "cat". */
 #include "apps.h"
 
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "esp_log.h"
-#include "esp_random.h"
+#include "esp_timer.h"
 #include "esp_heap_caps.h"
 #include "ui.h"
 #include "board.h"
@@ -19,206 +21,126 @@
 #include "utf8.h"
 
 static const char *TAG = "cat";
-#define CAT_FILE "/data/cat.json"
+#define OLD_CAT_FILE "/data/cat.json" /* virtual pet save (before Meow Coding), deleted at boot */
 #define SCALE 3
+#define MAX_SESS     4
+#define FLOOR_Y      126              /* the cat stands on this line */
+#define STALE_US     (75 * 1000000LL) /* the agent repeats the list every 30 s; older than this = gone */
 
-/* ---------------- simulation ---------------- */
+/* ---------------- sessions (written by the web server task, read by the UI) ---------------- */
+typedef enum { ST_IDLE, ST_WORK, ST_WAIT, ST_DONE, ST_ERR } sess_st_t;
+
 typedef struct {
-    double full, fun, clean, energy, health; /* 0..100 */
-    time_t born, updated;
-    int care_days;
-    double day_acc;   /* hours accumulated in the current "care day" */
-    double day_good;  /* hours of that day with good care */
-    int poops;
-    double poop_timer; /* hours until next poop */
-    bool sleeping, lights_off, away;
-} cat_t;
+    char id[12], ag[12], name[100], dir[48], br[48], act[100], model[24];
+    sess_st_t st;
+    int for_s, ctx; /* seconds in this state when received; context use in %, -1 unknown */
+    double tok, usd;
+    int64_t at_us; /* when received */
+} sess_t;
 
-static cat_t s_cat;
-static bool s_loaded;
-static bool s_dirty;
+static sess_t *s_sess; /* MAX_SESS, in PSRAM */
+static int s_nsess;
+static int64_t s_sess_us; /* last coding message */
+static SemaphoreHandle_t s_lock;
+static volatile uint32_t s_gen; /* bumped on every update */
+static volatile bool s_ev_wait, s_ev_done;
+static char s_ev_id[12]; /* session that just started waiting */
+static int s_lim[2] = {-1, -1};      /* plan usage in %: 5-hour and weekly window (-1 unknown, API key) */
+static double s_lim_reset[2];        /* when they reset, epoch seconds */
 
-static double diff_mult(void)
+static sess_st_t parse_st(const char *s)
 {
-    char d[12];
-    settings_get_str("cat", "diff", d, sizeof(d), "normal");
-    return !strcmp(d, "easy") ? 0.6 : !strcmp(d, "hard") ? 1.5 : 1.0;
+    if (!s) return ST_IDLE;
+    return !strcmp(s, "work")   ? ST_WORK
+           : !strcmp(s, "wait") ? ST_WAIT
+           : !strcmp(s, "done") ? ST_DONE
+           : !strcmp(s, "err")  ? ST_ERR
+                                : ST_IDLE;
 }
 
-static double clampd(double v) { return v < 0 ? 0 : v > 100 ? 100 : v; }
-
-static cat_age_t stage(void)
+static const char *st_key(sess_st_t s)
 {
-    int d = s_cat.care_days;
-    return d < 3 ? CAT_AGE_KITTEN : d < 10 ? CAT_AGE_JUNIOR : d < 40 ? CAT_AGE_ADULT : CAT_AGE_SENIOR;
+    static const char *k[] = {"idle", "work", "wait", "done", "err"};
+    return k[s];
 }
 
-static const char *stage_name(cat_age_t a, bool en)
+static void jstr(cJSON *o, const char *k, char *dst, size_t n)
 {
-    static const char *vi[] = {"mèo con", "mèo nhỡ", "mèo lớn", "mèo già"};
-    static const char *e[] = {"kitten", "junior", "adult", "senior"};
-    return en ? e[a] : vi[a];
+    utf8_copy(dst, n, cJSON_GetStringValue(cJSON_GetObjectItem(o, k)));
 }
 
-static const char *stage_key(cat_age_t a)
+static double jnum(cJSON *o, const char *k, double def)
 {
-    static const char *k[] = {"kitten", "junior", "adult", "senior"};
-    return k[a];
+    cJSON *v = cJSON_GetObjectItem(o, k);
+    return cJSON_IsNumber(v) ? v->valuedouble : def;
 }
 
-typedef enum { MOOD_HAPPY, MOOD_SAD, MOOD_HUNGRY, MOOD_SICK, MOOD_SLEEP, MOOD_AWAY } mood_t;
-
-static mood_t mood(void)
+void cat_coding_update(cJSON *msg)
 {
-    if (s_cat.away) return MOOD_AWAY;
-    if (s_cat.sleeping) return MOOD_SLEEP;
-    if (s_cat.health < 40) return MOOD_SICK;
-    if (s_cat.full < 25) return MOOD_HUNGRY;
-    if (s_cat.fun < 25 || s_cat.clean < 25) return MOOD_SAD;
-    return MOOD_HAPPY;
-}
-
-static const char *mood_key(mood_t m)
-{
-    static const char *k[] = {"happy", "sad", "hungry", "sick", "sleep", "away"};
-    return k[m];
-}
-
-static void new_cat(void)
-{
-    memset(&s_cat, 0, sizeof(s_cat));
-    s_cat.full = 80;
-    s_cat.fun = 80;
-    s_cat.clean = 100;
-    s_cat.energy = 80;
-    s_cat.health = 100;
-    s_cat.born = s_cat.updated = net_time_valid() ? time(NULL) : 0;
-    s_cat.poop_timer = 4;
-    s_dirty = true;
-}
-
-/* Advance the simulation by `h` hours (h <= 1). */
-static void step(double h)
-{
-    if (s_cat.away) return;
-    double k = diff_mult();
-    bool night = ui_is_night();
-    /* sleep transitions */
-    if (!s_cat.sleeping && (s_cat.energy < 12 || (night && s_cat.lights_off) || (night && s_cat.energy < 60))) s_cat.sleeping = true;
-    if (s_cat.sleeping && s_cat.energy >= 95 && !night && !s_cat.lights_off) s_cat.sleeping = false;
-
-    double sleepf = s_cat.sleeping ? 0.4 : 1.0; /* slower needs while sleeping */
-    s_cat.full = clampd(s_cat.full - 6 * k * h * sleepf);
-    s_cat.fun = clampd(s_cat.fun - 5 * k * h * sleepf);
-    s_cat.clean = clampd(s_cat.clean - (3 + 4 * s_cat.poops) * k * h);
-    s_cat.energy = clampd(s_cat.energy + (s_cat.sleeping ? 14 : -4 * k) * h);
-
-    if (!s_cat.sleeping) {
-        s_cat.poop_timer -= h;
-        if (s_cat.poop_timer <= 0) {
-            if (s_cat.poops < 3) s_cat.poops++;
-            s_cat.poop_timer = 3 + (esp_random() % 300) / 100.0;
+    cJSON *arr = cJSON_GetObjectItem(msg, "s");
+    if (!s_sess || !cJSON_IsArray(arr)) return;
+    sess_t tmp[MAX_SESS];
+    int n = 0;
+    int64_t now = esp_timer_get_time();
+    cJSON *o;
+    cJSON_ArrayForEach(o, arr) {
+        if (n >= MAX_SESS) break;
+        sess_t *s = &tmp[n++];
+        memset(s, 0, sizeof(*s));
+        jstr(o, "id", s->id, sizeof(s->id));
+        jstr(o, "ag", s->ag, sizeof(s->ag));
+        jstr(o, "name", s->name, sizeof(s->name));
+        jstr(o, "dir", s->dir, sizeof(s->dir));
+        jstr(o, "br", s->br, sizeof(s->br));
+        jstr(o, "act", s->act, sizeof(s->act));
+        jstr(o, "model", s->model, sizeof(s->model));
+        s->st = parse_st(cJSON_GetStringValue(cJSON_GetObjectItem(o, "st")));
+        s->for_s = (int)jnum(o, "for", 0);
+        s->ctx = (int)jnum(o, "ctx", -1);
+        s->tok = jnum(o, "tok", 0);
+        s->usd = jnum(o, "usd", 0);
+        s->at_us = now;
+    }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    bool fresh = now - s_sess_us < STALE_US;
+    for (int i = 0; i < n; i++) {
+        sess_st_t before = ST_IDLE;
+        bool known = false;
+        for (int k = 0; fresh && k < s_nsess; k++)
+            if (!strcmp(s_sess[k].id, tmp[i].id)) {
+                before = s_sess[k].st;
+                known = true;
+            }
+        if (tmp[i].st == ST_WAIT && (!known || before != ST_WAIT)) {
+            s_ev_wait = true;
+            snprintf(s_ev_id, sizeof(s_ev_id), "%.11s", tmp[i].id);
         }
+        if (tmp[i].st == ST_DONE && known && before == ST_WORK) s_ev_done = true;
     }
-    bool bad = s_cat.full < 15 || s_cat.clean < 15 || s_cat.fun < 10;
-    bool good = s_cat.full > 50 && s_cat.clean > 50 && s_cat.fun > 40;
-    if (bad) s_cat.health = clampd(s_cat.health - 4 * k * h);
-    else if (good) s_cat.health = clampd(s_cat.health + 2 * h);
-    if (s_cat.health <= 0) {
-        s_cat.away = true;
-        ESP_LOGW(TAG, "the cat ran away");
-    }
-    /* care days: a day counts if it was good care for >= 60% of the time */
-    s_cat.day_acc += h;
-    if (good) s_cat.day_good += h;
-    if (s_cat.day_acc >= 24) {
-        if (s_cat.day_good >= 24 * 0.6) s_cat.care_days++;
-        s_cat.day_acc = s_cat.day_good = 0;
-    }
-    s_dirty = true;
+    memcpy(s_sess, tmp, n * sizeof(sess_t));
+    s_nsess = n;
+    cJSON *lim = cJSON_GetObjectItem(msg, "lim");
+    s_lim[0] = (int)jnum(lim, "h5", -1);
+    s_lim[1] = (int)jnum(lim, "d7", -1);
+    s_lim_reset[0] = jnum(lim, "h5r", 0);
+    s_lim_reset[1] = jnum(lim, "d7r", 0);
+    s_sess_us = now;
+    s_gen++;
+    xSemaphoreGive(s_lock);
 }
 
-static void catch_up(void)
+/* copy of the current list (empty when the PC is gone or stopped sending) */
+static int sess_copy(sess_t *out)
 {
-    if (!net_time_valid()) return;
-    time_t now = time(NULL);
-    if (!s_cat.updated) {
-        s_cat.updated = now;
-        if (!s_cat.born) s_cat.born = now;
-        return;
-    }
-    double hours = difftime(now, s_cat.updated) / 3600.0;
-    if (hours <= 0) {
-        s_cat.updated = now;
-        return;
-    }
-    if (hours > 72) hours = 72; /* forgiving: at most 3 days of neglect while switched off */
-    while (hours > 0) {
-        double h = hours > 1 ? 1 : hours;
-        step(h);
-        hours -= h;
-    }
-    s_cat.updated = now;
+    if (!s_sess) return 0;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    int n = pc_online() && esp_timer_get_time() - s_sess_us < STALE_US ? s_nsess : 0;
+    memcpy(out, s_sess, n * sizeof(sess_t));
+    xSemaphoreGive(s_lock);
+    return n;
 }
 
-/* ---------------- persistence ---------------- */
-static void save(void)
-{
-    cJSON *j = cJSON_CreateObject();
-    cJSON_AddNumberToObject(j, "full", s_cat.full);
-    cJSON_AddNumberToObject(j, "fun", s_cat.fun);
-    cJSON_AddNumberToObject(j, "clean", s_cat.clean);
-    cJSON_AddNumberToObject(j, "energy", s_cat.energy);
-    cJSON_AddNumberToObject(j, "health", s_cat.health);
-    cJSON_AddNumberToObject(j, "born", (double)s_cat.born);
-    cJSON_AddNumberToObject(j, "updated", (double)s_cat.updated);
-    cJSON_AddNumberToObject(j, "care", s_cat.care_days);
-    cJSON_AddNumberToObject(j, "dacc", s_cat.day_acc);
-    cJSON_AddNumberToObject(j, "dgood", s_cat.day_good);
-    cJSON_AddNumberToObject(j, "poops", s_cat.poops);
-    cJSON_AddNumberToObject(j, "ptimer", s_cat.poop_timer);
-    cJSON_AddBoolToObject(j, "sleep", s_cat.sleeping);
-    cJSON_AddBoolToObject(j, "lights", s_cat.lights_off);
-    cJSON_AddBoolToObject(j, "away", s_cat.away);
-    char *t = cJSON_PrintUnformatted(j);
-    settings_write_file(CAT_FILE, t, strlen(t));
-    cJSON_free(t);
-    cJSON_Delete(j);
-    s_dirty = false;
-}
-
-static double jnum(cJSON *j, const char *k, double d)
-{
-    cJSON *v = cJSON_GetObjectItem(j, k);
-    return cJSON_IsNumber(v) ? v->valuedouble : d;
-}
-
-static void load(void)
-{
-    char *t = settings_read_file(CAT_FILE, NULL);
-    cJSON *j = t ? cJSON_Parse(t) : NULL;
-    free(t);
-    if (!j) {
-        new_cat();
-        return;
-    }
-    s_cat.full = jnum(j, "full", 80);
-    s_cat.fun = jnum(j, "fun", 80);
-    s_cat.clean = jnum(j, "clean", 100);
-    s_cat.energy = jnum(j, "energy", 80);
-    s_cat.health = jnum(j, "health", 100);
-    s_cat.born = (time_t)jnum(j, "born", 0);
-    s_cat.updated = (time_t)jnum(j, "updated", 0);
-    s_cat.care_days = (int)jnum(j, "care", 0);
-    s_cat.day_acc = jnum(j, "dacc", 0);
-    s_cat.day_good = jnum(j, "dgood", 0);
-    s_cat.poops = (int)jnum(j, "poops", 0);
-    s_cat.poop_timer = jnum(j, "ptimer", 4);
-    s_cat.sleeping = cJSON_IsTrue(cJSON_GetObjectItem(j, "sleep"));
-    s_cat.lights_off = cJSON_IsTrue(cJSON_GetObjectItem(j, "lights"));
-    s_cat.away = cJSON_IsTrue(cJSON_GetObjectItem(j, "away"));
-    cJSON_Delete(j);
-}
+static int sess_secs(const sess_t *s) { return s->for_s + (int)((esp_timer_get_time() - s->at_us) / 1000000); }
 
 /* ---------------- sprites ---------------- */
 typedef struct {
@@ -313,15 +235,17 @@ static const uint16_t *cur_palette(void)
 }
 
 /* ---------------- UI ---------------- */
-static lv_obj_t *s_title, *s_bar_lbl[4], *s_bars[4], *s_msg, *s_area, *s_stars, *s_dark;
-static spr_t s_cat_spr, s_prop, s_poop[3], s_mini;
+static lv_obj_t *s_count, *s_state, *s_time, *s_act, *s_name, *s_where;
+static lv_obj_t *s_ctx, *s_tok, *s_lim5, *s_ctxbar;
+static int s_act_lines; /* 2 with a session, 3 for the hint without one */
+static spr_t s_cat_spr, s_prop, s_mini;
 static cat_pose_t s_pose = CAT_POSE_SIT;
-static uint32_t s_anim_until_ms;
-static int s_action; /* 1 eat, 2 play, 3 bath, 4 pet, 6 startled (5 is the lights button) */
-static int s_cat_x = 0, s_walk_dir = 0;
-static uint32_t s_pet_strokes;
 static volatile bool s_clap; /* set by the mic task, handled in cat_tick */
-static int s_jump;           /* px the cat is lifted while startled */
+static uint32_t s_startle_until;
+static int s_jump;             /* px the cat is lifted while startled */
+static char s_focus[12];       /* session picked by a tap or a new "waiting" (else the first one) */
+static uint32_t s_focus_until; /* the pick holds for 2 min */
+static uint32_t s_shown_gen = UINT32_MAX;
 
 void cat_hear_clap(void)
 {
@@ -329,16 +253,6 @@ void cat_hear_clap(void)
 }
 
 static uint32_t now_ms(void) { return lv_tick_get(); }
-
-/* The cat tile runs a 200 ms tick. Setting a style, size or the hidden flag invalidates even when nothing changes,
- * which redrew the play area with the scaled cat ~5 times a second while it sat still (~15 % of a core, 0.2.2
- * measurement). Everything below only touches LVGL when the value really changed; cat_build() resets the cache. */
-static struct {
-    int bar[4], bar_col[4], lbl_alert[4];
-    int dark, scale, x, jump;
-} s_shown;
-
-static void shown_reset(void) { memset(&s_shown, 0xFF, sizeof(s_shown)); /* -1: nothing shown yet */ }
 
 static void set_hidden(lv_obj_t *o, bool hidden)
 {
@@ -348,39 +262,165 @@ static void set_hidden(lv_obj_t *o, bool hidden)
     }
 }
 
-static void say(const char *vi, const char *en)
+/* Setting text, a colour or the hidden flag invalidates even when nothing changes (the 0.2.2 cat tile spent ~15 %
+ * of a core redrawing like that): everything below only touches LVGL on a real change. */
+static void set_txt(lv_obj_t *l, const char *t)
 {
-    const char *t = ui_tr(vi, en);
-    if (s_msg && strcmp(lv_label_get_text(s_msg), t)) lv_label_set_text(s_msg, t);
+    if (l && strcmp(lv_label_get_text(l), t)) lv_label_set_text(l, t);
 }
 
-static int cat_scale(void) { return stage() == CAT_AGE_KITTEN ? 4 : 3; }
+static char s_clean_last[8][104]; /* text last asked for, per label slot (user data), to skip the glyph filter */
+
+static void set_txt_clean(lv_obj_t *l, const char *t)
+{
+    if (!l) return;
+    uintptr_t slot = (uintptr_t)lv_obj_get_user_data(l);
+    const size_t nslots = sizeof(s_clean_last) / sizeof(s_clean_last[0]);
+    if (slot && slot < nslots && !strcmp(s_clean_last[slot], t)) return;
+    if (slot && slot < nslots) snprintf(s_clean_last[slot], sizeof(s_clean_last[0]), "%s", t);
+    ui_set_text_clean(l, t);
+}
+
+static void set_color(lv_obj_t *l, ui_color_t c)
+{
+    if (!l) return;
+    lv_color_t want = ui_lc(c);
+    if (!lv_color_eq(lv_obj_get_style_text_color(l, 0), want)) lv_obj_set_style_text_color(l, want, 0);
+}
+
+static void fmt_dur(int s, char *out, size_t n)
+{
+    if (s < 0) s = 0;
+    if (s < 3600) snprintf(out, n, "%d:%02d", s / 60, s % 60);
+    else snprintf(out, n, "%dh%02d", s / 3600, s / 60 % 60);
+}
+
+static void fmt_tok(double t, char *out, size_t n)
+{
+    if (t >= 1e9) snprintf(out, n, "%.1fB", t / 1e9);
+    else if (t >= 1e6) snprintf(out, n, "%.1fM", t / 1e6);
+    else if (t >= 1e3) snprintf(out, n, "%.1fK", t / 1e3);
+    else snprintf(out, n, "%d", (int)t);
+}
+
+static const char *st_text(sess_st_t s)
+{
+    switch (s) {
+    case ST_WORK: return ui_tr("Đang cào phím", "Pawing keys");
+    case ST_WAIT: return ui_tr("Sen ơi!", "Hooman!");
+    case ST_DONE: return ui_tr("Xong! Pate?", "Done! Treats?");
+    case ST_ERR: return ui_tr("Toang rồi", "Hairball!");
+    default: return ui_tr("Liếm lông", "Grooming");
+    }
+}
+
+static ui_color_t st_color(sess_st_t s)
+{
+    return s == ST_WAIT || s == ST_ERR ? UI_C_ALERT : s == ST_WORK ? UI_C_ACCENT : s == ST_DONE ? UI_C_OK : UI_C_DIM;
+}
+
+/* The agent sends the kind of action ("read", "bash"...); the cat says it in a few words. */
+static const char *act_text(const char *kind, sess_st_t st)
+{
+    static const struct { const char *k, *vi, *en; } A[] = {
+        {"read", "Đang đọc file", "Reading a file"},     {"image", "Đọc ảnh nè!", "Ooh, a picture!"},
+        {"edit", "Đang sửa code", "Fixing code"},         {"write", "Viết file mới", "Writing a new file"},
+        {"bash", "Đang chạy bash", "Running bash"},       {"search", "Đánh hơi tìm code", "Sniffing for code"},
+        {"web", "Đang lướt web", "Surfing the web"},      {"agent", "Gọi đồng bọn", "Calling the gang"},
+        {"plan", "Đang lên kế hoạch", "Plotting a plan"}, {"ask", "Có câu hỏi cho sen", "Has a question"},
+        {"skill", "Lục túi đồ nghề", "Digging in its kit"}, {"compact", "Dọn ổ trí nhớ", "Tidying its memory"},
+        {"tool", "Đang vọc công cụ", "Fiddling with a tool"},
+    };
+    if (!kind[0]) return st == ST_WORK ? ui_tr("Đang ngẫm sự đời…", "Purr-cessing…") : "";
+    for (size_t i = 0; i < sizeof(A) / sizeof(A[0]); i++)
+        if (!strcmp(kind, A[i].k)) return ui_tr(A[i].vi, A[i].en);
+    return ui_tr("Đang vọc công cụ", "Fiddling with a tool"); /* a kind from a newer agent */
+}
+
+static const char *agent_name(const char *ag) { return !strcmp(ag, "claude") ? "Claude Code" : ag[0] ? ag : "Agent"; }
+
+static int pick_focus(const sess_t *ss, int n)
+{
+    if (s_focus[0] && now_ms() < s_focus_until)
+        for (int i = 0; i < n; i++)
+            if (!strcmp(ss[i].id, s_focus)) return i;
+    s_focus[0] = 0;
+    return 0;
+}
 
 const char *cat_mood_text(void)
 {
-    static const char *vi[] = {"vui vẻ", "buồn", "đói", "ốm", "đang ngủ", "đã bỏ đi"};
-    static const char *en[] = {"happy", "sad", "hungry", "sick", "sleeping", "gone"};
-    mood_t m = mood();
-    return ui_lang_en() ? en[m] : vi[m];
+    sess_t ss[MAX_SESS];
+    int n = sess_copy(ss);
+    sess_st_t st = n ? ss[0].st : ST_IDLE; /* the list comes sorted: most urgent first */
+    bool en = ui_lang_en();
+    if (!n) return en ? "napping" : "ngủ khò";
+    switch (st) {
+    case ST_WORK: return en ? "pawing keys" : "cào phím";
+    case ST_WAIT: return en ? "calling you" : "gọi sen";
+    case ST_DONE: return en ? "wants treats" : "đòi pate";
+    case ST_ERR: return en ? "hairball" : "toang";
+    default: return en ? "grooming" : "liếm lông";
+    }
+}
+
+/* the pose for a state; t = ms clock for the animation */
+static cat_pose_t pose_for(int n, const sess_t *f, uint32_t t, int type_ms, bool *prop_on, cat_prop_t *prop)
+{
+    *prop_on = false;
+    if (!n || f->st == ST_IDLE) {
+        if (!n) {
+            *prop = CAT_PROP_ZZZ;
+            *prop_on = (t / 1200) % 2;
+            return (t / 1200) % 2 ? CAT_POSE_SLEEP1 : CAT_POSE_SLEEP2;
+        }
+        return (t % 4000) < 200 ? CAT_POSE_BLINK : CAT_POSE_SIT;
+    }
+    switch (f->st) {
+    case ST_WORK:
+        if (!f->act[0] || (t / 6000) % 4 == 3) { /* thinking (no tool running), and a short pause now and then */
+            *prop = CAT_PROP_DOTS;
+            *prop_on = true;
+            return CAT_POSE_THINK;
+        }
+        return (t / type_ms) % 2 ? CAT_POSE_CODE1 : CAT_POSE_CODE2;
+    case ST_WAIT:
+        *prop = CAT_PROP_QUESTION;
+        *prop_on = (t / 500) % 3 != 2;
+        return CAT_POSE_WAIT;
+    case ST_DONE:
+        if (sess_secs(f) < 30) {
+            *prop = CAT_PROP_SPARKLE;
+            *prop_on = (t / 400) % 2;
+            return CAT_POSE_HAPPY;
+        }
+        return (t % 4000) < 200 ? CAT_POSE_BLINK : CAT_POSE_SIT;
+    case ST_ERR: return CAT_POSE_SAD;
+    default: return CAT_POSE_SIT;
+    }
+}
+
+static void show_prop(cat_prop_t p, bool on)
+{
+    if (!s_prop.img) return;
+    static int last = -1;
+    if (on && (last != (int)p || s_force_redraw)) {
+        last = p;
+        spr_set(&s_prop, cat_prop(p), cur_palette(), false);
+    }
+    set_hidden(s_prop.img, !on);
 }
 
 static void apply_pose(void)
 {
     static cat_pose_t last_pose = CAT_POSE_COUNT;
-    static cat_age_t last_age = CAT_AGE_COUNT;
     static const uint16_t *last_pal;
-    static bool last_flip;
     const uint16_t *pal = cur_palette();
-    cat_age_t a = stage();
-    bool flip = s_walk_dir < 0;
-    if (!s_force_redraw && s_pose == last_pose && a == last_age && pal == last_pal && flip == last_flip) return;
+    if (!s_force_redraw && s_pose == last_pose && pal == last_pal) return;
     s_force_redraw = false;
     last_pose = s_pose;
-    last_age = a;
     last_pal = pal;
-    last_flip = flip;
-    spr_set(&s_cat_spr, cat_sprite(a, s_pose), pal, flip);
-    for (int i = 0; i < 3; i++) spr_set(&s_poop[i], cat_prop(CAT_PROP_POOP), pal, false);
+    spr_set(&s_cat_spr, cat_sprite(CAT_AGE_ADULT, s_pose), pal, false);
 }
 
 static void update_mini(void)
@@ -388,18 +428,17 @@ static void update_mini(void)
     if (!s_mini.img) return;
     static cat_pose_t last = CAT_POSE_COUNT;
     static const uint16_t *last_pal;
-    mood_t m = mood();
-    cat_pose_t p = m == MOOD_SLEEP ? ((now_ms() / 1500) % 2 ? CAT_POSE_SLEEP1 : CAT_POSE_SLEEP2)
-                 : m == MOOD_HUNGRY || m == MOOD_SAD ? CAT_POSE_SAD
-                 : m == MOOD_SICK ? CAT_POSE_SICK
-                 : (now_ms() % 5000) < 250 ? CAT_POSE_BLINK : CAT_POSE_SIT;
+    sess_t ss[MAX_SESS];
+    int n = sess_copy(ss);
+    bool prop_on;
+    cat_prop_t prop;
+    cat_pose_t p = pose_for(n, n ? &ss[0] : NULL, now_ms(), 600, &prop_on, &prop);
+    if (p == CAT_POSE_THINK) p = CAT_POSE_CODE1; /* no bubble on the clock: keep it at the keyboard */
     const uint16_t *pal = cur_palette();
     if (p == last && pal == last_pal && !s_force_redraw) return;
     last = p;
     last_pal = pal;
-    spr_set(&s_mini, cat_sprite(stage(), p), pal, false);
-    if (m == MOOD_AWAY) lv_obj_add_flag(s_mini.img, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_remove_flag(s_mini.img, LV_OBJ_FLAG_HIDDEN);
+    spr_set(&s_mini, cat_sprite(CAT_AGE_ADULT, p), pal, false);
 }
 
 void cat_mini_attach(lv_obj_t *parent, int x, int y, int scale)
@@ -411,159 +450,116 @@ void cat_mini_attach(lv_obj_t *parent, int x, int y, int scale)
     update_mini();
 }
 
-static void show_prop(cat_prop_t p, bool on)
+static void tap_cat_cb(lv_event_t *e) { audio_sfx_play(SFX_MEOW); }
+
+/* tap the details: next session */
+static void tap_info_cb(lv_event_t *e)
 {
-    if (!s_prop.img) return;
-    if (!on) {
-        set_hidden(s_prop.img, true);
+    sess_t ss[MAX_SESS];
+    int n = sess_copy(ss);
+    if (n < 2) return;
+    int i = pick_focus(ss, n);
+    snprintf(s_focus, sizeof(s_focus), "%s", ss[(i + 1) % n].id);
+    s_focus_until = now_ms() + 120000;
+    s_shown_gen = UINT32_MAX;
+}
+
+static void act_lines(int lines)
+{
+    if (lines == s_act_lines) return;
+    s_act_lines = lines;
+    lv_obj_set_height(s_act, lines * lv_font_get_line_height(ui_f(UI_F_SMALL)));
+}
+
+/* One session in focus, laid out for the usual case of a single Claude Code window: a big state next to the cat,
+ * what it is doing, the session title across the screen, then context, tokens and cost. With more sessions the
+ * header shows "1/2" and a tap goes to the next one. */
+static void update_text(const sess_t *ss, int n, int fi)
+{
+    char buf[160], d[16];
+    bool on = pc_online();
+    set_hidden(s_time, !n);
+    set_hidden(s_where, !n);
+    if (!n) {
+        char nm[72]; /* the web allows 16 bytes */
+        settings_get_str("cat", "name", nm, sizeof(nm), "Mướp");
+        set_txt(s_count, "");
+        set_txt_clean(s_state, nm);
+        set_color(s_state, UI_C_TEXT);
+        act_lines(3);
+        set_color(s_act, UI_C_DIM);
+        set_txt_clean(s_act, on ? ui_tr("Rảnh quá nên ngủ. Bật \"Meow Coding\" ở khay MeowBox Agent rồi mở Claude Code.",
+                                        "Bored, so napping. Turn on \"Meow Coding\" in the MeowBox Agent tray, then start Claude Code.")
+                                : ui_tr("Chưa thấy máy tính đâu. Mở MeowBox Agent để mèo code cùng sen.",
+                                        "No computer around. Open MeowBox Agent and the cat codes along."));
+        set_txt_clean(s_name, on ? ui_tr("Chưa ai giao việc", "Nobody to code for") : ui_tr("Máy tính đâu rồi?", "Where's the computer?"));
+        set_hidden(s_ctx, true);
+        set_hidden(s_tok, true);
+        set_hidden(s_lim5, true);
+        set_hidden(s_ctxbar, true);
         return;
     }
-    static int last = -1;
-    if (last != (int)p || lv_obj_has_flag(s_prop.img, LV_OBJ_FLAG_HIDDEN)) {
-        last = p;
-        spr_set(&s_prop, cat_prop(p), cur_palette(), false);
+    const sess_t *f = &ss[fi];
+    if (n > 1) snprintf(buf, sizeof(buf), "%d/%d", fi + 1, n);
+    else snprintf(buf, sizeof(buf), "%s", f->model[0] ? f->model : agent_name(f->ag));
+    set_txt(s_count, buf);
+    set_txt_clean(s_state, st_text(f->st));
+    set_color(s_state, st_color(f->st));
+    fmt_dur(sess_secs(f), d, sizeof(d));
+    set_txt(s_time, d);
+    act_lines(2);
+    set_color(s_act, UI_C_TEXT);
+    set_txt_clean(s_act, act_text(f->act, f->st));
+    set_txt_clean(s_name, f->name[0] ? f->name : f->dir[0] ? f->dir : f->id);
+    snprintf(buf, sizeof(buf), f->br[0] ? "%s · %s" : "%s", f->dir, f->br);
+    set_txt_clean(s_where, buf);
+
+    bool ctx = f->ctx >= 0;
+    set_hidden(s_ctx, !ctx);
+    set_hidden(s_ctxbar, !ctx);
+    set_hidden(s_tok, f->tok <= 0);
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    int h5 = s_lim[0];
+    xSemaphoreGive(s_lock);
+    set_hidden(s_lim5, h5 < 0);
+    if (ctx) {
+        int v = f->ctx > 100 ? 100 : f->ctx;
+        snprintf(buf, sizeof(buf), "Context %d%%", v);
+        set_txt(s_ctx, buf);
+        if (lv_bar_get_value(s_ctxbar) != v) lv_bar_set_value(s_ctxbar, v, LV_ANIM_OFF);
+        lv_color_t c = ui_lc(v >= 80 ? UI_C_ALERT : v >= 60 ? UI_C_WARN : UI_C_ACCENT);
+        if (!lv_color_eq(lv_obj_get_style_bg_color(s_ctxbar, LV_PART_INDICATOR), c))
+            lv_obj_set_style_bg_color(s_ctxbar, c, LV_PART_INDICATOR);
     }
-    set_hidden(s_prop.img, false);
-}
-
-static void start_action(int a)
-{
-    if (s_cat.away) {
-        say("Mèo đã bỏ đi. Vào web để nhận mèo mới.", "The cat left. Adopt a new one on the web page.");
-        return;
-    }
-    if (s_cat.sleeping && a != 5) {
-        say("Suỵt, mèo đang ngủ.", "Shh, the cat is asleep.");
-        return;
-    }
-    s_action = a;
-    s_walk_dir = 0;
-    switch (a) {
-    case 1:
-        if (s_cat.full > 92) {
-            say("No rồi, không ăn nữa đâu!", "Too full to eat!");
-            s_action = 0;
-            return;
-        }
-        s_cat.full = clampd(s_cat.full + 35);
-        s_cat.health = clampd(s_cat.health + 2);
-        s_anim_until_ms = now_ms() + 3000;
-        say("Măm măm…", "Nom nom…");
-        audio_sfx_play(SFX_MEOW);
-        break;
-    case 2:
-        if (s_cat.energy < 15) {
-            say("Mệt quá, muốn ngủ…", "Too tired to play…");
-            s_action = 0;
-            return;
-        }
-        s_cat.fun = clampd(s_cat.fun + 25);
-        s_cat.energy = clampd(s_cat.energy - 10);
-        s_anim_until_ms = now_ms() + 3500;
-        say("Vờn len nè!", "Yarn time!");
-        break;
-    case 3:
-        s_cat.clean = 100;
-        s_cat.poops = 0;
-        s_cat.fun = clampd(s_cat.fun - 5);
-        s_anim_until_ms = now_ms() + 3000;
-        say("Tắm sạch thơm tho", "All clean!");
-        break;
-    case 4:
-        s_cat.fun = clampd(s_cat.fun + 3);
-        s_anim_until_ms = now_ms() + 1500;
-        if (++s_pet_strokes % 4 == 1) audio_sfx_play(SFX_PURR);
-        say("Rừ rừ…", "Purr…");
-        break;
-    }
-    s_dirty = true;
-}
-
-static void lights_label(lv_obj_t *btn)
-{
-    lv_label_set_text(ui_button_label(btn), s_cat.lights_off ? ui_tr("Bật đèn", "Lights on") : ui_tr("Tắt đèn", "Lights off"));
-}
-
-static void act_cb(lv_event_t *e)
-{
-    int a = (int)(intptr_t)lv_event_get_user_data(e);
-    if (a == 5) {
-        if (s_cat.away) return;
-        s_cat.lights_off = !s_cat.lights_off;
-        s_cat.sleeping = s_cat.lights_off;
-        say(s_cat.lights_off ? "Chúc ngủ ngon." : "Dậy thôi!", s_cat.lights_off ? "Good night." : "Wake up!");
-        lights_label(lv_event_get_target(e));
-        s_dirty = true;
-        return;
-    }
-    start_action(a);
-}
-
-static void pet_cb(lv_event_t *e)
-{
-    lv_indev_t *in = lv_indev_active();
-    if (!in) return;
-    lv_point_t v;
-    lv_indev_get_vect(in, &v);
-    if (abs(v.x) + abs(v.y) > 2 && !s_cat.sleeping && !s_cat.away && now_ms() > s_anim_until_ms) start_action(4);
-}
-
-static void tap_cat_cb(lv_event_t *e)
-{
-    if (s_cat.sleeping || s_cat.away) return;
-    audio_sfx_play(SFX_MEOW);
-    say("Meo?", "Meow?");
-}
-
-static void update_bars(void)
-{
-    double v[4] = {s_cat.full, s_cat.fun, s_cat.clean, s_cat.energy};
-    for (int i = 0; i < 4; i++) {
-        if (!s_bars[i]) continue;
-        int val = (int)v[i];
-        if (val != s_shown.bar[i]) {
-            lv_bar_set_value(s_bars[i], val, LV_ANIM_OFF);
-            s_shown.bar[i] = val;
-        }
-        ui_color_t c = v[i] < 20 ? UI_C_ALERT : v[i] < 45 ? UI_C_WARN : UI_C_OK;
-        if (ui_theme()->btn == THEME_BTN_FILL) c = v[i] < 20 ? UI_C_ALERT : UI_C_TEXT;
-        if ((int)c != s_shown.bar_col[i]) {
-            lv_obj_set_style_bg_color(s_bars[i], ui_lc(c), LV_PART_INDICATOR);
-            s_shown.bar_col[i] = c;
-        }
-        int alert = v[i] < 20;
-        if (alert != s_shown.lbl_alert[i]) {
-            lv_obj_set_style_text_color(s_bar_lbl[i], ui_lc(alert ? UI_C_ALERT : UI_C_TEXT), 0);
-            s_shown.lbl_alert[i] = alert;
-        }
+    fmt_tok(f->tok, d, sizeof(d));
+    snprintf(buf, sizeof(buf), "%s tok", d);
+    set_txt(s_tok, buf);
+    if (h5 >= 0) { /* the plan's 5-hour window, shared by every session */
+        snprintf(buf, sizeof(buf), "5h %d%%", h5);
+        set_txt(s_lim5, buf);
+        set_color(s_lim5, h5 >= 90 ? UI_C_ALERT : h5 >= 70 ? UI_C_WARN : UI_C_DIM);
     }
 }
 
 static void cat_tick(lv_timer_t *t)
 {
-    static uint32_t last_sim, last_save, last_nag;
     uint32_t ms = now_ms();
-    if (!s_loaded && net_time_valid()) {
-        catch_up();
-        s_loaded = true;
-    }
-    if (ms - last_sim >= 60000) {
-        last_sim = ms;
-        if (net_time_valid()) {
-            time_t now = time(NULL);
-            double h = s_cat.updated ? difftime(now, s_cat.updated) / 3600.0 : 1.0 / 60;
-            if (h > 0 && h < 2) step(h);
-            s_cat.updated = now;
+    if (s_ev_wait) { /* an agent needs you: show the tile (and wake the screen), chime */
+        s_ev_wait = false;
+        xSemaphoreTake(s_lock, portMAX_DELAY);
+        snprintf(s_focus, sizeof(s_focus), "%s", s_ev_id);
+        xSemaphoreGive(s_lock);
+        s_focus_until = ms + 120000;
+        s_shown_gen = UINT32_MAX;
+        if (settings_get_bool("cat", "show", true)) {
+            ui_wake();
+            if (ui_active_tile() != UI_TILE_CAT) ui_show_tile(UI_TILE_CAT, true);
         }
+        if (settings_get_bool("cat", "snd", true)) audio_sfx_play(SFX_CHIME);
     }
-    if (s_dirty && ms - last_save >= 300000) {
-        last_save = ms;
-        save();
-    }
-    mood_t m = mood();
-    if ((m == MOOD_HUNGRY || m == MOOD_SICK) && !ui_is_night() && ms - last_nag > 1800000) {
-        last_nag = ms;
-        audio_sfx_play(SFX_MEOW);
+    if (s_ev_done) { /* a turn finished: a meow (not at night) */
+        s_ev_done = false;
+        if (settings_get_bool("cat", "snd", true) && !ui_is_night()) audio_sfx_play(SFX_MEOW);
     }
     if (ui_active_tile() == UI_TILE_CLOCK) update_mini();
     if (ui_active_tile() != UI_TILE_CAT || !s_cat_spr.img) {
@@ -571,188 +567,138 @@ static void cat_tick(lv_timer_t *t)
         return;
     }
 
-    char name[72]; /* the web allows 16 characters: up to 64 bytes of Vietnamese */
-    settings_get_str("cat", "name", name, sizeof(name), "Mướp");
-    char title[112];
-    snprintf(title, sizeof(title), "%s, %s", name, stage_name(stage(), ui_lang_en()));
-    utf8_trim(title);
-    if (strcmp(lv_label_get_text(s_title), title)) lv_label_set_text(s_title, title);
-    update_bars();
-
-    /* lights off: the play area turns dark and shows a few stars */
-    if ((int)s_cat.lights_off != s_shown.dark) {
-        lv_obj_set_style_bg_opa(s_dark, s_cat.lights_off ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
-        s_shown.dark = s_cat.lights_off;
+    sess_t ss[MAX_SESS];
+    int n = sess_copy(ss);
+    int fi = n ? pick_focus(ss, n) : 0;
+    /* text: on a new message, and once a second for the timer */
+    static uint32_t last_txt;
+    if (s_gen != s_shown_gen || ms - last_txt >= 1000) {
+        s_shown_gen = s_gen;
+        last_txt = ms;
+        update_text(ss, n, fi);
     }
-    set_hidden(s_stars, !s_cat.lights_off);
-    for (int i = 0; i < 3; i++) set_hidden(s_poop[i].img, !(i < s_cat.poops && !s_cat.away));
 
     if (s_clap) {
         s_clap = false;
-        if (!s_cat.away && (!s_action || s_action == 6)) {
-            s_action = 6; /* startled: fur up and a hop, also wakes it for a moment (it goes back to sleep) */
-            s_walk_dir = 0;
-            s_anim_until_ms = ms + 1600;
-            say("Giật cả mình!", "Eek, what was that?");
-            if (!ui_is_night()) audio_sfx_play(SFX_MEOW);
-        }
+        s_startle_until = ms + 1600; /* fur up and a hop */
+        if (!ui_is_night()) audio_sfx_play(SFX_MEOW);
     }
-    uint32_t phase = ms / 400;
-    bool acting = s_action && ms < s_anim_until_ms;
-    if (!acting && s_action) {
-        bool keep = s_action != 6; /* a startle changes nothing worth a flash write */
-        s_action = 0;
-        show_prop(0, false);
-        if (keep) save();
-    }
-    if (s_cat.away) {
-        set_hidden(s_cat_spr.img, true);
-        show_prop(CAT_PROP_PAW, true);
-        say("Mèo đã bỏ đi rồi…", "The cat has left…");
-        return;
-    }
-    set_hidden(s_cat_spr.img, false);
-    if (acting) {
-        switch (s_action) {
-        case 1: s_pose = phase % 2 ? CAT_POSE_EAT1 : CAT_POSE_EAT2; show_prop(CAT_PROP_FISH, (phase / 2) % 2); break;
-        case 2: s_pose = phase % 2 ? CAT_POSE_PLAY1 : CAT_POSE_PLAY2; show_prop(CAT_PROP_YARN, true); break;
-        case 3: s_pose = CAT_POSE_BLINK; show_prop(CAT_PROP_BUBBLES, true); break;
-        case 4: s_pose = CAT_POSE_HAPPY; show_prop(CAT_PROP_HEART, true); break;
-        case 6: {
-            s_pose = CAT_POSE_ANGRY;
-            show_prop(0, false);
-            uint32_t t = 1600 - (s_anim_until_ms - ms); /* 0..1600 ms: one hop in the first 400 ms */
-            s_jump = t < 400 ? (int)(t < 200 ? t / 10 : (400 - t) / 10) : 0;
-            break;
-        }
-        }
-    } else if (s_cat.sleeping) {
-        s_pose = (ms / 1200) % 2 ? CAT_POSE_SLEEP1 : CAT_POSE_SLEEP2;
-        show_prop(CAT_PROP_ZZZ, (ms / 1200) % 2);
-        s_walk_dir = 0;
+    bool prop_on;
+    cat_prop_t prop = CAT_PROP_ZZZ;
+    if (ms < s_startle_until) {
+        s_pose = CAT_POSE_ANGRY;
+        prop_on = false;
+        uint32_t e = 1600 - (s_startle_until - ms); /* 0..1600 ms: one hop in the first 400 ms */
+        s_jump = e < 400 ? (int)(e < 200 ? e / 10 : (400 - e) / 10) : 0;
     } else {
-        static uint32_t next_change;
-        static int idle_mode; /* 0 sit, 1 walk, 2 groom */
-        if (ms > next_change) {
-            int r = esp_random() % 10;
-            idle_mode = r < 5 ? 0 : r < 8 ? 1 : 2;
-            s_walk_dir = idle_mode == 1 ? (s_cat_x > 16 ? -1 : s_cat_x < -16 ? 1 : (esp_random() & 1 ? 1 : -1)) : 0;
-            next_change = ms + 2500 + esp_random() % 4000;
-        }
-        if (m == MOOD_SICK) { s_pose = CAT_POSE_SICK; s_walk_dir = 0; }
-        else if (m == MOOD_SAD || m == MOOD_HUNGRY) { s_pose = CAT_POSE_SAD; s_walk_dir = 0; }
-        else if (idle_mode == 1 && s_walk_dir) {
-            s_pose = phase % 2 ? CAT_POSE_WALK1 : CAT_POSE_WALK2;
-            s_cat_x += s_walk_dir * 2;
-            if (s_cat_x > 24 || s_cat_x < -24) s_walk_dir = -s_walk_dir;
-        } else if (idle_mode == 2) s_pose = CAT_POSE_GROOM;
-        else s_pose = (ms % 4000) < 200 ? CAT_POSE_BLINK : CAT_POSE_SIT;
-        show_prop(0, false);
-        if (m == MOOD_HUNGRY) say("Đói quá, cho ăn đi!", "Hungry, feed me!");
-        else if (m == MOOD_SICK) say("Mèo bị ốm, chăm sóc kỹ nhé.", "The cat is sick, take care.");
-        else if (s_cat.poops) say("Có gì đó cần dọn…", "Something needs cleaning…");
+        s_pose = pose_for(n, n ? &ss[fi] : NULL, ms, 400, &prop_on, &prop);
+        s_jump = 0;
     }
-    int sc = cat_scale();
-    if (!acting || s_action != 6) s_jump = 0;
-    if (sc != s_shown.scale || s_cat_x != s_shown.x || s_jump != s_shown.jump) {
-        lv_image_set_scale(s_cat_spr.img, 256 * sc);
-        lv_obj_set_size(s_cat_spr.img, CAT_SPRITE_W * sc, CAT_SPRITE_H * sc);
-        lv_obj_set_pos(s_cat_spr.img, 86 - CAT_SPRITE_W * sc / 2 + s_cat_x, 132 - CAT_SPRITE_H * sc - s_jump);
-        s_shown.scale = sc;
-        s_shown.x = s_cat_x;
-        s_shown.jump = s_jump;
+    show_prop(prop, prop_on);
+    static int shown_jump = -1;
+    if (s_jump != shown_jump) {
+        lv_obj_set_y(s_cat_spr.img, FLOOR_Y - CAT_SPRITE_H * SCALE - s_jump);
+        shown_jump = s_jump;
     }
     apply_pose();
+}
+
+static lv_obj_t *small(lv_obj_t *p, ui_color_t c, int w)
+{
+    lv_obj_t *l = ui_label(p, UI_F_SMALL, c, "");
+    lv_obj_set_width(l, w);
+    ui_dot(l);
+    return l;
 }
 
 static void cat_build(lv_obj_t *t)
 {
     /* not s_mini: it belongs to the clock tile, built (and attached via cat_mini_attach) before this one */
     s_cat_spr.img = s_prop.img = NULL;
-    for (int i = 0; i < 3; i++) s_poop[i].img = NULL;
-    shown_reset();
+    s_shown_gen = UINT32_MAX;
+    s_act_lines = 0;
+    memset(s_clean_last, 0, sizeof(s_clean_last)); /* new labels */
     spr_alloc(&s_cat_spr, CAT_SPRITE_W, CAT_SPRITE_H);
     spr_alloc(&s_prop, CAT_PROP_W, CAT_PROP_H);
-    for (int i = 0; i < 3; i++) spr_alloc(&s_poop[i], CAT_PROP_W, CAT_PROP_H);
+    s_count = ui_header(t, "Meow Coding", "");
+    const int cx = UI_SAFE_X + 2, bw = UI_W - 2 * UI_SAFE_X - 4;
+    const int lh_s = lv_font_get_line_height(ui_f(UI_F_SMALL)), lh_b = lv_font_get_line_height(ui_f(UI_F_BODY));
 
-    if (ui_theme()->btn == THEME_BTN_RAW) {
-        s_title = ui_header(t, ui_tr("mèo", "cat"), "");
-    } else {
-        s_title = ui_label(t, UI_F_SMALL, ui_theme()->btn == THEME_BTN_CUT ? UI_C_ACCENT2 : UI_C_TEXT, "");
-        int lh = lv_font_get_line_height(ui_f(UI_F_SMALL)), x = ui_inset_l(UI_HEAD_Y, UI_HEAD_Y + lh);
-        lv_obj_set_pos(s_title, x, UI_HEAD_Y);
-        lv_obj_set_width(s_title, UI_W - x - ui_inset_r(UI_HEAD_Y, UI_HEAD_Y + lh)); /* a long cat name gets "…" */
-        ui_dot(s_title);
-    }
-
-    /* dark backdrop for "lights off", drawn behind the cat */
-    s_dark = lv_obj_create(t);
-    lv_obj_remove_style_all(s_dark);
-    lv_obj_set_pos(s_dark, UI_SAFE_X + 4, 36);
-    lv_obj_set_size(s_dark, 152, 100);
-    lv_obj_set_style_bg_color(s_dark, lv_color_hex(0x0A0C16), 0);
-    lv_obj_set_style_bg_opa(s_dark, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_radius(s_dark, ui_theme()->btn == THEME_BTN_TEXT ? 12 : 0, 0);
-    lv_obj_remove_flag(s_dark, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
-    s_stars = ui_label(s_dark, UI_F_SMALL, UI_C_WARN, ". *        .\n     .      .     *");
-    lv_obj_set_style_text_color(s_stars, lv_color_hex(0xF5E9A0), 0);
-    lv_obj_set_pos(s_stars, 10, 8);
-    lv_obj_add_flag(s_stars, LV_OBJ_FLAG_HIDDEN);
-
-    /* play area (touch): left 2/3, floor rule at y=136 */
-    s_area = lv_obj_create(t);
-    lv_obj_remove_style_all(s_area);
-    lv_obj_set_pos(s_area, UI_SAFE_X + 4, 36);
-    lv_obj_set_size(s_area, 152, 100);
-    lv_obj_add_flag(s_area, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(s_area, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
-    lv_obj_add_event_cb(s_area, pet_cb, LV_EVENT_PRESSING, NULL);
-    lv_obj_add_event_cb(s_area, tap_cat_cb, LV_EVENT_SHORT_CLICKED, NULL);
-    ui_rule(t, UI_SAFE_X + 4, 136, 152);
-
-    for (int i = 0; i < 3; i++) {
-        spr_place(&s_poop[i], t, 2);
-        lv_obj_set_pos(s_poop[i].img, UI_SAFE_X + 6 + i * 50, 104);
-        lv_obj_add_flag(s_poop[i].img, LV_OBJ_FLAG_HIDDEN);
-    }
-    spr_place(&s_cat_spr, t, cat_scale());
+    /* left: the cat at its laptop on the floor rule; tap = meow */
+    const int cw = CAT_SPRITE_W * SCALE + 4;
+    ui_rule(t, cx, FLOOR_Y, cw);
+    spr_place(&s_cat_spr, t, SCALE);
+    lv_obj_set_pos(s_cat_spr.img, cx + 2, FLOOR_Y - CAT_SPRITE_H * SCALE);
     spr_place(&s_prop, t, 2);
-    lv_obj_set_pos(s_prop.img, 128, 44);
+    lv_obj_set_pos(s_prop.img, cx + CAT_SPRITE_W * SCALE - 26, 24);
     lv_obj_add_flag(s_prop.img, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_move_foreground(s_area);
-    lv_obj_set_style_bg_opa(s_area, LV_OPA_TRANSP, 0);
+    lv_obj_t *area = lv_obj_create(t);
+    lv_obj_remove_style_all(area);
+    lv_obj_set_pos(area, cx, 30);
+    lv_obj_set_size(area, cw, FLOOR_Y - 30);
+    lv_obj_add_flag(area, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(area, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(area, tap_cat_cb, LV_EVENT_SHORT_CLICKED, NULL);
 
-    /* stats: label left, value right, bar under */
-    static const char *lbl_vi[4] = {"No", "Vui", "Sạch", "Năng lượng"};
-    static const char *lbl_en[4] = {"Full", "Fun", "Clean", "Energy"};
-    for (int i = 0; i < 4; i++) {
-        s_bar_lbl[i] = ui_label(t, UI_F_SMALL, UI_C_TEXT, ui_tr(lbl_vi[i], lbl_en[i]));
-        lv_obj_set_pos(s_bar_lbl[i], 182, 28 + i * 28);
-        s_bars[i] = ui_bar(t, 92, 4, UI_C_OK);
-        lv_obj_set_pos(s_bars[i], 182, 50 + i * 28);
-    }
+    /* right of the cat: state (big), time in it, what it is doing */
+    const int ix = cx + cw + 10, iw = UI_W - UI_SAFE_X - 2 - ix;
+    lv_obj_t *col = lv_obj_create(t);
+    lv_obj_remove_style_all(col);
+    lv_obj_set_pos(col, ix, 36);
+    lv_obj_set_size(col, iw, FLOOR_Y - 36);
+    lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(col, 2, 0);
+    lv_obj_remove_flag(col, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    s_state = ui_label(col, UI_F_TITLE, UI_C_ACCENT, "");
+    lv_obj_set_width(s_state, iw);
+    ui_dot(s_state);
+    lv_obj_set_user_data(s_state, (void *)1);
+    s_time = small(col, UI_C_DIM, iw);
+    s_act = ui_label(col, UI_F_SMALL, UI_C_TEXT, "");
+    lv_obj_set_width(s_act, iw);
+    lv_label_set_long_mode(s_act, LV_LABEL_LONG_DOT); /* wraps, "..." after the last line */
+    lv_obj_set_user_data(s_act, (void *)2);
+    act_lines(2);
 
-    s_msg = ui_label(t, UI_F_SMALL, UI_C_ACCENT2, "");
-    lv_obj_set_width(s_msg, UI_W - 2 * UI_SAFE_X - 16);
-    ui_dot(s_msg);
-    lv_obj_set_pos(s_msg, UI_SAFE_X + 8, 142);
+    /* across the screen: session title, folder and branch */
+    int y = FLOOR_Y + 4;
+    s_name = ui_label(t, UI_F_BODY, UI_C_TEXT, "");
+    lv_obj_set_width(s_name, bw);
+    ui_dot(s_name);
+    lv_obj_set_pos(s_name, cx, y);
+    lv_obj_set_user_data(s_name, (void *)3);
+    y += lh_b;
+    s_where = small(t, UI_C_DIM, bw);
+    lv_obj_set_pos(s_where, cx, y);
+    lv_obj_set_user_data(s_where, (void *)4);
 
-    lv_obj_t *row = lv_obj_create(t);
-    lv_obj_remove_style_all(row);
-    lv_obj_set_size(row, UI_W - 2 * UI_SAFE_X - 12, 40);
-    lv_obj_set_pos(row, UI_SAFE_X + 6, 166);
-    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-    static const char *acts_vi[] = {"Ăn", "Chơi", "Tắm"};
-    static const char *acts_en[] = {"Feed", "Play", "Bath"};
-    for (int i = 0; i < 3; i++) {
-        lv_obj_t *b = ui_button(row, ui_tr(acts_vi[i], acts_en[i]), false, 56, 40);
-        lv_obj_add_event_cb(b, act_cb, LV_EVENT_CLICKED, (void *)(intptr_t)(i + 1));
-    }
-    lv_obj_t *lb = ui_button(row, "", true, 84, 40);
-    lights_label(lb);
-    lv_obj_add_event_cb(lb, act_cb, LV_EVENT_CLICKED, (void *)(intptr_t)5);
+    /* usage: context bar, then context / tokens / estimated cost */
+    y += lh_s + 4;
+    s_ctxbar = ui_bar(t, bw, 4, UI_C_ACCENT);
+    lv_obj_set_pos(s_ctxbar, cx, y);
+    y += 6;
+    s_ctx = ui_label(t, UI_F_SMALL, UI_C_TEXT, "");
+    lv_obj_set_pos(s_ctx, cx, y);
+    s_tok = ui_label(t, UI_F_SMALL, UI_C_DIM, "");
+    lv_obj_align(s_tok, LV_ALIGN_TOP_MID, 12, y);
+    s_lim5 = ui_label(t, UI_F_SMALL, UI_C_DIM, "");
+    lv_obj_align(s_lim5, LV_ALIGN_TOP_RIGHT, -(UI_SAFE_X + 2), y);
+
+    /* tap next to the cat or below it: the next session (when there are several) */
+    lv_obj_t *hit = lv_obj_create(t);
+    lv_obj_remove_style_all(hit);
+    lv_obj_set_pos(hit, ix, 30);
+    lv_obj_set_size(hit, UI_W - ix, y + lh_s - 30);
+    lv_obj_add_flag(hit, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(hit, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(hit, tap_info_cb, LV_EVENT_SHORT_CLICKED, NULL);
+    lv_obj_t *hit2 = lv_obj_create(t);
+    lv_obj_remove_style_all(hit2);
+    lv_obj_set_pos(hit2, 0, FLOOR_Y + 2);
+    lv_obj_set_size(hit2, ix, y + lh_s - FLOOR_Y - 2);
+    lv_obj_add_flag(hit2, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(hit2, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(hit2, tap_info_cb, LV_EVENT_SHORT_CLICKED, NULL);
     s_force_redraw = true;
     apply_pose();
 }
@@ -760,34 +706,38 @@ static void cat_build(lv_obj_t *t)
 /* ---------------- web ---------------- */
 static void cat_cfg_hook(cJSON *doc)
 {
-    cJSON *st = cJSON_AddObjectToObject(doc, "stats");
-    double age = s_cat.born && net_time_valid() ? difftime(time(NULL), s_cat.born) / 86400.0 : 0;
-    cJSON_AddNumberToObject(st, "age", (int)age);
-    cJSON_AddStringToObject(st, "stage", stage_key(stage()));
-    cJSON_AddNumberToObject(st, "full", (int)s_cat.full);
-    cJSON_AddNumberToObject(st, "fun", (int)s_cat.fun);
-    cJSON_AddNumberToObject(st, "clean", (int)s_cat.clean);
-    cJSON_AddNumberToObject(st, "energy", (int)s_cat.energy);
-    cJSON_AddNumberToObject(st, "health", (int)s_cat.health);
-    cJSON_AddStringToObject(st, "mood", mood_key(mood()));
-    cJSON_AddBoolToObject(st, "away", s_cat.away);
-}
-
-static esp_err_t h_reset(httpd_req_t *req)
-{
-    cJSON *j = web_read_json(req);
-    if (!j) return ESP_OK;
-    cJSON_Delete(j);
-    if (board_lvgl_lock(500)) {
-        new_cat();
-        save();
-        s_cat_x = 0;
-        s_force_redraw = true;
-        board_lvgl_unlock();
+    sess_t ss[MAX_SESS];
+    int n = sess_copy(ss);
+    cJSON *st = cJSON_AddObjectToObject(doc, "st");
+    cJSON_AddBoolToObject(st, "pc", pc_online());
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    int lim[2] = {n || pc_online() ? s_lim[0] : -1, n || pc_online() ? s_lim[1] : -1};
+    double rst[2] = {s_lim_reset[0], s_lim_reset[1]};
+    xSemaphoreGive(s_lock);
+    if (lim[0] >= 0 || lim[1] >= 0) {
+        cJSON *l = cJSON_AddObjectToObject(st, "lim");
+        if (lim[0] >= 0) cJSON_AddNumberToObject(l, "h5", lim[0]);
+        if (rst[0] > 0) cJSON_AddNumberToObject(l, "h5r", rst[0]);
+        if (lim[1] >= 0) cJSON_AddNumberToObject(l, "d7", lim[1]);
+        if (rst[1] > 0) cJSON_AddNumberToObject(l, "d7r", rst[1]);
     }
-    cJSON *doc = settings_get("cat");
-    cat_cfg_hook(doc);
-    return web_send_json(req, doc);
+    cJSON *a = cJSON_AddArrayToObject(st, "s");
+    for (int i = 0; i < n; i++) {
+        cJSON *o = cJSON_CreateObject();
+        cJSON_AddStringToObject(o, "id", ss[i].id);
+        cJSON_AddStringToObject(o, "ag", ss[i].ag);
+        cJSON_AddStringToObject(o, "name", ss[i].name);
+        cJSON_AddStringToObject(o, "dir", ss[i].dir);
+        cJSON_AddStringToObject(o, "br", ss[i].br);
+        cJSON_AddStringToObject(o, "st", st_key(ss[i].st));
+        cJSON_AddStringToObject(o, "act", ss[i].act);
+        cJSON_AddNumberToObject(o, "for", sess_secs(&ss[i]));
+        cJSON_AddNumberToObject(o, "tok", ss[i].tok);
+        cJSON_AddNumberToObject(o, "usd", ss[i].usd);
+        if (ss[i].ctx >= 0) cJSON_AddNumberToObject(o, "ctx", ss[i].ctx);
+        cJSON_AddStringToObject(o, "model", ss[i].model);
+        cJSON_AddItemToArray(a, o);
+    }
 }
 
 static void on_cat_settings(const char *group, void *arg)
@@ -798,10 +748,11 @@ static void on_cat_settings(const char *group, void *arg)
 /* ---------------- init ---------------- */
 void cat_app_init(void)
 {
-    load();
+    s_lock = xSemaphoreCreateMutex();
+    s_sess = heap_caps_calloc(MAX_SESS, sizeof(sess_t), MALLOC_CAP_SPIRAM);
+    if (remove(OLD_CAT_FILE) == 0) ESP_LOGI(TAG, "removed the old virtual pet save");
     ui_register_builder(UI_TILE_CAT, cat_build);
     lv_timer_create(cat_tick, 200, NULL);
     settings_on_change(on_cat_settings, NULL);
     web_set_config_hook("cat", cat_cfg_hook);
-    web_register("/api/cat/reset", HTTP_POST, h_reset, WEB_AUTH_SESSION);
 }

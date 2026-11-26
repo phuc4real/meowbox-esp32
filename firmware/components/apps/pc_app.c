@@ -1,4 +1,4 @@
-/* PC screen (P5): WebSocket /ws/pc from pc-agent (stats, media, hello, notify) + media control back to the PC. */
+/* PC screen (P5): WebSocket /ws/pc from pc-agent (stats, media, hello, notify, coding) + media control back to the PC. */
 #include "apps.h"
 
 #include <stdio.h>
@@ -82,6 +82,9 @@ static void handle_msg(cJSON *j)
             radio_set_relay(hp ? hp + 3 : relay);
             ESP_LOGI(TAG, "agent relay %s", relay);
         }
+    } else if (!strcmp(t, "coding")) {
+        cat_coding_update(j);
+        return; /* nothing on the PC tile changed */
     } else if (!strcmp(t, "notify")) {
         cJSON *d = cJSON_GetObjectItem(j, "duration");
         notify_post(cJSON_GetStringValue(cJSON_GetObjectItem(j, "title")), cJSON_GetStringValue(cJSON_GetObjectItem(j, "text")),

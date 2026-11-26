@@ -52,6 +52,28 @@ mỗi ngày; chạy cùng Windows; cổng relay; thư mục log.
   nguyên (AAC trong MPEG-TS). Trong lúc tải loa tự thử lại, tray hiện thông báo. Máy có ffmpeg trong PATH thì dùng luôn.
 - yt-dlp là bản zip thuần Python (~3 MB) chạy bằng `meowbox.exe ytdlp …`; xem/cập nhật: `meowbox tools status|update`.
 
+## Meow Coding (Claude Code)
+
+The cat tile on the speaker shows what Claude Code is doing on this PC: the cat types at a laptop while a session
+works, holds up a "?" when one waits for you (a permission prompt or a question: the speaker opens the cat tile,
+wakes the screen and chimes), and is happy when a turn is done. Next to it: the session title, the current action
+("Đang đọc file", "Đang chạy bash", "Đọc ảnh nè!"), the time in that state, context used, tokens and an estimated cost.
+
+- Turn it on with **Meow Coding (Claude Code)** in the tray menu, or `meowbox coding install` (`uninstall`, `status`).
+  This adds hooks to `~/.claude/settings.json` (other hooks and settings are kept; the file as it was before is
+  saved once as `settings.json.meowbox.bak`). Sessions started after that show up.
+- Each hook runs `curl` in the background (`async`) and sends the event to `http://127.0.0.1:8767/hook`
+  (`coding_port` in `agent.json`, this PC only). Claude Code never waits for it, and when the agent is not running
+  the hook still ends without an error (`|| exit 0`), so no "hook failed" messages. Install again after updating the
+  agent: it replaces the HTTP hooks of the first Meow Coding builds.
+- The agent reads each session's transcript (`~/.claude/projects/…/*.jsonl`) for the title, model, tokens and
+  context. The cost is an estimate at API list prices; a Claude subscription is not billed per token.
+- The 5-hour and weekly usage of your Claude plan come from Claude Code's status line: `install` sets one
+  (`curl … http://127.0.0.1:8767/status`, it shows `MeowBox · 5h 23% · 7d 41%`) unless you already have your own,
+  which it never replaces. The speaker shows `5h 23%` next to the tokens. API-key sessions have no plan limits.
+- Only short labels go to the speaker: title, project folder, branch, and the kind of action (`read`, `bash`,
+  `image`...). No prompts, commands, file names or contents.
+
 ## Dòng lệnh
 
 Sau khi cài (và chọn thêm vào PATH), hoặc `python agent.py ...` khi chạy từ source:
@@ -61,6 +83,7 @@ meowbox notify "Build xong" "esp32-playground OK" --sound chime --priority high
 meowbox say "Build xong rồi nha"            # TTS Windows → WAV → /api/notify/audio
 meowbox say "test" --save test.wav           # chỉ lưu file, không gửi
 meowbox wifi-setup [on|off|status]           # Wi-Fi cài đặt MeowBox-XXXX (mật khẩu meowbox2026)
+meowbox coding install                       # Meow Coding: hook Claude Code (uninstall | status)
 meowbox config --set-host 192.168.1.50      # IP loa (tile Hệ thống)
 meowbox config --token <token> --speaker MeowBox-1A2B
 meowbox run                                  # agent không có icon (như bản cũ), --no-relay, --no-update

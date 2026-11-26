@@ -115,13 +115,12 @@ const snap=()=>{if(document.hidden)return;const n=new Image();n.alt=t('shotAlt')
 n.onload=()=>{if(img)img.replaceWith(n);else shot.prepend(n);img=n;ph.hidden=true};
 n.onerror=()=>{if(img){img.remove();img=null}ph.hidden=false};n.src=SHOT+'?t='+Date.now()};
 snap();every(snap,5000);onVis=snap;
-const s=cat&&cat.stats||{},h1=h('h1',0,!cat?'MeowBox':s.away?t('away'):cat.name+' '+(t('mood')[s.mood]||''));
+const cs=cat&&cat.st&&cat.st.s||[],c0=cs[0],h1=h('h1',0,!cat?'MeowBox':cat.name+' '+t('catIs')[c0?c0.st:'none']);
 const lb=h('div',{class:'lbl'}),nm=h('div',{class:'stn'}),sub=h('div'),pb=btn('',null),sl=h('div',{class:'muted'});
 const v={vol:0},vol=bind(v,'vol',{type:'range',min:0,max:100,'aria-label':t('vol')}),vb=h('b');
 vol.addEventListener('input',()=>vb.textContent=vol.value);vol.onchange=()=>radio({cmd:'vol',vol:v.vol});
 const kvb=h('div');let st;
 pb.onclick=async()=>{const ps=(st.play||{}).st||'stop',r=await radio(ps=='stop'||ps=='err'?{cmd:'play'}:{cmd:'stop'});st.play=r.play;draw(st)};
-const low=Object.entries(t('stats')).map(([k,l])=>[l,s[k]]).filter(x=>x[1]<30).sort((a,b)=>a[1]-b[1])[0];
 const draw=x=>{st=x;const p=x.play||{st:'stop'},on=p.st=='play'||p.st=='buf';
 lb.textContent=on?t('nowPlay'):t('nRadio');nm.textContent=p.name||'';nm.hidden=!p.name;
 sub.textContent=p.st=='play'?p.title||'':t(p.st=='buf'?'buf':p.st=='err'?'perr':'stop_');sub.className=p.st=='play'?'':p.st=='err'?'err':'muted';
@@ -129,7 +128,7 @@ pb.replaceChildren(ic(on?'stop':'play'),on?t('stop'):t('play'));
 sl.textContent=x.sleep?t('sleepLeft')+' '+fMS(x.sleep):'';
 if(document.activeElement!=vol){vol.value=v.vol=x.vol;vb.textContent=x.vol}
 kvb.replaceChildren(kv([[t('nWifi'),x.mode=='ap'?t('apMode'):x.ssid,x.mode=='ap'?null:sig(x.rssi)+', '+x.rssi+' dBm'],
-cat&&[t('nCat'),(t('stages')[s.stage]||'')+', '+s.age+t('d').trimEnd(),low?low[0]+' '+t('low')+', '+low[1]:t('moods')[s.mood],low?'err':''],
+cat&&[t('nCat'),c0?c0.name||c0.dir:t('codeNo'),c0?t('cst')[c0.st]+(cs.length>1?', +'+(cs.length-1):''):null,c0&&c0.st=='wait'?'err':''],
 pc&&[t('nPc'),pc.st&&pc.st.on?pc.st.name:t('pcOff'),pc.st&&pc.st.on?pc.st.ip:null],
 [t('time'),fT(x.time),'ICT (UTC+7)'],[t('ip'),x.ip,location.hostname]]))};
 draw(s0);every(async()=>{try{draw(await api('/api/status',{quiet:1}))}catch(e){}},3000);
@@ -295,14 +294,22 @@ rng(c,'n_bri',t('nBri')),btn(t('save'),save))),
 sec(t('fx'),h('div',{class:'lim'},fxSec,fld(t('web'),ws,t('webHint'))))]}
 
 const FUR={tabby:'repeating-linear-gradient(135deg,#8a8070 0 5px,#4e463c 5px 9px)',orange:'repeating-linear-gradient(135deg,#f0a04b 0 5px,#c8742a 5px 9px)',black:'#222',white:'#f7f4ee',calico:'conic-gradient(#f7f4ee 0 35%,#e08a3c 0 68%,#2a2a2a 0)',gray:'#8e9198'};
+// Meow Coding: the agent sessions the PC agent reports (refreshed every 3 s) + the cat's options
+const fTok=n=>n>=1e9?(n/1e9).toFixed(1)+'B':n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':String(n|0);
 async function pCat(){let c=await api('/api/config/cat');const sbox=h('div'),fb=h('div',{class:'furs'});
-const drawS=()=>{const s=c.stats||{};sbox.replaceChildren(...[h('div',{class:'stn'},c.name),h('p',{class:'muted'},[t('stages')[s.stage],t('age')+' '+s.age+t('d').trimEnd(),t('moods')[s.mood]].filter(Boolean).join(', ')),
-s.away?h('p',{class:'err'},t('away')):null,...Object.entries(t('stats')).map(([k,l])=>h('div',{class:'stat'},h('span',0,l),h('div',{class:'bar'+((s[k]|0)<30?' low':'')},h('div',{style:'width:'+(s[k]|0)+'%'})),h('small',0,s[k]|0)))].filter(Boolean))};
+const one=x=>h('div',{class:'cs'},h('div',{class:'stn'},x.name||x.dir||x.id),
+h('p',{class:'muted'},['Claude Code',x.model,x.dir,x.br].filter(Boolean).join(' · ')),
+h('p',{class:x.st=='wait'||x.st=='err'?'err':''},[t('cst')[x.st]||x.st,fMS(x.for|0),x.act&&(t('acts')[x.act]||t('acts').tool)].filter(Boolean).join(' · ')),
+x.ctx!=null?h('div',{class:'stat'},h('span',0,t('ctx')),h('div',{class:'bar'+(x.ctx>=80?' low':'')},h('div',{style:'width:'+x.ctx+'%'})),h('small',0,x.ctx+'%')):null,
+x.tok?h('p',{class:'muted'},fTok(x.tok)+' '+t('tok')+(x.usd?' · ~$'+x.usd.toFixed(2):'')):null);
+const lim=(k,l)=>{const L=(c.st||{}).lim||{};return L[k]==null?null:h('div',{class:'stat'},h('span',0,l),h('div',{class:'bar'+(L[k]>=90?' low':'')},h('div',{style:'width:'+Math.min(100,L[k])+'%'})),h('small',0,L[k]+'%'),
+L[k+'r']?h('small',{class:'muted'},t('limAt',{t:new Date(L[k+'r']*1000).toLocaleString(lang,{weekday:k=='d7'?'short':undefined,hour:'2-digit',minute:'2-digit'})})):null)};
+const drawS=()=>{const st=c.st||{},ss=st.s||[];sbox.replaceChildren(lim('h5',t('lim5'))||h('span'),lim('d7',t('lim7'))||h('span'),...(ss.length?ss.map(one):[h('p',{class:'muted'},st.pc?t('codeNone'):t('codeOff'))]),
+ss.some(x=>x.usd)?h('p',{class:'muted'},h('small',0,t('costHint'))):h('span'))};
 const drawF=()=>fb.replaceChildren(...Object.entries(t('furs')).map(([k,l])=>h('label',{class:c.fur==k?'on':''},h('input',{type:'radio',name:'fur',value:k,checked:c.fur==k,onchange:()=>{c.fur=k;drawF()}}),h('span',{class:'swatch',style:'background:'+FUR[k]}),l)));
-drawS();drawF();
-return[sec(t('catSt'),h('div',{class:'lim'},sbox)),sec(t('opts'),h('div',{class:'lim'},fld(t('catName'),bind(c,'name',{maxLength:16})),grp(t('fur'),fb),fld(t('diff'),bind(c,'diff',{tag:'select',opts:opt('diffs')})),sw(c,'clap',t('clap')),
-btn(t('save'),async()=>{c=Object.assign(c,await put('/api/config/cat',{name:c.name,fur:c.fur,diff:c.diff,clap:c.clap}));drawS();toast(t('saved'))}))),
-sec(t('danger'),btn(t('reset'),async()=>{if(await ask(t('reset'),t('resetQ'),t('reset'),1)){Object.assign(c,await api('/api/cat/reset',{b:{}}));drawS();toast(t('saved'))}},'danger'))]}
+drawS();drawF();every(async()=>{try{c.st=(await api('/api/config/cat',{quiet:1})).st;drawS()}catch(e){}},3000);
+return[sec(t('codeSt'),h('div',{class:'lim'},sbox)),sec(t('opts'),h('div',{class:'lim'},fld(t('catName'),bind(c,'name',{maxLength:16})),grp(t('fur'),fb),sw(c,'show',t('catShow')),sw(c,'snd',t('catSnd')),sw(c,'clap',t('clap')),
+btn(t('save'),async()=>{const st=c.st;c=Object.assign(c,await put('/api/config/cat',{name:c.name,fur:c.fur,clap:c.clap,show:c.show,snd:c.snd}));c.st=c.st||st;drawS();toast(t('saved'))})))]}
 
 async function pNotify(){const c=await api('/api/config/notify'),hl=h('ol',{class:'log'}),ex=h('pre'),tk={v:c.token};
 const ti=bind(tk,'v',{type:'password',readOnly:true,style:'font-family:var(--font-data)','aria-label':t('token')});

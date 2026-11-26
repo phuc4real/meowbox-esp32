@@ -30,12 +30,13 @@ int notify_post(const char *title, const char *text, const char *sound, const ch
 void pc_app_init(void);
 bool pc_online(void);
 
-/* Virtual cat (P6) */
+/* Meow Coding: the cat tile shows the AI coding agents running on the PC (cat_app.c) */
 #include "lvgl.h"
 void cat_app_init(void);
 void cat_mini_attach(lv_obj_t *parent, int x, int y, int scale); /* small live cat for the clock face */
-const char *cat_mood_text(void);
-void cat_hear_clap(void); /* thread-safe: the cat jumps (setting cat.clap) */
+const char *cat_mood_text(void);    /* "coding", "needs you"... for the clock's terminal line */
+void cat_hear_clap(void);           /* thread-safe: the cat jumps (setting cat.clap) */
+void cat_coding_update(cJSON *msg); /* thread-safe: {"t":"coding","s":[...]} from the PC agent */
 
 /* Battery runtime measurement */
 void battery_app_init(void);

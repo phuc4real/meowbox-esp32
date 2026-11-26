@@ -18,6 +18,7 @@ DEFAULTS = {
     "last_host": "",    # IP[:port] of the last successful connection
     "token": "",        # notify token (Notifications page on the speaker)
     "relay_port": 8765,
+    "coding_port": 8767,  # Meow Coding: Claude Code hooks POST here (127.0.0.1 only)
     "paused": False,    # tray: pause sending stats
     "auto_update": True,  # check GitHub daily for a newer agent and yt-dlp (Settings window)
 }

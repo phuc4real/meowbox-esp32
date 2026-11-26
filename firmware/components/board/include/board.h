@@ -38,9 +38,6 @@ esp_err_t board_init(void);
 
 i2c_master_bus_handle_t board_i2c(void);
 lv_display_t *board_display(void);
-lv_indev_t *board_touch(void);
-int board_btn_gpio(board_btn_t btn);
-const char *board_btn_name(board_btn_t btn);
 
 /* LVGL is not thread safe: wrap every LVGL call made outside LVGL callbacks. */
 bool board_lvgl_lock(int timeout_ms);
@@ -58,8 +55,6 @@ bool board_is_charging(void);
 int board_battery_raw(void);      /* averaged ADC raw, -1 on error */
 int board_battery_percent(void);  /* 0..100, -1 on error */
 int board_battery_mv(void);       /* calibrated battery voltage in mV (assumes OSTB_BATTERY_DIVIDER), -1 on error */
-/* Diagnostics: one-shot raw read of any ADC-capable GPIO (1..20), -1 if not possible. */
-int board_adc_probe(int gpio);
 
 #ifdef __cplusplus
 }

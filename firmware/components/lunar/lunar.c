@@ -267,14 +267,6 @@ int lunar_leap_month(int lunar_year)
     return 0;
 }
 
-int lunar_month_days(int lunar_month, int lunar_year, bool leap)
-{
-    const int32_t start = jd_from_lunar(1, lunar_month, lunar_year, leap);
-    if (start < 0) return 0;
-    const lunar_date_t ld = lunar_from_jd(start + 29);
-    return (ld.day == 1) ? 29 : 30;
-}
-
 /* ------------------------------------------------------------------------ */
 /* Can Chi                                                                  */
 /* ------------------------------------------------------------------------ */
@@ -284,9 +276,6 @@ static const char *const CAN[10] = {
 };
 static const char *const CHI[12] = {
     "Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi",
-};
-static const char *const ZODIAC_EN[12] = {
-    "Rat", "Ox", "Tiger", "Cat", "Dragon", "Snake", "Horse", "Goat", "Monkey", "Rooster", "Dog", "Pig",
 };
 
 static int pmod(int32_t a, int b)
@@ -317,12 +306,6 @@ const char *lunar_can_chi_month(int lunar_month, int lunar_year, char *buf, size
 const char *lunar_can_chi_day(int32_t jd, char *buf, size_t len)
 {
     return can_chi(pmod(jd + 9, 10), pmod(jd + 1, 12), buf, len);
-}
-
-const char *lunar_zodiac(int lunar_year, bool english)
-{
-    const int chi = pmod(lunar_year + 8, 12);
-    return english ? ZODIAC_EN[chi] : CHI[chi];
 }
 
 /* ------------------------------------------------------------------------ */

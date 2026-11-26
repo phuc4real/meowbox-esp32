@@ -1,5 +1,5 @@
 /*
- * MeowBox — clock, internet radio, notifications, PC screen and a virtual cat
+ * MeowBox — clock, internet radio, notifications, PC screen and a cat that codes along with Claude Code
  * for the OSTB xiaozhi-3st speaker. See docs/plan.md.
  */
 #include <stdio.h>

@@ -47,8 +47,6 @@ int wifi_mgr_portal_left_s(void);
 typedef enum { WIFI_HOLD_RADIO = 1 << 0, WIFI_HOLD_OTA = 1 << 1 } wifi_hold_t;
 void wifi_mgr_hold_awake(wifi_hold_t who, bool on);
 
-typedef void (*wifi_mgr_cb_t)(net_mode_t mode, void *arg);
-void wifi_mgr_on_change(wifi_mgr_cb_t cb, void *arg);
 
 /* ---------- time ---------- */
 bool net_time_valid(void);

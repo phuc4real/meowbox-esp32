@@ -296,7 +296,7 @@ The cat tile shows the AI coding agents running on the PC (Claude Code), reporte
 ```json
 {"name":"Mướp","fur":"tabby","clap":true,"show":true,"snd":true,
  "st":{"pc":true,"s":[{"id":"085ba2bd","ag":"claude","name":"Meow Coding cho loa","dir":"meowbox","br":"main",
-   "st":"work","act":"edit","for":42,"tok":4975388,"usd":17.12,"ctx":36,"model":"Opus 5.5"}],
+   "st":"work","act":"edit","for":42,"tok":4975388,"ctx":36,"model":"Opus 5.5"}],
    "lim":{"h5":23,"h5r":1764230400,"d7":41,"d7r":1764460800}}}
 ```
 - `fur`: `tabby` (mướp) | `orange` | `black` | `white` | `calico` (tam thể) | `gray`.
@@ -308,10 +308,10 @@ The cat tile shows the AI coding agents running on the PC (Claude Code), reporte
   is gone or sent nothing for 75 s. Per session: `st` = `wait` (a permission prompt or a question) | `work` | `err` |
   `done` | `idle`, `for` = seconds in that state, `act` = the kind of tool call: `read` | `image` | `edit` |
   `write` | `bash` | `search` | `web` | `agent` | `plan` | `ask` | `skill` | `compact` | `tool` (anything else), `""`
-  while thinking. The speaker and the web page word it ("Đang đọc file"); no file names or commands leave the PC. `tok` = tokens processed (input + output + cache), `usd` = cost estimated at API list prices,
+  while thinking. The speaker and the web page word it ("Đang đọc file"); no file names or commands leave the PC. `tok` = tokens processed (input + output + cache),
   `ctx` = context window used in % (absent until known), `model` = `Opus 5.5`... `lim` (absent for API-key use or
   before Claude Code's status line has run): the Claude plan's usage limits in %, `h5` = 5-hour window, `d7` = weekly,
-  `h5r` / `d7r` = when they reset (epoch seconds). The tile shows `5h 23%` where it used to show the cost.
+  `h5r` / `d7r` = when they reset (epoch seconds). The tile shows `5h 23%`.
 
 ### `PUT /api/config/cat`
 `{"name":"Mun","fur":"black","clap":false,"show":true,"snd":false}` (`name` ≤ 16 bytes) → same shape as GET.
@@ -417,7 +417,7 @@ Session auth. Why the speaker last started, and its error/warning log lines (Sys
 - Agent → speaker first message: `{"t":"hello","name":"DESKTOP-MEO","ver":"0.2.0","proto":1,"relay":"http://ip:8765"}`,
   optional `"take":true`. Then `stats` / `media` every second, `notify`, `coding`.
 - `coding` (Meow Coding, agent 0.2.4+): `{"t":"coding","s":[{"id":"085ba2bd","ag":"claude","name":"…","dir":"meowbox",
-  "br":"main","st":"work","act":"edit","for":42,"tok":4975388,"usd":17.12,"ctx":36,"model":"Opus 5.5"}]}`, sent
+  "br":"main","st":"work","act":"edit","for":42,"tok":4975388,"ctx":36,"model":"Opus 5.5"}]}`, sent
   when the list changes (at most once a second) and every 30 s. Fields as in `GET /api/config/cat`; `ctx` is left out
   until known; `lim` as in `GET /api/config/cat`, sent once Claude Code's status line has reported it. Firmware before
   0.2.4 ignores it. The agent learns the sessions from Claude Code's hooks

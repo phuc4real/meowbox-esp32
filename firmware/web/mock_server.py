@@ -141,9 +141,9 @@ def cat_out():
     ss = [
         {"id": "085ba2bd", "ag": "claude", "name": "Meow Coding cho loa", "dir": "meowbox", "br": "main",
          "st": ("work", "wait", "work", "done")[t // 20 % 4], "act": "edit", "for": t % 20,
-         "tok": 4_975_388, "usd": 17.12, "ctx": 36, "model": "Opus 5.5"},
+         "tok": 4_975_388, "ctx": 36, "model": "Opus 5.5"},
         {"id": "5f1c09aa", "ag": "claude", "name": "Fix login redirect", "dir": "shop-web", "br": "fix/login",
-         "st": "idle", "act": "", "for": 840, "tok": 812_400, "usd": 1.94, "ctx": 12, "model": "Sonnet 5.5"},
+         "st": "idle", "act": "", "for": 840, "tok": 812_400, "ctx": 12, "model": "Sonnet 5.5"},
     ]
     lim = {"h5": 23, "h5r": t - t % 3600 + 7200, "d7": 41, "d7r": t - t % 86400 + 3 * 86400}
     return {**S["cat"], "st": {"pc": True, "s": ss, "lim": lim}}

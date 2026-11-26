@@ -1,6 +1,5 @@
 #include "audio_hw.h"
 
-#include <math.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include "freertos/FreeRTOS.h"
@@ -255,34 +254,6 @@ void audio_hw_power_save(bool on)
     } else if (!on && !s_amp_on) {
         gpio_set_level(OSTB_PA_ENABLE, 1);
         s_amp_on = true;
-    }
-}
-
-void audio_hw_set_mute(bool mute)
-{
-    if (s_out) esp_codec_dev_set_out_mute(s_out, mute);
-}
-
-void audio_hw_tone(int freq_hz, int ms, int amplitude_pct)
-{
-    const int chunk = 240;
-    int16_t buf[240];
-    int total = s_rate * ms / 1000;
-    float amp = 32767.0f * amplitude_pct / 100.0f;
-    float phase = 0, step = 2.0f * (float)M_PI * freq_hz / s_rate;
-    int fade = s_rate / 200; /* 5 ms fade in/out avoids clicks */
-    for (int done = 0; done < total; done += chunk) {
-        int n = total - done < chunk ? total - done : chunk;
-        for (int i = 0; i < n; i++) {
-            int pos = done + i;
-            float env = 1.0f;
-            if (pos < fade) env = (float)pos / fade;
-            else if (total - pos < fade) env = (float)(total - pos) / fade;
-            buf[i] = (int16_t)(sinf(phase) * amp * env);
-            phase += step;
-            if (phase > 2.0f * (float)M_PI) phase -= 2.0f * (float)M_PI;
-        }
-        audio_hw_write_fx(buf, n);
     }
 }
 

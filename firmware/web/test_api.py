@@ -142,7 +142,7 @@ try:
     w, hh = struct.unpack("<ii", raw[18:26]) if len(raw) > 26 else (0, 0)
     check("screenshot BMP 296x240", c == 200 and ct == "image/bmp" and raw[:2] == b"BM" and (w, abs(hh)) == (296, 240))
     c, j = req("GET", "/api/config/cat"); check("cat get", keys(j, "name", "fur", "clap", "show", "snd", "st") and keys(j["st"], "pc", "s"))
-    check("cat sessions", all(keys(x, "id", "ag", "name", "dir", "st", "act", "for", "tok", "usd", "model") and
+    check("cat sessions", all(keys(x, "id", "ag", "name", "dir", "st", "act", "for", "tok", "model") and
                               x["st"] in ("work", "wait", "done", "err", "idle") for x in j["st"]["s"]) and
           ("lim" not in j["st"] or all(isinstance(v, int) for v in j["st"]["lim"].values())))
     c, j = req("PUT", "/api/config/cat", {"name": "Mun", "fur": "black", "clap": False, "show": False, "snd": True}); check("cat put", j["fur"] == "black" and j["clap"] is False and j["show"] is False and "st" in j)

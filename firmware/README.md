@@ -2,7 +2,7 @@
 
 Our own firmware for the OSTB xiaozhi-3st speaker (ESP32-S3): clock + lunar calendar + weather + alarms,
 internet radio (MP3/AAC/HLS, YouTube via the PC agent), notification speaker, PC companion screen, a
-virtual cat, battery runtime logging and four UI themes. Everything is configured from a web page on
+cat that codes along with Claude Code (Meow Coding), battery runtime logging and four UI themes. Everything is configured from a web page on
 the speaker. Plan and status: [../docs/firmware_v0.2.0.md](../docs/firmware_v0.2.0.md) (0.1.0: [../docs/plan.md](../docs/plan.md)). Hardware: [../docs/pinmap.md](../docs/pinmap.md).
 
 ## Requirements

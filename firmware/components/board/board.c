@@ -223,9 +223,6 @@ void board_set_button_cb(board_btn_cb_t cb, void *arg)
     s_btn_cb = cb;
 }
 
-int board_btn_gpio(board_btn_t btn) { return s_btn_gpio[btn]; }
-const char *board_btn_name(board_btn_t btn) { return s_btn_names[btn]; }
-
 /* ---------------- Power ---------------- */
 static int adc_read_gpio(int gpio, int samples)
 {
@@ -248,8 +245,6 @@ static int adc_read_gpio(int gpio, int samples)
     }
     return n ? sum / n : -1;
 }
-
-int board_adc_probe(int gpio) { return adc_read_gpio(gpio, 8); }
 
 int board_battery_raw(void) { return adc_read_gpio(OSTB_BATTERY_ADC_GPIO, 16); }
 
@@ -300,7 +295,6 @@ static void init_power(void)
 /* ---------------- Public ---------------- */
 i2c_master_bus_handle_t board_i2c(void) { return s_i2c; }
 lv_display_t *board_display(void) { return s_disp; }
-lv_indev_t *board_touch(void) { return s_indev; }
 bool board_lvgl_lock(int timeout_ms) { return lvgl_port_lock(timeout_ms); }
 void board_lvgl_unlock(void) { lvgl_port_unlock(); }
 

@@ -45,7 +45,6 @@ void ui_init(void);
 void ui_register_builder(ui_tile_t t, ui_builder_t fn);
 void ui_build_all(void);                 /* first build, after all builders are registered */
 
-lv_obj_t *ui_tile(ui_tile_t t);
 void ui_show_tile(ui_tile_t t, bool anim); /* also shows a tile left out by ui_tile_set_skip, until it is left */
 /* Leaves a tile out of the swipe order and the page indicator (true) or puts it back. A tile on screen stays until
  * the user swipes away from it. */
@@ -61,8 +60,6 @@ uint32_t ui_c(ui_color_t c);
 lv_color_t ui_lc(ui_color_t c);
 const lv_font_t *ui_f(ui_font_t f);
 bool ui_fx(void);                        /* effects enabled (display.fx != "eco") */
-/* Thread-safe: request a theme change (applied by the UI task). */
-void ui_request_rebuild(void);
 
 /* Themed widgets */
 lv_obj_t *ui_label(lv_obj_t *parent, ui_font_t f, ui_color_t c, const char *txt);

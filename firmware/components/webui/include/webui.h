@@ -14,6 +14,3 @@ typedef struct {
 
 /* Look up a served path (without leading '/', e.g. "index.html", "app.3f9a1c2b.js"); len = chars of path to use. */
 bool webui_find(const char *path, size_t len, webui_file_t *out);
-
-/* Number of files in the pack (0 = no web UI built in). */
-int webui_count(void);

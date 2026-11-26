@@ -1,7 +1,10 @@
 /* Meow Coding (cat tile): the cat codes along with the AI coding agents running on the PC. The PC agent sends
- * {"t":"coding","s":[...]} over /ws/pc (pc_app.c -> cat_coding_update); this tile shows the most important session
- * (waiting for you > working > error > done > idle) with the cat at a laptop, plus tokens, context and an estimated
- * cost, and lists the others. Name/fur/clap/auto-show/sounds live in settings group "cat". */
+ * {"t":"coding","s":[...],"lim":{...}} over /ws/pc (pc_app.c -> cat_coding_update); this tile shows the most
+ * important session (waiting for you > working > error > done > idle) with the cat at a laptop, plus context, tokens
+ * and the plan's 5-hour limit; a tap goes to the next session. Name/fur/clap/auto-show/sounds: settings group "cat".
+ *
+ * Session lists live in PSRAM, never on a task stack (taskLVGL has ~1-2 KB to spare): the web task parses into s_in
+ * and swaps it into s_sess under the lock; the UI reads a copy (s_view) taken only when a new list arrived. */
 #include "apps.h"
 
 #include <stdio.h>
@@ -31,14 +34,16 @@ static const char *TAG = "cat";
 typedef enum { ST_IDLE, ST_WORK, ST_WAIT, ST_DONE, ST_ERR } sess_st_t;
 
 typedef struct {
-    char id[12], ag[12], name[100], dir[48], br[48], act[100], model[24];
+    char id[12], ag[8], name[100], dir[40], br[40], act[12], model[16]; /* act: a kind ("read", "bash"...) */
     sess_st_t st;
     int for_s, ctx; /* seconds in this state when received; context use in %, -1 unknown */
-    double tok, usd;
+    double tok;
     int64_t at_us; /* when received */
 } sess_t;
 
-static sess_t *s_sess; /* MAX_SESS, in PSRAM */
+static sess_t *s_sess, *s_in, *s_view; /* MAX_SESS each, in PSRAM: current list, being parsed, UI copy */
+static int s_view_n;
+static uint32_t s_view_gen = UINT32_MAX;
 static int s_nsess;
 static int64_t s_sess_us; /* last coding message */
 static SemaphoreHandle_t s_lock;
@@ -79,7 +84,8 @@ void cat_coding_update(cJSON *msg)
 {
     cJSON *arr = cJSON_GetObjectItem(msg, "s");
     if (!s_sess || !cJSON_IsArray(arr)) return;
-    sess_t tmp[MAX_SESS];
+    sess_t *tmp = s_in; /* only the web server task writes it (one /ws/pc frame at a time) */
+    if (!tmp) return;
     int n = 0;
     int64_t now = esp_timer_get_time();
     cJSON *o;
@@ -98,7 +104,6 @@ void cat_coding_update(cJSON *msg)
         s->for_s = (int)jnum(o, "for", 0);
         s->ctx = (int)jnum(o, "ctx", -1);
         s->tok = jnum(o, "tok", 0);
-        s->usd = jnum(o, "usd", 0);
         s->at_us = now;
     }
     xSemaphoreTake(s_lock, portMAX_DELAY);
@@ -129,7 +134,7 @@ void cat_coding_update(cJSON *msg)
     xSemaphoreGive(s_lock);
 }
 
-/* copy of the current list (empty when the PC is gone or stopped sending) */
+/* the current list (empty when the PC is gone or stopped sending), copied into out */
 static int sess_copy(sess_t *out)
 {
     if (!s_sess) return 0;
@@ -140,46 +145,62 @@ static int sess_copy(sess_t *out)
     return n;
 }
 
+/* UI side (LVGL task only): s_view, refreshed on a new list or once a second (the list goes stale) */
+static int view(void)
+{
+    static uint32_t last_ms;
+    uint32_t ms = lv_tick_get();
+    if (s_gen != s_view_gen || ms - last_ms >= 1000) {
+        s_view_gen = s_gen;
+        last_ms = ms;
+        s_view_n = sess_copy(s_view);
+    }
+    return s_view_n;
+}
+
 static int sess_secs(const sess_t *s) { return s->for_s + (int)((esp_timer_get_time() - s->at_us) / 1000000); }
 
 /* ---------------- sprites ---------------- */
+/* Sprites are expanded at their screen size (a 32 px cat at x3 = 96 px, 36 KB in PSRAM) so LVGL only copies them:
+ * an image drawn with lv_image_set_scale goes through the transform path, which made the typing cat (a new frame
+ * every 400 ms) cost ~10 % of a core instead of ~4 %. */
 typedef struct {
     lv_obj_t *img;
     lv_image_dsc_t dsc;
     uint32_t *buf;
-    int w, h;
+    int w, h, scale; /* w, h: sprite pixels */
 } spr_t;
 
-static void spr_alloc(spr_t *s, int w, int h)
+static void spr_alloc(spr_t *s, int w, int h, int scale)
 {
     if (s->buf) return;
     s->w = w;
     s->h = h;
-    s->buf = heap_caps_calloc(w * h, 4, MALLOC_CAP_SPIRAM);
+    s->scale = scale;
+    s->buf = heap_caps_calloc(w * scale * h * scale, 4, MALLOC_CAP_SPIRAM);
     s->dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
     s->dsc.header.cf = LV_COLOR_FORMAT_ARGB8888;
-    s->dsc.header.w = w;
-    s->dsc.header.h = h;
-    s->dsc.header.stride = w * 4;
+    s->dsc.header.w = w * scale;
+    s->dsc.header.h = h * scale;
+    s->dsc.header.stride = w * scale * 4;
     s->dsc.data = (const uint8_t *)s->buf;
-    s->dsc.data_size = w * h * 4;
+    s->dsc.data_size = w * scale * h * scale * 4;
 }
 
 /* (re)create the LVGL image for a sprite on a new parent (after a theme rebuild) */
-static void spr_place(spr_t *s, lv_obj_t *parent, int scale)
+static void spr_place(spr_t *s, lv_obj_t *parent)
 {
     s->img = lv_image_create(parent);
     lv_image_set_src(s->img, &s->dsc);
-    lv_image_set_scale(s->img, 256 * scale);
-    lv_image_set_antialias(s->img, false);
-    lv_obj_set_size(s->img, s->w * scale, s->h * scale);
-    lv_image_set_inner_align(s->img, LV_IMAGE_ALIGN_CENTER);
+    lv_obj_set_size(s->img, s->w * s->scale, s->h * s->scale);
     lv_obj_remove_flag(s->img, LV_OBJ_FLAG_CLICKABLE);
 }
 
 static void spr_set(spr_t *s, const uint8_t *idx, const uint16_t *pal, bool flip)
 {
+    const int k = s->scale, dw = s->w * k;
     for (int y = 0; y < s->h; y++) {
+        uint32_t *row = s->buf + y * k * dw;
         for (int x = 0; x < s->w; x++) {
             int sx = flip ? s->w - 1 - x : x;
             uint8_t b = idx[(y * s->w + sx) / 2];
@@ -190,8 +211,9 @@ static void spr_set(spr_t *s, const uint8_t *idx, const uint16_t *pal, bool flip
                 uint32_t r = ((c >> 11) & 0x1F) * 255 / 31, g = ((c >> 5) & 0x3F) * 255 / 63, bl = (c & 0x1F) * 255 / 31;
                 argb = 0xFF000000u | (r << 16) | (g << 8) | bl;
             }
-            s->buf[y * s->w + x] = argb;
+            for (int d = 0; d < k; d++) row[x * k + d] = argb;
         }
+        for (int d = 1; d < k; d++) memcpy(row + d * dw, row, dw * 4); /* the other k-1 rows of this pixel row */
     }
     if (s->img) {
         lv_image_set_src(s->img, NULL);
@@ -350,9 +372,8 @@ static int pick_focus(const sess_t *ss, int n)
 
 const char *cat_mood_text(void)
 {
-    sess_t ss[MAX_SESS];
-    int n = sess_copy(ss);
-    sess_st_t st = n ? ss[0].st : ST_IDLE; /* the list comes sorted: most urgent first */
+    int n = view();
+    sess_st_t st = n ? s_view[0].st : ST_IDLE; /* the list comes sorted: most urgent first */
     bool en = ui_lang_en();
     if (!n) return en ? "napping" : "ngủ khò";
     switch (st) {
@@ -420,7 +441,7 @@ static void apply_pose(void)
     s_force_redraw = false;
     last_pose = s_pose;
     last_pal = pal;
-    spr_set(&s_cat_spr, cat_sprite(CAT_AGE_ADULT, s_pose), pal, false);
+    spr_set(&s_cat_spr, cat_sprite(s_pose), pal, false);
 }
 
 static void update_mini(void)
@@ -428,23 +449,22 @@ static void update_mini(void)
     if (!s_mini.img) return;
     static cat_pose_t last = CAT_POSE_COUNT;
     static const uint16_t *last_pal;
-    sess_t ss[MAX_SESS];
-    int n = sess_copy(ss);
+    int n = view();
     bool prop_on;
     cat_prop_t prop;
-    cat_pose_t p = pose_for(n, n ? &ss[0] : NULL, now_ms(), 600, &prop_on, &prop);
+    cat_pose_t p = pose_for(n, n ? &s_view[0] : NULL, now_ms(), 600, &prop_on, &prop);
     if (p == CAT_POSE_THINK) p = CAT_POSE_CODE1; /* no bubble on the clock: keep it at the keyboard */
     const uint16_t *pal = cur_palette();
     if (p == last && pal == last_pal && !s_force_redraw) return;
     last = p;
     last_pal = pal;
-    spr_set(&s_mini, cat_sprite(CAT_AGE_ADULT, p), pal, false);
+    spr_set(&s_mini, cat_sprite(p), pal, false);
 }
 
 void cat_mini_attach(lv_obj_t *parent, int x, int y, int scale)
 {
-    spr_alloc(&s_mini, CAT_SPRITE_W, CAT_SPRITE_H);
-    spr_place(&s_mini, parent, scale);
+    spr_alloc(&s_mini, CAT_SPRITE_W, CAT_SPRITE_H, scale); /* the clock always asks for the same scale */
+    spr_place(&s_mini, parent);
     lv_obj_set_pos(s_mini.img, x, y);
     s_force_redraw = true;
     update_mini();
@@ -455,11 +475,10 @@ static void tap_cat_cb(lv_event_t *e) { audio_sfx_play(SFX_MEOW); }
 /* tap the details: next session */
 static void tap_info_cb(lv_event_t *e)
 {
-    sess_t ss[MAX_SESS];
-    int n = sess_copy(ss);
+    int n = view();
     if (n < 2) return;
-    int i = pick_focus(ss, n);
-    snprintf(s_focus, sizeof(s_focus), "%s", ss[(i + 1) % n].id);
+    int i = pick_focus(s_view, n);
+    snprintf(s_focus, sizeof(s_focus), "%s", s_view[(i + 1) % n].id);
     s_focus_until = now_ms() + 120000;
     s_shown_gen = UINT32_MAX;
 }
@@ -472,7 +491,7 @@ static void act_lines(int lines)
 }
 
 /* One session in focus, laid out for the usual case of a single Claude Code window: a big state next to the cat,
- * what it is doing, the session title across the screen, then context, tokens and cost. With more sessions the
+ * what it is doing, the session title across the screen, then context, tokens and the 5-hour limit. With more sessions the
  * header shows "1/2" and a tap goes to the next one. */
 static void update_text(const sess_t *ss, int n, int fi)
 {
@@ -567,8 +586,8 @@ static void cat_tick(lv_timer_t *t)
         return;
     }
 
-    sess_t ss[MAX_SESS];
-    int n = sess_copy(ss);
+    int n = view();
+    const sess_t *ss = s_view;
     int fi = n ? pick_focus(ss, n) : 0;
     /* text: on a new message, and once a second for the timer */
     static uint32_t last_txt;
@@ -618,8 +637,8 @@ static void cat_build(lv_obj_t *t)
     s_shown_gen = UINT32_MAX;
     s_act_lines = 0;
     memset(s_clean_last, 0, sizeof(s_clean_last)); /* new labels */
-    spr_alloc(&s_cat_spr, CAT_SPRITE_W, CAT_SPRITE_H);
-    spr_alloc(&s_prop, CAT_PROP_W, CAT_PROP_H);
+    spr_alloc(&s_cat_spr, CAT_SPRITE_W, CAT_SPRITE_H, SCALE);
+    spr_alloc(&s_prop, CAT_PROP_W, CAT_PROP_H, 2);
     s_count = ui_header(t, "Meow Coding", "");
     const int cx = UI_SAFE_X + 2, bw = UI_W - 2 * UI_SAFE_X - 4;
     const int lh_s = lv_font_get_line_height(ui_f(UI_F_SMALL)), lh_b = lv_font_get_line_height(ui_f(UI_F_BODY));
@@ -627,9 +646,9 @@ static void cat_build(lv_obj_t *t)
     /* left: the cat at its laptop on the floor rule; tap = meow */
     const int cw = CAT_SPRITE_W * SCALE + 4;
     ui_rule(t, cx, FLOOR_Y, cw);
-    spr_place(&s_cat_spr, t, SCALE);
+    spr_place(&s_cat_spr, t);
     lv_obj_set_pos(s_cat_spr.img, cx + 2, FLOOR_Y - CAT_SPRITE_H * SCALE);
-    spr_place(&s_prop, t, 2);
+    spr_place(&s_prop, t);
     lv_obj_set_pos(s_prop.img, cx + CAT_SPRITE_W * SCALE - 26, 24);
     lv_obj_add_flag(s_prop.img, LV_OBJ_FLAG_HIDDEN);
     lv_obj_t *area = lv_obj_create(t);
@@ -672,7 +691,7 @@ static void cat_build(lv_obj_t *t)
     lv_obj_set_pos(s_where, cx, y);
     lv_obj_set_user_data(s_where, (void *)4);
 
-    /* usage: context bar, then context / tokens / estimated cost */
+    /* usage: context bar, then context / tokens / the plan's 5-hour limit */
     y += lh_s + 4;
     s_ctxbar = ui_bar(t, bw, 4, UI_C_ACCENT);
     lv_obj_set_pos(s_ctxbar, cx, y);
@@ -706,8 +725,8 @@ static void cat_build(lv_obj_t *t)
 /* ---------------- web ---------------- */
 static void cat_cfg_hook(cJSON *doc)
 {
-    sess_t ss[MAX_SESS];
-    int n = sess_copy(ss);
+    sess_t *ss = heap_caps_malloc(MAX_SESS * sizeof(sess_t), MALLOC_CAP_SPIRAM);
+    int n = ss ? sess_copy(ss) : 0;
     cJSON *st = cJSON_AddObjectToObject(doc, "st");
     cJSON_AddBoolToObject(st, "pc", pc_online());
     xSemaphoreTake(s_lock, portMAX_DELAY);
@@ -733,11 +752,11 @@ static void cat_cfg_hook(cJSON *doc)
         cJSON_AddStringToObject(o, "act", ss[i].act);
         cJSON_AddNumberToObject(o, "for", sess_secs(&ss[i]));
         cJSON_AddNumberToObject(o, "tok", ss[i].tok);
-        cJSON_AddNumberToObject(o, "usd", ss[i].usd);
         if (ss[i].ctx >= 0) cJSON_AddNumberToObject(o, "ctx", ss[i].ctx);
         cJSON_AddStringToObject(o, "model", ss[i].model);
         cJSON_AddItemToArray(a, o);
     }
+    free(ss);
 }
 
 static void on_cat_settings(const char *group, void *arg)
@@ -750,6 +769,9 @@ void cat_app_init(void)
 {
     s_lock = xSemaphoreCreateMutex();
     s_sess = heap_caps_calloc(MAX_SESS, sizeof(sess_t), MALLOC_CAP_SPIRAM);
+    s_in = heap_caps_calloc(MAX_SESS, sizeof(sess_t), MALLOC_CAP_SPIRAM);
+    s_view = heap_caps_calloc(MAX_SESS, sizeof(sess_t), MALLOC_CAP_SPIRAM);
+    if (!s_sess || !s_in || !s_view) s_sess = NULL; /* no PSRAM: the tile just stays empty */
     if (remove(OLD_CAT_FILE) == 0) ESP_LOGI(TAG, "removed the old virtual pet save");
     ui_register_builder(UI_TILE_CAT, cat_build);
     lv_timer_create(cat_tick, 200, NULL);

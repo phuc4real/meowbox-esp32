@@ -6,9 +6,8 @@
 extern "C" {
 #endif
 
-typedef enum { CAT_POSE_SIT, CAT_POSE_BLINK, CAT_POSE_WALK1, CAT_POSE_WALK2, CAT_POSE_SLEEP1, CAT_POSE_SLEEP2, CAT_POSE_EAT1, CAT_POSE_EAT2, CAT_POSE_HAPPY, CAT_POSE_SAD, CAT_POSE_SICK, CAT_POSE_GROOM, CAT_POSE_PLAY1, CAT_POSE_PLAY2, CAT_POSE_ANGRY, CAT_POSE_CODE1, CAT_POSE_CODE2, CAT_POSE_THINK, CAT_POSE_WAIT, CAT_POSE_COUNT } cat_pose_t;
-typedef enum { CAT_AGE_KITTEN, CAT_AGE_JUNIOR, CAT_AGE_ADULT, CAT_AGE_SENIOR, CAT_AGE_COUNT } cat_age_t;
-typedef enum { CAT_PROP_BOWL_EMPTY, CAT_PROP_BOWL_FULL, CAT_PROP_YARN, CAT_PROP_HEART, CAT_PROP_ZZZ, CAT_PROP_POOP, CAT_PROP_BUBBLES, CAT_PROP_FISH, CAT_PROP_PAW, CAT_PROP_SPARKLE, CAT_PROP_QUESTION, CAT_PROP_DOTS, CAT_PROP_COUNT } cat_prop_t;
+typedef enum { CAT_POSE_SIT, CAT_POSE_BLINK, CAT_POSE_SLEEP1, CAT_POSE_SLEEP2, CAT_POSE_HAPPY, CAT_POSE_SAD, CAT_POSE_ANGRY, CAT_POSE_CODE1, CAT_POSE_CODE2, CAT_POSE_THINK, CAT_POSE_WAIT, CAT_POSE_COUNT } cat_pose_t;
+typedef enum { CAT_PROP_ZZZ, CAT_PROP_SPARKLE, CAT_PROP_QUESTION, CAT_PROP_DOTS, CAT_PROP_COUNT } cat_prop_t;
 typedef enum { CAT_FUR_TABBY, CAT_FUR_ORANGE, CAT_FUR_BLACK, CAT_FUR_WHITE, CAT_FUR_CALICO, CAT_FUR_GRAY, CAT_FUR_COUNT } cat_fur_t;
 
 #define CAT_SPRITE_W 32
@@ -47,7 +46,7 @@ enum {
  *   }
  *
  *   // 32x32 cat at x3 -> 96x96:  static uint8_t buf[96*96*3];
- *   cat_expand(cat_sprite(CAT_AGE_ADULT, CAT_POSE_SIT), CAT_SPRITE_W, CAT_SPRITE_H,
+ *   cat_expand(cat_sprite(CAT_POSE_SIT), CAT_SPRITE_W, CAT_SPRITE_H,
  *              cat_palette(CAT_FUR_TABBY), 3, buf);
  *   lv_image_dsc_t dsc = { .header.magic = LV_IMAGE_HEADER_MAGIC, .header.cf = LV_COLOR_FORMAT_RGB565A8,
  *                          .header.w = 96, .header.h = 96, .header.stride = 96 * 2,
@@ -56,7 +55,7 @@ enum {
  *
  * If your panel needs byte-swapped RGB565, swap in the flush callback (as usual), not here.
  */
-const uint8_t *cat_sprite(cat_age_t age, cat_pose_t pose);   /* 32*32/2 = 512 bytes */
+const uint8_t *cat_sprite(cat_pose_t pose);                   /* 32*32/2 = 512 bytes */
 const uint8_t *cat_prop(cat_prop_t prop);                     /* 16*16/2 = 128 bytes */
 const uint16_t *cat_palette(cat_fur_t fur);                   /* 16 RGB565 colours (index 0 unused) */
 cat_fur_t cat_fur_from_name(const char *name);                /* "tabby","orange","black","white","calico","gray"; unknown -> tabby */

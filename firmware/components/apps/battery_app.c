@@ -252,7 +252,6 @@ static void battery_task(void *arg)
 int battery_eta_min(void) { return s_eta_min; }
 int battery_mv(void) { return s_mv; }
 int battery_pct(void) { return s_pct_f < 0 ? board_battery_percent() : (int)(s_pct_f + 0.5f); }
-int battery_session_min(void) { return s_open ? (int)(difftime(time(NULL), s_start) / 60) : -1; }
 
 static void status_hook_bat(cJSON *r)
 {

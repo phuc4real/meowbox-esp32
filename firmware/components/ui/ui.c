@@ -50,7 +50,6 @@ bool ui_fx(void) { return s_fx; }
 bool ui_lang_en(void) { return s_lang_en; }
 const char *ui_tr(const char *vi, const char *en) { return s_lang_en ? en : vi; }
 bool ui_is_night(void) { return s_night; }
-void ui_request_rebuild(void) { s_rebuild_req = true; }
 
 uint32_t ui_c(ui_color_t c)
 {
@@ -450,7 +449,6 @@ static void page_indicator(lv_obj_t *tile, int idx)
 }
 
 /* ---------------- tiles ---------------- */
-lv_obj_t *ui_tile(ui_tile_t t) { return s_tiles[t]; }
 
 /* Lays the tiles out side by side, leaving out the s_skip ones (hidden and parked past the end, where the scroll
  * area and the tileview's tile search never reach), and keeps the active tile on screen. */

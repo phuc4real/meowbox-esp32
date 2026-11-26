@@ -29,13 +29,9 @@ void audio_hw_duck(bool on);
 int64_t audio_hw_last_output_us(void);
 void audio_hw_set_volume(int volume); /* 0..100 */
 int audio_hw_get_volume(void);
-void audio_hw_set_mute(bool mute);
 /* Call periodically. on: switch the speaker amplifier off once nothing has played for 3 s (the next write turns it
  * back on); off: amplifier on now. */
 void audio_hw_power_save(bool on);
-
-/* Blocking sine tone, for beeps and hardware tests. */
-void audio_hw_tone(int freq_hz, int ms, int amplitude_pct);
 
 /* Input: 16-bit, AUDIO_MIC_CHANNELS interleaved frames. */
 esp_err_t audio_hw_mic_enable(bool enable);

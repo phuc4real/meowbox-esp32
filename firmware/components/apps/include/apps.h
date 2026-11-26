@@ -44,7 +44,6 @@ void battery_status_hook(cJSON *status);
 int battery_pct(void);          /* smoothed 0..100 */
 int battery_mv(void);           /* -1 unknown */
 int battery_eta_min(void);      /* estimated minutes left, -1 unknown/charging */
-int battery_session_min(void);  /* minutes on battery so far, -1 if charging */
 
 /* Firmware updates from GitHub Releases (update_app.c) */
 void update_app_init(void);

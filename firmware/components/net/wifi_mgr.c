@@ -90,8 +90,6 @@ static volatile int s_force_idx = -1;
 static bool s_time_valid;
 static TaskHandle_t s_dns_task;
 
-#define MAX_CB 4
-static struct { wifi_mgr_cb_t cb; void *arg; } s_cbs[MAX_CB];
 
 /* ---------- persistence ---------- */
 static void load_nets(void)
@@ -164,19 +162,6 @@ static void set_mode(net_mode_t m)
     if (s_mode == m) return;
     s_mode = m;
     ESP_LOGI(TAG, "mode -> %s", wifi_mgr_mode_str());
-    for (int i = 0; i < MAX_CB; i++)
-        if (s_cbs[i].cb) s_cbs[i].cb(m, s_cbs[i].arg);
-}
-
-void wifi_mgr_on_change(wifi_mgr_cb_t cb, void *arg)
-{
-    for (int i = 0; i < MAX_CB; i++) {
-        if (!s_cbs[i].cb) {
-            s_cbs[i].arg = arg;
-            s_cbs[i].cb = cb;
-            return;
-        }
-    }
 }
 
 net_mode_t wifi_mgr_mode(void) { return s_mode; }

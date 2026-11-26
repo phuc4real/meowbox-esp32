@@ -54,17 +54,11 @@ bool solar_from_lunar(int lunar_day, int lunar_month, int lunar_year, bool leap,
 /* Leap month number (1..12) of lunar year, or 0 if that year has none. */
 int lunar_leap_month(int lunar_year);
 
-/* Number of days (29 or 30) in the given lunar month, 0 if invalid. */
-int lunar_month_days(int lunar_month, int lunar_year, bool leap);
-
 /* ---- Can Chi (sexagenary cycle), Vietnamese names --------------------- */
 /* Each returns buf (UTF-8, e.g. "Ất Tỵ"); buf of 24 bytes is always enough. */
 const char *lunar_can_chi_year(int lunar_year, char *buf, size_t len);
 const char *lunar_can_chi_month(int lunar_month, int lunar_year, char *buf, size_t len);
 const char *lunar_can_chi_day(int32_t jd, char *buf, size_t len);
-
-/* Zodiac animal of the year, chi only: "Tỵ" (vi) / "Snake" (en). */
-const char *lunar_zodiac(int lunar_year, bool english);
 
 /* ---- Formatting -------------------------------------------------------- */
 /* Vietnamese month name: 1 -> "Giêng" ... 11 -> "Mười Một", 12 -> "Chạp". */

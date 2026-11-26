@@ -8,7 +8,7 @@
 #include "audio_hw.h"
 
 static QueueHandle_t s_q;
-static volatile bool s_stop, s_busy;
+static volatile bool s_stop;
 
 typedef struct { float f0, f1; int ms; float amp; uint8_t wave; } seg_t; /* wave 0 sine, 1 triangle, 2 noise */
 
@@ -68,13 +68,9 @@ static void sfx_task(void *arg)
     sfx_t s;
     while (xQueueReceive(s_q, &s, portMAX_DELAY)) {
         s_stop = false;
-        s_busy = true;
         audio_hw_duck(true);
         play(s);
-        if (uxQueueMessagesWaiting(s_q) == 0) {
-            audio_hw_duck(false);
-            s_busy = false;
-        }
+        if (uxQueueMessagesWaiting(s_q) == 0) audio_hw_duck(false);
     }
 }
 
@@ -97,4 +93,3 @@ void audio_sfx_stop(void)
     s_stop = true;
 }
 
-bool audio_sfx_busy(void) { return s_busy; }

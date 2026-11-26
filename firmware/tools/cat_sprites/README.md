@@ -1,46 +1,47 @@
-# cat_sprites: sprite mèo cho MeowBox
+# cat_sprites: the MeowBox cat
 
-`sprites.py` là **nguồn gốc duy nhất**. Mọi sprite đều vẽ bằng chữ ngay trong file: mỗi ký tự là 1 pixel.
-Code C trong `firmware/components/cat_sprites/` được **sinh tự động**, đừng sửa tay mấy file đó.
+`sprites.py` is the **only source**. Every sprite is drawn as text in that file, one character per pixel. The C code
+in `firmware/components/cat_sprites/` is **generated**: don't edit it by hand.
 
-## Sửa sprite
+The Meow Coding tile uses the adult cat: `SIT`, `BLINK`, `SLEEP1/2`, `HAPPY`, `SAD`, `ANGRY`, and the coding poses
+`CODE1/2`, `THINK`, `WAIT`, which `sprites.py` builds from `SIT`/`BLINK` with the `LAPTOP` and `PAW` overlays. Props:
+`ZZZ`, `SPARKLE`, `QUESTION`, `DOTS`. The virtual pet's other ages, poses and props are in git history (before 0.2.5).
 
-1. Mở `sprites.py`, tìm `SPRITES["ADULT"]["SIT"]` (hoặc `PROPS["HEART"]`...).
-2. Sửa từng ký tự. Sprite mèo là 32x32, prop là 16x16 (script kiểm tra luôn kích thước).
-3. Chạy:
+## Editing a sprite
+
+1. Open `sprites.py` and find `SPRITES["SIT"]` (or `PROPS["ZZZ"]`, `LAPTOP`...).
+2. Change the characters. Cat sprites are 32x32, props 16x16 (the script checks the size).
+3. Run:
 
 ```
-python sprites.py            # kiểm tra + sinh C + render preview
-python sprites.py gen        # chỉ sinh C
-python sprites.py preview    # chỉ render preview (cần: pip install pillow --user)
-python sprites.py dump adult sit   # in sprite ra để copy/so sánh
+python sprites.py            # check + write C + render previews
+python sprites.py gen        # write C only
+python sprites.py preview    # previews only (needs Pillow)
+python sprites.py dump sit   # print a sprite to copy or compare
 ```
 
-4. Mở `preview/cat_<lông>.png` xem lại (15 pose × 4 tuổi), `preview/all.png` (đủ 6 bộ lông),
-   `preview/props.png`, `preview/screen_mock.png` (giả lập màn 296x240, mèo phóng ×3).
+4. Look at `preview/cat_<fur>.png` (every pose), `preview/all.png` (all 6 furs), `preview/props.png` and
+   `preview/screen_mock.png` (a 296x240 screen, the cat at x3).
 
-## Bảng ký tự
+## Characters
 
-| ký tự | slot | ý nghĩa | đổi theo lông? |
+| char | slot | meaning | follows the fur? |
 |---|---|---|---|
-| `.` | 0 | trong suốt | |
-| `O` | 1 | viền (mèo đen dùng viền sáng) | có |
-| `F` `S` | 2, 3 | lông chính / lông tối (bóng) | có |
-| `T` | 4 | sọc mướp (lông trắng/tam thể thì = màu lông, nên sọc "biến mất") | có |
-| `P` `Q` | 5, 6 | mảng cam / mảng đen của mèo tam thể (lông khác = màu lông) | có |
-| `L` | 7 | bụng, mõm, chân | có |
-| `E` | 8 | mắt (đen thì vàng hổ phách, trắng thì xanh dương, xám thì xanh lá) | có |
-| `W` `K` `D` | 9–11 | trắng, hồng (tai/mũi/má/lưỡi), tối (con ngươi, viền prop) | **cố định** |
-| `B` `R` `Y` `N` | 12–15 | xanh, đỏ, vàng, nâu (đồ vật) | **cố định** |
+| `.` | 0 | transparent | |
+| `O` | 1 | outline (light on the black cat) | yes |
+| `F` `S` | 2, 3 | fur / fur shade | yes |
+| `T` | 4 | tabby stripe (= fur on white and calico, so the stripes vanish) | yes |
+| `P` `Q` | 5, 6 | calico orange / black patches (= fur on the others) | yes |
+| `L` | 7 | belly, muzzle, paws | yes |
+| `E` | 8 | eyes (amber on black, blue on white, green on gray) | yes |
+| `W` `K` `D` | 9-11 | white, pink (ears, nose, cheeks, tongue), dark (pupils, prop outline) | **fixed** |
+| `B` `R` `Y` `N` | 12-15 | blue, red, yellow, brown (objects) | **fixed** |
 
-Prop chỉ được dùng các ký tự cố định (`W K D B R Y N`), script sẽ báo lỗi nếu lỡ dùng màu lông,
-vì prop vẽ bằng palette của con mèo đang hiển thị.
+Props and overlays may only use the fixed characters (`W K D B R Y N`): they are drawn with the palette of the cat on
+screen, and the script refuses fur characters in props.
 
-## Mẹo
+## Tips
 
-- Đặt `T` cho sọc mướp và `P`/`Q` cho mảng tam thể ở **chỗ khác nhau**, để lông nào nhìn cũng ổn.
-- Mặt dùng `O` cho miệng và mắt nhắm (mèo đen có viền sáng nên vẫn thấy). Con ngươi dùng `D`.
-- Tuổi SENIOR cũng là chữ thường, sửa thoải mái: mí mắt trễ (`O` đè hàng trên của mắt), mõm `L` rộng hơn, lông mày `W`.
-- Màu nằm ở `PALETTES` (hex), lúc sinh C sẽ tự đổi sang RGB565.
-- Bộ sprite ban đầu được ghép từ các phần (đầu, tai, thân, đuôi) rồi tự thêm viền, sau đó lưu thành chữ.
-  Giờ cứ sửa chữ trực tiếp là được.
+- Put `T` (tabby stripes) and `P`/`Q` (calico patches) in **different places** so every fur looks right.
+- Faces use `O` for the mouth and closed eyes (the black cat has a light outline, so they still show); pupils use `D`.
+- Colours are in `PALETTES` (hex); the C output converts them to RGB565.

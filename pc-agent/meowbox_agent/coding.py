@@ -4,8 +4,8 @@ Claude Code sends every hook event to http://127.0.0.1:<coding_port>/hook: comma
 (written by `meowbox coding install`) that run curl in the background (`async`) and always exit 0, so Claude Code
 never waits for them and shows no "hook failed" when the agent is not running. Background hooks can arrive out of
 order; event() keeps a late PostToolUse from undoing "done" or a late PreToolUse from hiding a permission prompt.
-The tracker keeps one entry per session (state, kind of action, title) and reads the session's transcript for tokens, context use and an estimated cost. The core sends a summary to the speaker as
-{"t":"coding","s":[...]} whenever it changes (docs: firmware/web/API.md, /ws/pc protocol).
+The tracker keeps one entry per session (state, kind of action, title) and reads the session's transcript for
+tokens and context use. The core sends a summary to the speaker as {"t":"coding","s":[...]} whenever it changes (docs: firmware/web/API.md, /ws/pc protocol).
 
 Claude Code's status line (also written by `meowbox coding install`, only when no other status line is set) POSTs
 its input to /status: it carries the plan's usage limits (5-hour and weekly windows, in %) and the exact context use.
@@ -38,23 +38,8 @@ EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Post
           "PermissionDenied", "Notification", "PreCompact", "Stop", "StopFailure", "SessionEnd"]
 STATE_ORDER = {"wait": 0, "work": 1, "err": 2, "done": 3, "idle": 4}
 
-# List prices per million tokens (input, output, cache read); cache writes cost 1.25x input (5 min) or 2x (1 h).
-# First prefix that matches wins. Estimates only: a Claude subscription is not billed per token.
-PRICES = [
-    ("claude-fable-5-2", 8, 40, 0.2), ("claude-mythos-5-2", 8, 40, 0.2), ("claude-fable", 10, 50, 1.0),
-    ("claude-mythos", 10, 50, 1.0), ("claude-opus-5-5", 4, 20, 0.2), ("claude-opus", 5, 25, 0.5),
-    ("claude-sonnet-5-5", 2, 10, 0.1), ("claude-sonnet-5", 2, 10, 0.2), ("claude-sonnet", 3, 15, 0.3),
-    ("claude-haiku-5", 0.1, 0.5, 0.01), ("claude-haiku", 1, 5, 0.1),
-]
 SMALL_WINDOW = ("claude-haiku-4", "claude-3", "claude-opus-4-5", "claude-sonnet-4-5", "claude-opus-4-1",
                 "claude-opus-4-2", "claude-sonnet-4-2")  # 200K context; the rest have 1M
-
-
-def price(model: str) -> tuple[float, float, float]:
-    for pre, i, o, r in PRICES:
-        if model.startswith(pre):
-            return i, o, r
-    return 5, 25, 0.5
 
 
 def window(model: str) -> int:
@@ -135,7 +120,6 @@ class Session:
     offset: int = 0
     seen: set = field(default_factory=set)
     tokens: int = 0
-    cost: float = 0.0
     ctx: int = 0
     model: str = ""
     read_at: float = 0.0
@@ -248,7 +232,7 @@ class Tracker:
         with self._lock:
             return dict(self.limits)
 
-    # -- transcript: tokens, cost, context, title (worker thread)
+    # -- transcript: tokens, context, title (worker thread)
     def refresh_usage(self, force: bool = False) -> None:
         with self._lock:
             todo = [s for s in self.sessions.values() if s.transcript
@@ -278,7 +262,7 @@ class Tracker:
             for s in ss[:MAX_SESSIONS]:
                 d = {"id": s.id[:8], "ag": "claude", "name": short(s.title, 48), "dir": short(basename(s.cwd), 32),
                      "br": short(s.branch, 32), "st": s.state, "act": s.act, "for": int(now - s.since),
-                     "tok": s.tokens, "usd": round(s.cost, 2), "model": model_label(s.model)}
+                     "tok": s.tokens, "model": model_label(s.model)}
                 if s.ctx_pct is not None:
                     d["ctx"] = min(100, round(s.ctx_pct))
                 elif s.model:
@@ -305,7 +289,7 @@ def read_transcript(s: Session) -> None:
     p = Path(s.transcript)
     size = p.stat().st_size
     if size < s.offset:  # rewritten
-        s.offset, s.tokens, s.cost, s.seen = 0, 0, 0.0, set()
+        s.offset, s.tokens, s.seen = 0, 0, set()
     if size == s.offset:
         return
     with p.open("rb") as f:
@@ -336,11 +320,7 @@ def read_transcript(s: Session) -> None:
             s.model = model
         inp, out = u.get("input_tokens", 0) or 0, u.get("output_tokens", 0) or 0
         cr, cw = u.get("cache_read_input_tokens", 0) or 0, u.get("cache_creation_input_tokens", 0) or 0
-        cc = u.get("cache_creation") or {}
-        cw1h = cc.get("ephemeral_1h_input_tokens", 0) or 0
-        pi, po, pr = price(model or "")
         s.tokens += inp + out + cr + cw
-        s.cost += (inp * pi + out * po + cr * pr + (cw - cw1h) * pi * 1.25 + cw1h * pi * 2) / 1e6
         s.ctx = inp + cr + cw
 
 

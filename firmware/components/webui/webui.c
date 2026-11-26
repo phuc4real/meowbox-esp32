@@ -55,8 +55,6 @@ bad:
     return s_ok = false;
 }
 
-int webui_count(void) { return load() ? (int)s_head.count : 0; }
-
 bool webui_find(const char *path, size_t len, webui_file_t *out)
 {
     if (!load() || len == 0 || len >= PATH_MAX_LEN) return false;

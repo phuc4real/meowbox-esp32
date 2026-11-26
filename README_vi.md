@@ -98,6 +98,8 @@ máy tính phải cùng mạng Wi-Fi với loa.
 ## 5. Báo thức
 
 - Mỗi báo thức có giờ, các ngày trong tuần, âm thanh và số phút báo lại.
+- Trên trang Báo thức, giờ nhập theo kiểu 24 giờ (ví dụ `06:30`, `18:45`). Thêm hoặc sửa xong thì bấm **Lưu**,
+  rời trang mà chưa lưu thì thay đổi bị bỏ.
 - Âm thanh là chuông có sẵn, hoặc một đài radio trong danh sách. Đài không phát được thì loa tự dùng chuông.
 - Lúc báo thức kêu:
   - giữ VOL+ hoặc VOL− khoảng 1 giây để tắt;

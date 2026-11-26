@@ -101,8 +101,9 @@ python -m esptool --port COM10 -b 921600 write-flash 0 backup\speaker_full_16MB.
       heavy-load soak: no hang, no reset, lowest internal RAM 39.5 KB ([docs/perf/results-0.2.2.md](docs/perf/results-0.2.2.md))
 - [x] 0.2.3: QR code to join the setup hotspot, error log kept across restarts (web System page), cat dimmed at
       night, cat tile CPU cut from ~15 % to < 5 %, unused ntfy.sh setting removed
-- [x] Next (not released yet): UI sounds and notifications mixed over the radio, which is lowered meanwhile
-      instead of paused; the cat jumps when you clap; the PC screen is skipped while no computer is connected
+- [x] 0.2.4: UI sounds and notifications mixed over the radio, which is lowered meanwhile instead of paused; the
+      cat jumps when you clap; the PC screen is skipped while no computer is connected; alarms entered in 24-hour
+      time on the web page; built from ESP-IDF `release/v6.1` (the `v6.1.x` tags leave far less RAM)
 - [ ] Open items in [docs/backlog.md](docs/backlog.md): 24 h soak and hands-on checklist, update edge cases
       (rollback, Wi-Fi lost while downloading), internal RAM back over 40 KB, battery calibration, swipe at ≥ 25 FPS,
       mini game, which "free" GPIOs reach pads

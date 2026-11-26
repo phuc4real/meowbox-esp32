@@ -52,8 +52,9 @@ Commit the regenerated outputs together with their source.
 
 ## Firmware gotchas
 
-- Internal RAM: lowest free 39.5 KB under the heaviest soak (0.2.2: five stations, two web sessions, screenshots,
-  notifications, theme rebuilds; 40.8 KB idle; `docs/perf/results-0.2.2.md`); keep it ≥ 40 KB, there is no margin.
+- Internal RAM: under the heaviest soak (0.2.4: five stations, screenshots, notifications through the mixer, theme
+  rebuilds; `docs/perf/results-0.2.4.md`) the lowest free is ~39.9 KB with one 36.3 KB dip, median 40.3 KB; ~48 KB
+  idle. Keep it ≥ 40 KB, there is no margin.
   Put big buffers and task stacks in PSRAM (never for a task that writes flash). After changes that allocate, run
   `tools/memwatch.py` and look at the lowest `int_free`; `heap_min` in `/api/status` always shows ~7.8 KB from a short
   dip during boot.

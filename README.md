@@ -37,7 +37,7 @@ other projects.
 | [docs/firmware_v0.2.0.md](docs/firmware_v0.2.0.md) | 0.2.0 plan and status: web, PC agent, GitHub updates, radio, performance (mostly Vietnamese) |
 | [docs/roadmap.md](docs/roadmap.md) | ideas parked for later: MeowBox Cloud (incl. an always-on YouTube relay), the rest of the theme pass, PC agent UI/UX |
 | [docs/backlog.md](docs/backlog.md) | smaller known work not planned yet: checks on the device, internal RAM, performance, hardware |
-| [docs/perf/](docs/perf/results-0.2.3.md) | memory/CPU measurements under load ([0.2.3](docs/perf/results-0.2.3.md), [0.2.2](docs/perf/results-0.2.2.md), [0.2.0](docs/perf/results-0.2.0.md)) and the 0.2.0 code review |
+| [docs/perf/](docs/perf/results-0.2.4.md) | memory/CPU measurements under load ([0.2.4](docs/perf/results-0.2.4.md), [0.2.3](docs/perf/results-0.2.3.md), [0.2.2](docs/perf/results-0.2.2.md), [0.2.0](docs/perf/results-0.2.0.md)) and the 0.2.0 code review |
 | [docs/ui_redesign.md](docs/ui_redesign.md) | UI review, theme system, per-theme rules (in Vietnamese) |
 | [firmware/README.md](firmware/README.md) | build, flash, use, regenerate assets, partitions |
 | [firmware/web/API.md](firmware/web/API.md) | REST API of the speaker |

@@ -317,9 +317,16 @@ static lv_obj_t *s_title, *s_bar_lbl[4], *s_bars[4], *s_msg, *s_area, *s_stars, 
 static spr_t s_cat_spr, s_prop, s_poop[3], s_mini;
 static cat_pose_t s_pose = CAT_POSE_SIT;
 static uint32_t s_anim_until_ms;
-static int s_action; /* 1 eat, 2 play, 3 bath, 4 pet */
+static int s_action; /* 1 eat, 2 play, 3 bath, 4 pet, 6 startled (5 is the lights button) */
 static int s_cat_x = 0, s_walk_dir = 0;
 static uint32_t s_pet_strokes;
+static volatile bool s_clap; /* set by the mic task, handled in cat_tick */
+static int s_jump;           /* px the cat is lifted while startled */
+
+void cat_hear_clap(void)
+{
+    if (settings_get_bool("cat", "clap", true)) s_clap = true;
+}
 
 static uint32_t now_ms(void) { return lv_tick_get(); }
 
@@ -328,7 +335,7 @@ static uint32_t now_ms(void) { return lv_tick_get(); }
  * measurement). Everything below only touches LVGL when the value really changed; cat_build() resets the cache. */
 static struct {
     int bar[4], bar_col[4], lbl_alert[4];
-    int dark, scale, x;
+    int dark, scale, x, jump;
 } s_shown;
 
 static void shown_reset(void) { memset(&s_shown, 0xFF, sizeof(s_shown)); /* -1: nothing shown yet */ }
@@ -559,7 +566,10 @@ static void cat_tick(lv_timer_t *t)
         audio_sfx_play(SFX_MEOW);
     }
     if (ui_active_tile() == UI_TILE_CLOCK) update_mini();
-    if (ui_active_tile() != UI_TILE_CAT || !s_cat_spr.img) return;
+    if (ui_active_tile() != UI_TILE_CAT || !s_cat_spr.img) {
+        s_clap = false; /* only the cat on screen reacts, not later when the tile is opened */
+        return;
+    }
 
     char name[72]; /* the web allows 16 characters: up to 64 bytes of Vietnamese */
     settings_get_str("cat", "name", name, sizeof(name), "Mướp");
@@ -577,12 +587,23 @@ static void cat_tick(lv_timer_t *t)
     set_hidden(s_stars, !s_cat.lights_off);
     for (int i = 0; i < 3; i++) set_hidden(s_poop[i].img, !(i < s_cat.poops && !s_cat.away));
 
+    if (s_clap) {
+        s_clap = false;
+        if (!s_cat.away && (!s_action || s_action == 6)) {
+            s_action = 6; /* startled: fur up and a hop, also wakes it for a moment (it goes back to sleep) */
+            s_walk_dir = 0;
+            s_anim_until_ms = ms + 1600;
+            say("Giật cả mình!", "Eek, what was that?");
+            if (!ui_is_night()) audio_sfx_play(SFX_MEOW);
+        }
+    }
     uint32_t phase = ms / 400;
     bool acting = s_action && ms < s_anim_until_ms;
     if (!acting && s_action) {
+        bool keep = s_action != 6; /* a startle changes nothing worth a flash write */
         s_action = 0;
         show_prop(0, false);
-        save();
+        if (keep) save();
     }
     if (s_cat.away) {
         set_hidden(s_cat_spr.img, true);
@@ -597,6 +618,13 @@ static void cat_tick(lv_timer_t *t)
         case 2: s_pose = phase % 2 ? CAT_POSE_PLAY1 : CAT_POSE_PLAY2; show_prop(CAT_PROP_YARN, true); break;
         case 3: s_pose = CAT_POSE_BLINK; show_prop(CAT_PROP_BUBBLES, true); break;
         case 4: s_pose = CAT_POSE_HAPPY; show_prop(CAT_PROP_HEART, true); break;
+        case 6: {
+            s_pose = CAT_POSE_ANGRY;
+            show_prop(0, false);
+            uint32_t t = 1600 - (s_anim_until_ms - ms); /* 0..1600 ms: one hop in the first 400 ms */
+            s_jump = t < 400 ? (int)(t < 200 ? t / 10 : (400 - t) / 10) : 0;
+            break;
+        }
         }
     } else if (s_cat.sleeping) {
         s_pose = (ms / 1200) % 2 ? CAT_POSE_SLEEP1 : CAT_POSE_SLEEP2;
@@ -625,12 +653,14 @@ static void cat_tick(lv_timer_t *t)
         else if (s_cat.poops) say("Có gì đó cần dọn…", "Something needs cleaning…");
     }
     int sc = cat_scale();
-    if (sc != s_shown.scale || s_cat_x != s_shown.x) {
+    if (!acting || s_action != 6) s_jump = 0;
+    if (sc != s_shown.scale || s_cat_x != s_shown.x || s_jump != s_shown.jump) {
         lv_image_set_scale(s_cat_spr.img, 256 * sc);
         lv_obj_set_size(s_cat_spr.img, CAT_SPRITE_W * sc, CAT_SPRITE_H * sc);
-        lv_obj_set_pos(s_cat_spr.img, 86 - CAT_SPRITE_W * sc / 2 + s_cat_x, 132 - CAT_SPRITE_H * sc);
+        lv_obj_set_pos(s_cat_spr.img, 86 - CAT_SPRITE_W * sc / 2 + s_cat_x, 132 - CAT_SPRITE_H * sc - s_jump);
         s_shown.scale = sc;
         s_shown.x = s_cat_x;
+        s_shown.jump = s_jump;
     }
     apply_pose();
 }

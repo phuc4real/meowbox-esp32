@@ -35,6 +35,7 @@ bool pc_online(void);
 void cat_app_init(void);
 void cat_mini_attach(lv_obj_t *parent, int x, int y, int scale); /* small live cat for the clock face */
 const char *cat_mood_text(void);
+void cat_hear_clap(void); /* thread-safe: the cat jumps (setting cat.clap) */
 
 /* Battery runtime measurement */
 void battery_app_init(void);

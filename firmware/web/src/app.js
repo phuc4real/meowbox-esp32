@@ -296,8 +296,8 @@ const drawS=()=>{const s=c.stats||{};sbox.replaceChildren(...[h('div',{class:'st
 s.away?h('p',{class:'err'},t('away')):null,...Object.entries(t('stats')).map(([k,l])=>h('div',{class:'stat'},h('span',0,l),h('div',{class:'bar'+((s[k]|0)<30?' low':'')},h('div',{style:'width:'+(s[k]|0)+'%'})),h('small',0,s[k]|0)))].filter(Boolean))};
 const drawF=()=>fb.replaceChildren(...Object.entries(t('furs')).map(([k,l])=>h('label',{class:c.fur==k?'on':''},h('input',{type:'radio',name:'fur',value:k,checked:c.fur==k,onchange:()=>{c.fur=k;drawF()}}),h('span',{class:'swatch',style:'background:'+FUR[k]}),l)));
 drawS();drawF();
-return[sec(t('catSt'),h('div',{class:'lim'},sbox)),sec(t('opts'),h('div',{class:'lim'},fld(t('catName'),bind(c,'name',{maxLength:16})),grp(t('fur'),fb),fld(t('diff'),bind(c,'diff',{tag:'select',opts:opt('diffs')})),
-btn(t('save'),async()=>{c=Object.assign(c,await put('/api/config/cat',{name:c.name,fur:c.fur,diff:c.diff}));drawS();toast(t('saved'))}))),
+return[sec(t('catSt'),h('div',{class:'lim'},sbox)),sec(t('opts'),h('div',{class:'lim'},fld(t('catName'),bind(c,'name',{maxLength:16})),grp(t('fur'),fb),fld(t('diff'),bind(c,'diff',{tag:'select',opts:opt('diffs')})),sw(c,'clap',t('clap')),
+btn(t('save'),async()=>{c=Object.assign(c,await put('/api/config/cat',{name:c.name,fur:c.fur,diff:c.diff,clap:c.clap}));drawS();toast(t('saved'))}))),
 sec(t('danger'),btn(t('reset'),async()=>{if(await ask(t('reset'),t('resetQ'),t('reset'),1)){Object.assign(c,await api('/api/cat/reset',{b:{}}));drawS();toast(t('saved'))}},'danger'))]}
 
 async function pNotify(){const c=await api('/api/config/notify'),hl=h('ol',{class:'log'}),ex=h('pre'),tk={v:c.token};

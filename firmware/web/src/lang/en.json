@@ -245,6 +245,7 @@
   "gray": "Gray"
  },
  "diff": "Difficulty",
+ "clap": "Jumps when you clap (listens to the loudness only, records nothing)",
  "diffs": {
   "easy": "Easy",
   "normal": "Normal",

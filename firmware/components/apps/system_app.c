@@ -25,6 +25,35 @@
 static lv_obj_t *s_net, *s_addr, *s_bat, *s_mem, *s_bar[AUDIO_MIC_CHANNELS], *s_frames;
 static volatile int s_mic_db[AUDIO_MIC_CHANNELS];
 
+/* Clap: a 10 ms block CLAP_RISE_DB over the background and at least CLAP_MIN_DB, back down by CLAP_FALL_DB within
+ * 150 ms (so speech and music onsets do not count). Ignored while the speaker itself makes sound. Levels are the
+ * System tile's scale: 20 log10(rms / 32768) + 90. */
+#define CLAP_MIN_DB  66
+#define CLAP_RISE_DB 20
+#define CLAP_FALL_DB 10
+static void clap_detect(float block_db)
+{
+    static float bg = 40;
+    static int peak_db, peak_age = -1;
+    static int64_t last_clap;
+    int64_t now = esp_timer_get_time();
+    bool own_sound = now - audio_hw_last_output_us() < 300000;
+    if (peak_age >= 0) {
+        if (block_db < peak_db - CLAP_FALL_DB) {
+            peak_age = -1;
+            if (!own_sound && now - last_clap > 3000000) {
+                last_clap = now;
+                cat_hear_clap();
+            }
+        } else if (++peak_age > 15) peak_age = -1; /* stayed loud: not a clap */
+        else if (block_db > peak_db) peak_db = (int)block_db;
+    } else if (!own_sound && block_db >= CLAP_MIN_DB && block_db > bg + CLAP_RISE_DB) {
+        peak_db = (int)block_db;
+        peak_age = 0;
+    }
+    if (block_db < bg + CLAP_RISE_DB) bg += (block_db - bg) * 0.02f; /* ~0.5 s background average, spikes left out */
+}
+
 static void mic_task(void *arg)
 {
     const int frames = 441;
@@ -47,6 +76,7 @@ static void mic_task(void *arg)
             vTaskDelay(pdMS_TO_TICKS(20));
             continue;
         }
+        float all = 0;
         for (int c = 0; c < AUDIO_MIC_CHANNELS; c++) {
             float s = 0;
             for (int i = 0; i < frames; i++) {
@@ -54,7 +84,10 @@ static void mic_task(void *arg)
                 s += v * v;
             }
             acc[c] += s / frames;
+            all += s / frames;
         }
+        float rms = sqrtf(all / AUDIO_MIC_CHANNELS);
+        clap_detect(rms < 1 ? 0 : 20.0f * log10f(rms / 32768.0f) + 90.0f);
         if (++blocks == 10) {
             for (int c = 0; c < AUDIO_MIC_CHANNELS; c++) {
                 float rms = sqrtf(acc[c] / blocks);

@@ -33,7 +33,7 @@ static group_t s_groups[] = {
     {"weather", "{\"on\":true,\"name\":\"Hà Nội\",\"lat\":21.0245,\"lon\":105.8412,\"unit\":\"c\"}", NULL},
     {"display", "{\"bri\":80,\"idle_bri\":20,\"idle_s\":60,\"sleep_s\":300,\"h24\":true,\"night\":true,\"n_from\":22,\"n_to\":7,"
                 "\"n_bri\":5,\"lang\":\"vi\",\"theme\":\"swiss\",\"night_mode\":\"auto\",\"fx\":\"full\"}", NULL},
-    {"cat", "{\"name\":\"Mướp\",\"fur\":\"tabby\",\"diff\":\"normal\"}", NULL},
+    {"cat", "{\"name\":\"Mướp\",\"fur\":\"tabby\",\"diff\":\"normal\",\"clap\":true}", NULL},
     {"notify", "{\"token\":\"\",\"dur\":10,\"vol\":70,\"quiet_low\":true}", NULL},
     {"pc", "{\"host\":\"\",\"port\":8765,\"auto\":true}", NULL},
     {"update", "{\"auto\":false}", NULL}, /* auto = check GitHub for a new release every day (off: only when asked) */

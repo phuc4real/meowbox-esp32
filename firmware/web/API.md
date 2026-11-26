@@ -290,16 +290,18 @@ shows it, refreshing every 5 s while the tab is visible; on `404` it shows a pla
 
 ### `GET /api/config/cat`
 ```json
-{"name":"Mướp","fur":"tabby","diff":"normal",
+{"name":"Mướp","fur":"tabby","diff":"normal","clap":true,
  "stats":{"age":12,"stage":"kitten","full":80,"fun":65,"clean":90,"energy":55,"health":100,"mood":"happy","away":false}}
 ```
 - `fur`: `tabby` (mướp) | `black` | `white` | `calico` (tam thể) | `gray`.
 - `diff`: `easy` | `normal` | `hard`.
+- `clap`: the cat jumps when the mics hear a clap while its tile is on screen (default `true`). Only the loudness
+  is measured; nothing is recorded. Sounds the speaker plays itself are ignored.
 - `stats` is read-only: `age` in days, `stage` = `kitten` | `junior` | `adult` | `senior`, values 0–100,
   `mood` = `happy` | `sad` | `hungry` | `sick` | `sleep`, `away` = the cat left (needs reset).
 
 ### `PUT /api/config/cat`
-`{"name":"Mun","fur":"black","diff":"easy"}` (`name` ≤ 16 bytes) → same shape as GET.
+`{"name":"Mun","fur":"black","diff":"easy","clap":false}` (`name` ≤ 16 bytes) → same shape as GET.
 
 ### `POST /api/cat/reset`
 Body `{}`. Starts a new kitten (keeps name/fur/diff). → same shape as GET.

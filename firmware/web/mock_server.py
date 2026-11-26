@@ -48,7 +48,7 @@ def fresh_state():
         "display": {"bri": 80, "idle_bri": 20, "idle_s": 60, "sleep_s": 300, "h24": True, "night": True,
                     "n_from": 22, "n_to": 7, "n_bri": 5, "lang": "vi", "tz": "ICT-7",
                     "theme": DEFAULT_THEME, "night_mode": "auto", "fx": "full"},
-        "cat": {"name": "Mướp", "fur": "tabby", "diff": "normal",
+        "cat": {"name": "Mướp", "fur": "tabby", "diff": "normal", "clap": True,
                 "stats": {"age": 12, "stage": "kitten", "full": 80, "fun": 65, "clean": 90,
                           "energy": 55, "health": 100, "mood": "happy", "away": False}},
         "notify": {"token": tok(), "dur": 10, "vol": 70, "quiet_low": True},
@@ -542,7 +542,7 @@ class H(BaseHTTPRequestHandler):
         simple = {
             "weather": ("on", "name", "lat", "lon", "unit"),
             "display": ("bri", "idle_bri", "idle_s", "sleep_s", "h24", "night", "n_from", "n_to", "n_bri", "lang", "theme", "night_mode", "fx"),
-            "cat": ("name", "fur", "diff"),
+            "cat": ("name", "fur", "diff", "clap"),
             "pc": ("host", "port", "auto"),
             "update": ("auto",),
             "notify": ("dur", "vol", "quiet_low"),
@@ -561,7 +561,8 @@ class H(BaseHTTPRequestHandler):
                 merge(tmp, b, simple[g])
                 if g == "cat":
                     need(tmp["fur"] in ("tabby", "orange", "black", "white", "calico", "gray") and
-                         tmp["diff"] in ("easy", "normal", "hard") and 0 < len(tmp["name"].encode()) <= 16)
+                         tmp["diff"] in ("easy", "normal", "hard") and 0 < len(tmp["name"].encode()) <= 16 and
+                         isinstance(tmp["clap"], bool))
                 if g == "display":
                     need(tmp["lang"] in ("vi", "en") and 0 <= tmp["n_from"] <= 23 and 0 <= tmp["n_to"] <= 23)
                     need(tmp["theme"] in THEME_IDS and tmp["night_mode"] in ("auto", "on", "off") and tmp["fx"] in ("full", "eco"))

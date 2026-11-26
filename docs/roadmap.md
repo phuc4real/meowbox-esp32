@@ -30,6 +30,7 @@ Hibernation API để Durable Object không tốn tiền khi không có gì đ�
 | Gộp luồng HLS | Worker tải playlist `.m3u8` và các đoạn, trả cho loa một luồng HTTP liền | giúp nhiều với đài HLS trên mạng yếu. Worker chỉ chuyển byte nên ít CPU |
 | Proxy đài MP3/AAC thường | Worker chuyển tiếp luồng | lợi ít: Wi-Fi yếu vẫn là Wi-Fi yếu. Chỉ dùng cho đài có vấn đề HTTPS/chứng chỉ |
 | Điều khiển loa từ xa | trang web gọi Worker, Worker chuyển lệnh qua WebSocket | để sau, cần đăng nhập và phân quyền |
+| Weather (and other small data) over the WebSocket | the Worker calls open-meteo, caches the answer per location and pushes `{t,code,hi,lo}` down to the speaker | low gain on its own: today it is one HTTPS request every 30 min (TLS buffers already in PSRAM). Worth it only once the WebSocket exists, since it removes the `weather` task and its TLS handshake. Time stays on SNTP |
 
 ### Relay YouTube chạy 24/7 (from plan.md F2)
 Relay YouTube hiện nằm trong PC agent nên chỉ chạy khi PC bật. Chạy cùng relay đó trên một máy luôn bật trong nhà

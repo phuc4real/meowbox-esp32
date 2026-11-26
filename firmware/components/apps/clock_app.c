@@ -7,6 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
 #include "cJSON.h"
@@ -628,5 +629,6 @@ void clock_app_init(void)
     lv_timer_create(clock_tick, 250, NULL);
     settings_on_change(on_settings, NULL);
     web_set_config_hook("weather", weather_cfg_hook);
-    xTaskCreate(weather_task, "weather", 6144, NULL, 3, &s_wx_task);
+    /* Stack in PSRAM: the task only reads settings and never writes flash. */
+    xTaskCreatePinnedToCoreWithCaps(weather_task, "weather", 6144, NULL, 3, &s_wx_task, tskNO_AFFINITY, MALLOC_CAP_SPIRAM);
 }

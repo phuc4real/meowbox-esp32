@@ -1,6 +1,9 @@
 # Kế hoạch: firmware "MeowBox" cho loa OSTB xiaozhi-3st
 
-> **Trạng thái 2026-11-22:** P0–P6 đã chạy trên loa (trừ mini game và ntfy.sh); P7 còn vài mục. Các ô chưa đánh dấu bên dưới là việc còn lại.
+> **Status 2026-11-26:** this is the original 0.1.0 plan, kept for history. Everything in it is done, dropped (marked
+> ~~struck out~~ with the date) or moved: unfinished work is in [backlog.md](backlog.md) (mini game, battery
+> calibration) and [roadmap.md](roadmap.md) (always-on YouTube relay). Sizes, partitions and paths below are as
+> planned in 0.1.0; the current ones are in [firmware/README.md](../firmware/README.md).
 
 > Thay hẳn xiaozhi bằng firmware tự viết: **đồng hồ + radio internet +
 > loa thông báo + màn phụ PC + mèo ảo**, cấu hình qua trang web ngay trên loa.
@@ -106,10 +109,10 @@ Giữ vị trí hai slot app như firmware gốc; vùng assets cũ được chia
 | phy_init | 0xf000 | 4 KB | |
 | ota_0 | 0x20000 | 5.25 MB | firmware |
 | ota_1 | 0x560000 | 5.25 MB | firmware (OTA qua web, có rollback) |
-| storage | 0xaa0000 | 4.375 MB | LittleFS chỉ đọc: web, web font, ảnh xem trước theme |
+| storage | 0xaa0000 | 4.375 MB | LittleFS chỉ đọc: web, web font, ảnh xem trước theme (0.1.0; từ 0.2.0 web nằm trong app) |
 | data | 0xf00000 | 1 MB | LittleFS: cấu hình, danh sách Wi-Fi, mật khẩu, lưu mèo, log pin |
 
-Firmware hiện khoảng 2.8 MB (kèm font của 4 theme), còn trống gần một nửa slot.
+Firmware 0.1.0 khoảng 2.8 MB (kèm font của 4 theme); 0.2.3 khoảng 3.1 MB kèm web, còn trống khoảng 42 % slot.
 
 ---
 
@@ -136,7 +139,7 @@ Sau 60 s không thao tác: giảm độ sáng. Ban đêm (giờ cấu hình): ch
 - Thời tiết: `api.open-meteo.com/v1/forecast` mỗi 30 phút. Vị trí đặt bằng tên thành phố, tra qua open-meteo geocoding trên trang web.
 - Báo thức: tối đa 5, chọn ngày trong tuần, âm thanh = chuông hoặc một đài radio (nếu stream lỗi thì dùng chuông).
 - Hẹn giờ tắt radio: 15/30/60/90 phút.
-- Tuỳ chọn sau: Pomodoro.
+- ~~Tuỳ chọn sau: Pomodoro.~~ Dropped 2026-11-26.
 
 ### F2 Radio
 - Danh sách đài lưu JSON trong NVS/LittleFS, sửa qua web. Mặc định có vài đài MP3 công khai để test.
@@ -163,7 +166,8 @@ MeowBox: phát stream đó như một đài radio bình thường (có tên bài
 - Chỉ chạy khi PC bật và agent đang chạy. Tắt PC thì radio thường vẫn chạy được.
 - Dùng cho cá nhân. yt-dlp phải cập nhật thường xuyên vì YouTube hay đổi; agent tự chạy `yt-dlp -U`.
 - Lưu "đài YouTube" như đài thường (lofi live, playlist yêu thích).
-- Sau này có máy chạy 24/7 (Raspberry Pi, NAS) thì chạy relay ở đó, khỏi phụ thuộc PC.
+- Sau này có máy chạy 24/7 (Raspberry Pi, NAS) thì chạy relay ở đó, khỏi phụ thuộc PC. Moved to
+  [roadmap.md](roadmap.md) (MeowBox Cloud) 2026-11-26.
 
 ### F3 Trang web cấu hình
 - Lần đầu (chưa có Wi-Fi): SoftAP `MeowBox-XXXX` (WPA2, mật khẩu `meowbox2026`, hiện trên màn loa) + captive portal → chọn mạng, nhập mật khẩu.
@@ -174,7 +178,8 @@ MeowBox: phát stream đó như một đài radio bình thường (có tên bài
   - Còn dùng mật khẩu mặc định thì web hiện banner nhắc đổi.
   - Đăng nhập bằng cookie session (HTTP Basic chỉ dùng cho API).
   - Mật khẩu lưu dạng hash (SHA-256 + salt) trong NVS.
-  - Quên mật khẩu: giữ BOOT + vol− lúc khởi động để reset về mặc định.
+  - ~~Quên mật khẩu: giữ BOOT + vol− lúc khởi động để reset về mặc định.~~ Dropped 2026-11-26: erase the `data`
+    partition over USB instead ([firmware/README.md](../firmware/README.md)).
 - API thông báo dùng token riêng, tạo ngẫu nhiên lần đầu, xem và đổi trên web.
 - Backend: REST JSON (`GET/PUT /api/config/<mục>`). Frontend: một file HTML + JS thuần, gzip.
 
@@ -188,7 +193,8 @@ Authorization: Bearer <token>
 POST /api/notify/audio   (body = file WAV/MP3, ≤ 1 MB)   phát một file âm thanh
 GET  /api/notify?text=...&token=...                     dạng ngắn cho script/điện thoại
 ```
-- Hiện overlay trên màn hiện tại. Radio tự hạ nhỏ (ducking) trong lúc phát tiếng thông báo.
+- Hiện overlay trên màn hiện tại. Radio tự hạ nhỏ (ducking) trong lúc phát tiếng thông báo. Done after 0.2.3:
+  UI sounds are mixed into the music, lowered to ~30 % meanwhile (`audio_hw_write_fx` in `components/audio`).
 - Hàng đợi 10 tin; giữ lịch sử 20 tin gần nhất (xem lại trên web).
 - `high`: tự bật màn, kêu cả khi ở chế độ đêm. `low`: không kêu trong giờ đêm.
 - Ví dụ dùng: `curl` cuối script build, Task Scheduler, iOS Shortcuts / Android HTTP Shortcuts.
@@ -204,7 +210,8 @@ GET  /api/notify?text=...&token=...                     dạng ngắn cho script
   ```
 - Tin loa → PC: `{"t":"media_cmd","cmd":"play_pause"|"next"|"prev"|"vol_up"|"vol_down"}`.
 - Màn hiển thị: 4 vòng/thanh (CPU, RAM, GPU, nhiệt độ), mạng lên/xuống, card nhạc có nút ⏮ ⏯ ⏭.
-- Khi PC tắt: màn hiện "PC offline", lúc vuốt qua thì bỏ qua màn này (tuỳ chọn).
+- Khi PC tắt: màn hiện "PC offline", lúc vuốt qua thì bỏ qua màn này (tuỳ chọn). Done after 0.2.3: with no
+  agent connected the PC tile leaves the swipe order and the page indicator (`ui_tile_set_skip`).
 - **PC agent** (`pc-agent/agent.py`):
   - `psutil`: CPU, RAM, mạng, ổ đĩa.
   - Nhiệt độ: đọc web server JSON của LibreHardwareMonitor (`localhost:8085/data.json`) nếu đang chạy; không có thì bỏ trống.
@@ -225,6 +232,7 @@ GET  /api/notify?text=...&token=...                     dạng ngắn cho script
 - Tiếng kêu ngắn (sfx). Đói hoặc ốm thì kêu nhắc, tôn trọng giờ đêm.
 - Lưu trạng thái vào NVS mỗi 5 phút và khi có thay đổi lớn.
 - Tuỳ chọn vui: mic nghe tiếng vỗ tay → thú giật mình hoặc nhảy (dùng ES7210, chỉ đo âm lượng, không ghi âm).
+  Done after 0.2.3 (setting `cat.clap`, on by default; only while the cat tile is on screen).
 
 ---
 
@@ -259,7 +267,7 @@ Mỗi giai đoạn kết thúc bằng một bản chạy được trên loa th�
 
 ### P3 Radio
 - [x] Player MP3/AAC qua HTTP, ICY metadata, ring buffer PSRAM, tự kết nối lại
-- [x] Nhớ đài/âm lượng; âm báo **tạm dừng** radio thay vì trộn tiếng (chưa có mixer)
+- [x] Nhớ đài/âm lượng; âm báo **tạm dừng** radio thay vì trộn tiếng (chưa có mixer). After 0.2.3: mixed and ducked
 - [x] Màn radio, trang web quản lý đài
 - [x] Báo thức bằng radio
 - [x] HLS (VOV)

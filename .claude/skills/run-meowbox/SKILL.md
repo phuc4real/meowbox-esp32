@@ -89,4 +89,4 @@ py -3.14 firmware/tools/memwatch.py --host $MEOWBOX_HOST --every 5 --minutes 6 -
   still booting / on its setup hotspot `MeowBox-XXXX`.
 - `ui-alive` says `FROZEN` with `decode` near 100 %: the 0.2.1 decoder spin (fixed in 0.2.2). `radio stop` brings
   the screen back.
-- `pyserial missing`: use `D:\esp\.espressif\python_env\idf6.1_py3.14_env\Scripts\python.exe` for `serial`.
+- `pyserial missing`: use the IDF venv's Python for `serial`, `C:\Espressif\tools\python\release-v6.1\venv\Scripts\python.exe`.

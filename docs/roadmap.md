@@ -5,8 +5,8 @@ Các ý tưởng để dành, chưa xếp vào bản nào. Khi quyết định l
 
 | Ý tưởng | Khi nào làm | Trạng thái |
 |---|---|---|
-| MeowBox Cloud (Cloudflare Worker) | khi số liệu ở mục 4 của v0.2.0 cho thấy vẫn thiếu băng thông, hoặc cần thông báo khi loa ở ngoài | để dành |
-| Tối ưu lại các theme về UI/UX | sau v0.2.0 | started in v0.2.2 (see "Done in v0.2.2" below) |
+| MeowBox Cloud (Cloudflare Worker) | khi số liệu ở mục 4 của v0.2.0 cho thấy vẫn thiếu băng thông (đo ở chỗ Wi-Fi yếu: [backlog.md](backlog.md), "Checks on the device"), hoặc cần thông báo khi loa ở ngoài | để dành |
+| Tối ưu lại các theme về UI/UX | sau v0.2.0 | mostly done in v0.2.2-v0.2.3; what is left: "Still to do" below |
 | PC agent UI/UX | after v0.2.0 (v0.2.0 ships the agent functionally complete) | parked |
 
 ---
@@ -30,6 +30,12 @@ Hibernation API để Durable Object không tốn tiền khi không có gì đ�
 | Gộp luồng HLS | Worker tải playlist `.m3u8` và các đoạn, trả cho loa một luồng HTTP liền | giúp nhiều với đài HLS trên mạng yếu. Worker chỉ chuyển byte nên ít CPU |
 | Proxy đài MP3/AAC thường | Worker chuyển tiếp luồng | lợi ít: Wi-Fi yếu vẫn là Wi-Fi yếu. Chỉ dùng cho đài có vấn đề HTTPS/chứng chỉ |
 | Điều khiển loa từ xa | trang web gọi Worker, Worker chuyển lệnh qua WebSocket | để sau, cần đăng nhập và phân quyền |
+
+### Relay YouTube chạy 24/7 (from plan.md F2)
+Relay YouTube hiện nằm trong PC agent nên chỉ chạy khi PC bật. Chạy cùng relay đó trên một máy luôn bật trong nhà
+(Raspberry Pi, NAS) thì khỏi phụ thuộc PC. Đây cũng là chỗ chạy được yt-dlp bằng IP mạng nhà và ffmpeg cho việc chuyển
+mã ở mục dưới, nên làm cùng với Cloud: agent cần chạy được không có Windows (bỏ Media Session, pycaw, SAPI) và có xác
+thực khi mở ra ngoài LAN.
 
 ### Những việc Worker không làm được
 - **Chuyển mã sang Opus bitrate thấp** (mono 32–48 kbps, nhẹ hơn khoảng 3–4 lần so với 128 kbps stereo; loa vốn trộn
@@ -96,6 +102,12 @@ chủ chuyển mã luồng nhạc như trên.
   size and the hidden flag every time, redrawing the scaled cat. Now it touches LVGL only on change: 4.4-5.6 %.
 - The cat follows night mode with a darker, warmer palette.
 - Swipe FPS measured (see [backlog.md](backlog.md)); the ≥ 25 FPS goal is not met yet.
+
+### Still to do
+- Make the eco effects mode mean the same on the web page and on the speaker: on the web only Cyberpunk and Brutal
+  have effects (`fx` in `web/themes.json`), on the speaker `fx_segments` / `fx_hud` in `components/ui/ui.c` differ per
+  theme. Decide per theme what eco turns off and use the same list on both.
+- Swipe at ≥ 25 FPS while the radio plays: in [backlog.md](backlog.md) (Performance).
 
 ---
 

@@ -8,6 +8,8 @@ screen and a pixel-art virtual cat, all configured from a web page on the speake
 This repo also documents the hardware (reverse-engineered, no schematic) so the board can be reused for
 other projects.
 
+**How to use the speaker** (Vietnamese user guide): [README_vi.md](README_vi.md).
+
 | Swiss (default) | Cyberpunk | Zen | Brutalism |
 |---|---|---|---|
 | ![Swiss](firmware/web/assets/themes/swiss.png) | ![Cyberpunk](firmware/web/assets/themes/cyberpunk.png) | ![Zen](firmware/web/assets/themes/zen.png) | ![Brutalism](firmware/web/assets/themes/brutal.png) |
@@ -30,10 +32,11 @@ other projects.
 | [docs/hardware.md](docs/hardware.md) | parts, block diagram, audio path, power |
 | [docs/pinmap.md](docs/pinmap.md) | every GPIO with how it was verified, free pins, display geometry |
 | [docs/reverse-engineering.md](docs/reverse-engineering.md) | how the pins were dug out of the vendor binary, step by step |
-| [docs/plan.md](docs/plan.md) | original MeowBox feature plan, 0.1.0 (in Vietnamese) |
+| [README_vi.md](README_vi.md) | user guide: setup, every screen and web page, troubleshooting (in Vietnamese) |
+| [docs/plan.md](docs/plan.md) | original MeowBox feature plan, 0.1.0, with what was done or dropped (in Vietnamese) |
 | [docs/firmware_v0.2.0.md](docs/firmware_v0.2.0.md) | 0.2.0 plan and status: web, PC agent, GitHub updates, radio, performance (mostly Vietnamese) |
-| [docs/roadmap.md](docs/roadmap.md) | ideas parked for later: MeowBox Cloud, theme UI/UX pass (started in 0.2.2), PC agent UI/UX |
-| [docs/backlog.md](docs/backlog.md) | smaller known work not planned yet: checks on the device, performance, hardware |
+| [docs/roadmap.md](docs/roadmap.md) | ideas parked for later: MeowBox Cloud (incl. an always-on YouTube relay), the rest of the theme pass, PC agent UI/UX |
+| [docs/backlog.md](docs/backlog.md) | smaller known work not planned yet: checks on the device, internal RAM, performance, hardware |
 | [docs/perf/](docs/perf/results-0.2.3.md) | memory/CPU measurements under load ([0.2.3](docs/perf/results-0.2.3.md), [0.2.2](docs/perf/results-0.2.2.md), [0.2.0](docs/perf/results-0.2.0.md)) and the 0.2.0 code review |
 | [docs/ui_redesign.md](docs/ui_redesign.md) | UI review, theme system, per-theme rules (in Vietnamese) |
 | [firmware/README.md](firmware/README.md) | build, flash, use, regenerate assets, partitions |
@@ -98,8 +101,11 @@ python -m esptool --port COM10 -b 921600 write-flash 0 backup\speaker_full_16MB.
       heavy-load soak: no hang, no reset, lowest internal RAM 39.5 KB ([docs/perf/results-0.2.2.md](docs/perf/results-0.2.2.md))
 - [x] 0.2.3: QR code to join the setup hotspot, error log kept across restarts (web System page), cat dimmed at
       night, cat tile CPU cut from ~15 % to < 5 %, unused ntfy.sh setting removed
-- [ ] Open items in [docs/backlog.md](docs/backlog.md): 24 h soak and hands-on checklist, battery calibration,
-      swipe at ≥ 25 FPS, mini game, which "free" GPIOs reach pads
+- [x] Next (not released yet): UI sounds and notifications mixed over the radio, which is lowered meanwhile
+      instead of paused; the cat jumps when you clap; the PC screen is skipped while no computer is connected
+- [ ] Open items in [docs/backlog.md](docs/backlog.md): 24 h soak and hands-on checklist, update edge cases
+      (rollback, Wi-Fi lost while downloading), internal RAM back over 40 KB, battery calibration, swipe at ≥ 25 FPS,
+      mini game, which "free" GPIOs reach pads
 
 ## Licences
 

@@ -14,11 +14,14 @@ then `python web/build.py`.
 
 ## 2. Build
 
-One PowerShell command (IDF isn't on PATH otherwise):
+One PowerShell command (IDF isn't on PATH otherwise). Use the `release-v6.1` profile, not EIM's `v6.1` / `v6.1.1`
+(CLAUDE.md, Environment: the `v6.1.x` tags build images with far less internal RAM):
 
 ```powershell
-$env:IDF_TOOLS_PATH='D:\esp\.espressif'; . D:\esp\esp-idf\export.ps1 *> $null; cd firmware; idf.py build
+. C:\Espressif\tools\Microsoft.release-v6.1.PowerShell_profile.ps1 *> $null; cd firmware; idf.py build
 ```
+
+If the build says the `build` directory was configured for another project, run `idf.py fullclean` first.
 
 Stop and fix any build error before flashing. Note the app size: it must fit `ota_0`/`ota_1` (5.25 MB).
 

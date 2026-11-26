@@ -7,9 +7,17 @@ Overview and layout: @README.md. Build, flash, asset generators, partitions: @fi
 
 ## Environment
 
-- ESP-IDF 6.1 is **not** on PATH in a fresh shell. Activate it in the same PowerShell command that uses it. The
-  default `python` is 3.15 with no packages and IDF's venv is for 3.14, so point both at 3.14 first:
-  `$env:IDF_TOOLS_PATH='D:\esp\.espressif'; $env:IDF_PYTHON_ENV_PATH='D:\esp\.espressif\python_env\idf6.1_py3.14_env'; $env:PATH="C:\Users\phuc\AppData\Local\Python\pythoncore-3.14-64;$env:PATH"; . D:\esp\esp-idf\export.ps1 *> $null; cd firmware; idf.py build`
+- ESP-IDF must be the **`release/v6.1` branch** at or after commit `c43d665a` (what 0.2.3 was built with), **not** the
+  `v6.1.0` / `v6.1.1` tags: identical code built with either tag leaves ~12 KB internal RAM free when idle instead of
+  ~48 KB (measured 2026-11-26). Check the `ESP-IDF:` line of `python -m esptool --chip esp32s3 image-info
+  build\meowbox.bin` (a commit hash on the branch, `v6.1.1` for the tag).
+- That IDF is in `C:\esp\release-v6.1\esp-idf` (a shallow clone at `c43d665a` that shares EIM's tools in
+  `C:\Espressif\tools`, with its own venv in `C:\Espressif\tools\python\release-v6.1`). It is **not** on PATH in a fresh
+  shell; activate it in the same PowerShell command that uses it:
+  `. C:\Espressif\tools\Microsoft.release-v6.1.PowerShell_profile.ps1 *> $null; cd firmware; idf.py build`
+  EIM's `v6.1` / `v6.1.1` installs next to it are the tags: don't build with them.
+- The `build/` folder remembers the project path and the IDF it was configured with. After the repo moves or IDF
+  changes, run `idf.py fullclean` first (it keeps `sdkconfig`).
 - Run repo scripts with `py -3.14` (it has Pillow, pyserial, ruff and the agent's packages).
 - The speaker is on **COM10** (native USB-Serial/JTAG, no buttons needed). COM13 is an unrelated ESP8266.
 - You may build and flash / OTA the speaker without asking (`/flash-speaker`). `backup/` holds the vendor flash

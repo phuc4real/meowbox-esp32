@@ -37,7 +37,8 @@ Loa nhớ nhiều mạng Wi-Fi. Mỗi lần khởi động, nó thử trước c
 
 ## 2. Trên loa
 
-Vuốt trái/phải để đổi màn: **Đồng hồ → Radio → Máy tính → Mèo → Hệ thống**.
+Vuốt trái/phải để đổi màn: **Đồng hồ → Radio → Máy tính → Mèo → Hệ thống**. Khi chưa có máy tính nào nối loa
+thì màn Máy tính được bỏ qua: vuốt từ Radio sang thẳng Mèo.
 
 | Nút | Bấm | Ghi chú |
 |---|---|---|
@@ -104,7 +105,7 @@ máy tính phải cùng mạng Wi-Fi với loa.
 
 ## 6. Thông báo
 
-Loa hiện thông báo lên màn hình và kêu một tiếng. Thông báo gửi được từ bất kỳ máy nào trong mạng, ví dụ script, máy
+Loa hiện thông báo lên màn hình và kêu một tiếng. Đang phát radio thì nhạc vẫn chạy, chỉ nhỏ đi trong lúc kêu. Thông báo gửi được từ bất kỳ máy nào trong mạng, ví dụ script, máy
 chủ hay Home Assistant. Mỗi lần gửi cần **token** lấy ở trang Thông báo.
 
 ```bash
@@ -148,6 +149,8 @@ Mèo sống theo thời gian thật, kể cả lúc loa tắt. Mèo có 4 chỉ 
 - Trên màn Mèo có các nút **Ăn**, **Chơi**, **Tắm** và **Tắt đèn** để mèo đi ngủ. Chạm vào mèo thì nó kêu "meo".
 - Ban đêm mèo tự ngủ. Lúc mèo ngủ thì không chơi được.
 - Bỏ đói, bỏ bẩn lâu thì mèo ốm, rồi bỏ đi. Khi đó vào trang Mèo trên web để nhận mèo mới.
+- Vỗ tay to một cái khi đang mở màn Mèo thì mèo giật mình nhảy lên. Loa chỉ đo độ to, không ghi âm; tắt được ở
+  trang Mèo.
 - Đặt tên, màu lông và độ khó ở trang Mèo.
 
 ## 9. Giao diện

@@ -7,8 +7,10 @@ the speaker. Plan and status: [../docs/firmware_v0.2.0.md](../docs/firmware_v0.2
 
 ## Requirements
 
-- ESP-IDF **6.1** (`release/v6.1`). Component versions are pinned in `main/idf_component.yml` and
-  `dependencies.lock`; `idf.py build` downloads them into `managed_components/`.
+- ESP-IDF **6.1** from the `release/v6.1` branch (0.2.3 was built at commit `c43d665a`). The `v6.1.0` and `v6.1.1`
+  tags build and run, but leave far less internal RAM (~12 KB free when idle instead of ~48 KB), which is not enough
+  for streaming. Component versions are pinned in `main/idf_component.yml` and `dependencies.lock`; `idf.py build`
+  downloads them into `managed_components/`.
 - Python 3 with Pillow for the asset generators (`tools/`), Node.js only to regenerate fonts.
 
 ## Build & flash
@@ -57,7 +59,7 @@ server. API: [web/API.md](web/API.md) "Update".
 
 | Where | What |
 |---|---|
-| Screen | swipe left/right: **Clock → Radio → PC → Cat → System**. Turns off after 5 idle minutes (web: Appearance → "Screen off after", 0 = never); a button, a touch, an alarm or a notification wakes it, and that press does nothing else |
+| Screen | swipe left/right: **Clock → Radio → PC → Cat → System** (PC is skipped while no agent is connected). Turns off after 5 idle minutes (web: Appearance → "Screen off after", 0 = never); a button, a touch, an alarm or a notification wakes it, and that press does nothing else |
 | Middle button | power only: holding it switches the speaker off (hardware). The firmware can't see it |
 | Volume buttons | click ±5, hold to repeat. During an alarm: click = snooze, hold ~1 s = stop |
 | Cat corner on the clock | tap to open the Cat tile |

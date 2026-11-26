@@ -223,7 +223,7 @@ Same shape (full `al` list). → same shape as GET.
 
 ### `GET /api/config/weather`
 ```json
-{"on":true,"name":"Hà Nội","lat":21.0245,"lon":105.8412,"unit":"c",
+{"on":true,"name":"Hồ Chí Minh","lat":10.823,"lon":106.630,"unit":"c",
  "now":{"t":24.5,"code":3,"hi":28,"lo":20,"at":1763790000}}
 ```
 `now` is read-only (last open-meteo result, `null` if none yet). `code` = WMO weather code. `unit`: `c` | `f`; the

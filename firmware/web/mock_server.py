@@ -43,7 +43,7 @@ def fresh_state():
         ]},
         "alarms": {"snooze": 5, "max": 5, "al": [
             {"on": True, "h": 6, "m": 30, "days": 31, "snd": "chime", "st": 0}]},
-        "weather": {"on": True, "name": "Hà Nội", "lat": 21.0245, "lon": 105.8412, "unit": "c",
+        "weather": {"on": True, "name": "Hồ Chí Minh", "lat": 10.823, "lon": 106.630, "unit": "c",
                     "now": {"t": 24.5, "code": 3, "hi": 28, "lo": 20, "at": int(time.time())}},
         "display": {"bri": 80, "idle_bri": 20, "idle_s": 60, "sleep_s": 300, "h24": True, "night": True,
                     "n_from": 22, "n_to": 7, "n_bri": 5, "lang": "vi", "tz": "ICT-7",

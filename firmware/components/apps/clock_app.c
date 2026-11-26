@@ -56,7 +56,7 @@ static bool fetch_weather(void)
              "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
              "&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min"
              "&timezone=Asia%%2FBangkok&forecast_days=1%s",
-             settings_get_num("weather", "lat", 21.0245), settings_get_num("weather", "lon", 105.8412),
+             settings_get_num("weather", "lat", 10.823), settings_get_num("weather", "lon", 106.630),
              unit[0] == 'f' ? "&temperature_unit=fahrenheit" : "");
     esp_http_client_config_t cfg = {.url = url, .crt_bundle_attach = esp_crt_bundle_attach, .timeout_ms = 10000,
                                     .buffer_size = 2048};

@@ -23,14 +23,13 @@ typedef struct {
 } group_t;
 
 static group_t s_groups[] = {
-    {"radio", "{\"vol\":40,\"last\":3,\"max\":50,\"st\":["
-              "{\"id\":1,\"name\":\"Radio Paradise\",\"url\":\"http://stream.radioparadise.com/mp3-128\",\"type\":\"stream\"},"
-              "{\"id\":2,\"name\":\"SomaFM Groove Salad\",\"url\":\"http://ice1.somafm.com/groovesalad-128-mp3\",\"type\":\"stream\"},"
-              "{\"id\":3,\"name\":\"Lofi Girl\",\"url\":\"https://www.youtube.com/@LofiGirl/live\",\"type\":\"youtube\"},"
-              "{\"id\":4,\"name\":\"VOV3\",\"url\":\"https://str.vov.gov.vn/vovlive/vov3.sdp_aac/playlist.m3u8\",\"type\":\"hls\"}"
+    {"radio", "{\"vol\":40,\"last\":1,\"max\":50,\"st\":["
+              "{\"id\":1,\"name\":\"MANGORADIO\",\"url\":\"http://mangoradio.stream.laut.fm/mangoradio\",\"type\":\"stream\"},"
+              "{\"id\":2,\"name\":\"Lofi 24/7\",\"url\":\"http://usa9.fastcast4u.com/proxy/jamz?mp=/1\",\"type\":\"stream\"},"
+              "{\"id\":3,\"name\":\"Jazz Sakura\",\"url\":\"http://kathy.torontocast.com:3330/stream/1/?esPlayer&cb=82181.mp3\",\"type\":\"stream\"}"
               "]}", NULL},
     {"alarms", "{\"snooze\":5,\"max\":5,\"al\":[]}", NULL},
-    {"weather", "{\"on\":true,\"name\":\"Hà Nội\",\"lat\":21.0245,\"lon\":105.8412,\"unit\":\"c\"}", NULL},
+    {"weather", "{\"on\":true,\"name\":\"Hồ Chí Minh\",\"lat\":10.823,\"lon\":106.630,\"unit\":\"c\"}", NULL},
     {"display", "{\"bri\":80,\"idle_bri\":20,\"idle_s\":60,\"sleep_s\":300,\"h24\":true,\"night\":true,\"n_from\":22,\"n_to\":7,"
                 "\"n_bri\":5,\"lang\":\"vi\",\"theme\":\"swiss\",\"night_mode\":\"auto\",\"fx\":\"full\"}", NULL},
     {"cat", "{\"name\":\"Mướp\",\"fur\":\"tabby\",\"clap\":true,\"show\":true,\"snd\":true}", NULL}, /* Meow Coding */

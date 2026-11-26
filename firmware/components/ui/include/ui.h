@@ -46,7 +46,10 @@ void ui_register_builder(ui_tile_t t, ui_builder_t fn);
 void ui_build_all(void);                 /* first build, after all builders are registered */
 
 lv_obj_t *ui_tile(ui_tile_t t);
-void ui_show_tile(ui_tile_t t, bool anim);
+void ui_show_tile(ui_tile_t t, bool anim); /* also shows a tile left out by ui_tile_set_skip, until it is left */
+/* Leaves a tile out of the swipe order and the page indicator (true) or puts it back. A tile on screen stays until
+ * the user swipes away from it. */
+void ui_tile_set_skip(ui_tile_t t, bool skip);
 ui_tile_t ui_active_tile(void);
 bool ui_lang_en(void);
 const char *ui_tr(const char *vi, const char *en);

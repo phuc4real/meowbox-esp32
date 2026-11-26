@@ -9,12 +9,15 @@
 #include "board.h"
 #include "settings.h"
 #include "misc/lv_text_private.h" /* lv_text_encoded_next */
+#include "widgets/tileview/lv_tileview_private.h" /* lv_tileview_tile_t: a tile's swipe directions */
 
 static const char *TAG = "ui";
 
 static lv_obj_t *s_tv;
 static lv_obj_t *s_tiles[UI_TILE_COUNT];
 static ui_builder_t s_builders[UI_TILE_COUNT];
+static lv_obj_t *s_ind[UI_TILE_COUNT]; /* page indicator of each tile: dot row, or label in raw themes */
+static uint8_t s_skip_want, s_skip;    /* tiles left out of the swipe order (bit per tile): wanted, applied */
 static lv_obj_t *s_ov;
 static lv_timer_t *s_ov_timer;
 static ui_overlay_cb_t s_ov_cb;
@@ -380,23 +383,50 @@ static void tile_bg_draw(lv_event_t *e)
 }
 
 /* ---------------- page indicator ---------------- */
+static void raw_indicator_text(lv_obj_t *l, int idx)
+{
+    char buf[32] = "";
+    for (int i = 0, n = 1; i < UI_TILE_COUNT; i++) {
+        if (s_skip & (1 << i)) continue;
+        char p[6];
+        snprintf(p, sizeof(p), i == idx ? "[%d] " : "%d ", n++);
+        strcat(buf, p);
+    }
+    lv_label_set_text(l, buf);
+}
+
+/* shows only the tiles in the swipe order (s_skip) */
+static void indicator_refresh(void)
+{
+    for (int i = 0; i < UI_TILE_COUNT; i++) {
+        if (!s_ind[i]) continue;
+        if (lv_obj_check_type(s_ind[i], &lv_label_class)) {
+            raw_indicator_text(s_ind[i], i);
+            continue;
+        }
+        for (int j = 0; j < UI_TILE_COUNT; j++) {
+            lv_obj_t *d = lv_obj_get_child(s_ind[i], j);
+            if (!d) break;
+            if ((s_skip & (1 << j)) && j != i) lv_obj_add_flag(d, LV_OBJ_FLAG_HIDDEN);
+            else lv_obj_remove_flag(d, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
 static void page_indicator(lv_obj_t *tile, int idx)
 {
     const theme_def_t *t = ui_theme();
     if (t->btn == THEME_BTN_RAW) {
-        char buf[32] = "";
-        for (int i = 0; i < UI_TILE_COUNT; i++) {
-            char p[6];
-            snprintf(p, sizeof(p), i == idx ? "[%d] " : "%d ", i + 1);
-            strcat(buf, p);
-        }
-        lv_obj_t *l = ui_label(tile, UI_F_SMALL, UI_C_TEXT, buf);
+        lv_obj_t *l = ui_label(tile, UI_F_SMALL, UI_C_TEXT, "");
+        raw_indicator_text(l, idx);
+        s_ind[idx] = l;
         lv_obj_set_style_bg_color(l, ui_lc(UI_C_BG), 0);
         lv_obj_set_style_bg_opa(l, LV_OPA_COVER, 0);
         lv_obj_align(l, LV_ALIGN_TOP_MID, 0, UI_FOOT_Y - lv_font_get_line_height(ui_f(UI_F_SMALL)) / 2);
         return;
     }
     lv_obj_t *row = lv_obj_create(tile);
+    s_ind[idx] = row;
     lv_obj_remove_style_all(row);
     lv_obj_set_size(row, 80, 6);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
@@ -422,7 +452,59 @@ static void page_indicator(lv_obj_t *tile, int idx)
 /* ---------------- tiles ---------------- */
 lv_obj_t *ui_tile(ui_tile_t t) { return s_tiles[t]; }
 
-void ui_show_tile(ui_tile_t t, bool anim) { lv_tileview_set_tile(s_tv, s_tiles[t], anim ? LV_ANIM_ON : LV_ANIM_OFF); }
+/* Lays the tiles out side by side, leaving out the s_skip ones (hidden and parked past the end, where the scroll
+ * area and the tileview's tile search never reach), and keeps the active tile on screen. */
+static void tiles_layout(uint8_t skip)
+{
+    if (skip == s_skip) return;
+    lv_obj_t *act = lv_tileview_get_tile_active(s_tv);
+    s_skip = skip;
+    int first = -1, last = -1;
+    for (int i = 0; i < UI_TILE_COUNT; i++)
+        if (!(skip & (1 << i))) {
+            if (first < 0) first = i;
+            last = i;
+        }
+    for (int i = 0, col = 0; i < UI_TILE_COUNT; i++) {
+        lv_tileview_tile_t *tile = (lv_tileview_tile_t *)s_tiles[i];
+        if (skip & (1 << i)) {
+            lv_obj_add_flag(s_tiles[i], LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_pos(s_tiles[i], lv_pct(UI_TILE_COUNT * 100), 0);
+            continue;
+        }
+        lv_obj_remove_flag(s_tiles[i], LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_pos(s_tiles[i], lv_pct(col++ * 100), 0);
+        tile->dir = i == first ? LV_DIR_RIGHT : i == last ? LV_DIR_LEFT : LV_DIR_HOR;
+    }
+    lv_obj_update_layout(s_tv);
+    if (act) lv_tileview_set_tile(s_tv, act, LV_ANIM_OFF);
+    indicator_refresh();
+}
+
+/* Applies s_skip_want unless that would move the tiles under the user: never while a swipe is in progress, and a
+ * tile on screen stays until the user leaves it. */
+static void tiles_apply(void)
+{
+    if (s_skip_want == s_skip || lv_obj_is_scrolling(s_tv)) return;
+    lv_indev_t *in = lv_indev_get_next(NULL);
+    if (in && lv_indev_get_state(in) == LV_INDEV_STATE_PRESSED) return;
+    uint8_t skip = s_skip_want & ~(1 << ui_active_tile());
+    tiles_layout(skip);
+}
+
+void ui_tile_set_skip(ui_tile_t t, bool skip)
+{
+    uint8_t m = skip ? (s_skip_want | (1 << t)) : (s_skip_want & ~(1 << t));
+    if (m == s_skip_want) return;
+    s_skip_want = m;
+    tiles_apply();
+}
+
+void ui_show_tile(ui_tile_t t, bool anim)
+{
+    if (s_skip & (1 << t)) tiles_layout(s_skip & ~(1 << t)); /* shown on request; left out again once left */
+    lv_tileview_set_tile(s_tv, s_tiles[t], anim ? LV_ANIM_ON : LV_ANIM_OFF);
+}
 
 ui_tile_t ui_active_tile(void)
 {
@@ -460,6 +542,7 @@ void ui_build_all(void)
         if (s_builders[i]) s_builders[i](t);
         page_indicator(t, i);
     }
+    indicator_refresh();
     s_built_night = s_night;
     ESP_LOGI(TAG, "built theme %s (%s%s)", ui_theme()->id, s_night ? "night" : "day", s_fx ? "" : ", eco");
 }
@@ -652,6 +735,7 @@ static void ui_timer(lv_timer_t *tmr)
             }
         }
     }
+    tiles_apply();
     uint32_t idle_ms = lv_display_get_inactive_time(NULL);
     int sleep_s = settings_get_int("display", "sleep_s", 300);
     bool want = sleep_s > 0 && idle_ms > (uint32_t)sleep_s * 1000 && !s_ov && esp_timer_get_time() >= s_force_until;

@@ -205,6 +205,7 @@ static void pc_tick(lv_timer_t *t)
 {
     bool on = pc_online();
     if (s_fd >= 0 && !on && esp_timer_get_time() - s_last_us > 15000000) s_fd = -1;
+    ui_tile_set_skip(UI_TILE_PC, !on); /* no computer: swiping goes from Radio straight to the cat */
     if (!s_body) return;
     /* compare with what the tile shows, not a remembered state: the tile is rebuilt on theme / night changes and
      * the agent may connect while another tile is on screen */

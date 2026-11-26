@@ -226,7 +226,8 @@ Same shape (full `al` list). → same shape as GET.
 {"on":true,"name":"Hà Nội","lat":21.0245,"lon":105.8412,"unit":"c",
  "now":{"t":24.5,"code":3,"hi":28,"lo":20,"at":1763790000}}
 ```
-`now` is read-only (last open-meteo result, `null` if none yet). `code` = WMO weather code. `unit`: `c` | `f`.
+`now` is read-only (last open-meteo result, `null` if none yet). `code` = WMO weather code. `unit`: `c` | `f`; the
+device asks open-meteo for that unit, so `t`, `hi` and `lo` are in it, and the clock shows `°C` or `°F`.
 The UI looks the city up itself at `https://geocoding-api.open-meteo.com/v1/search` and only sends the result.
 
 ### `PUT /api/config/weather`

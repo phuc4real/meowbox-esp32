@@ -49,12 +49,14 @@ static const char *wmo_text(int c, bool en)
 static bool fetch_weather(void)
 {
     if (!settings_get_bool("weather", "on", true)) return false;
-    char url[256];
-    snprintf(url, sizeof(url),
+    char url[288], unit[4];
+    settings_get_str("weather", "unit", unit, sizeof(unit), "c");
+    snprintf(url, sizeof(url), /* open-meteo converts: every temperature comes in the unit picked on the web page */
              "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
              "&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min"
-             "&timezone=Asia%%2FBangkok&forecast_days=1",
-             settings_get_num("weather", "lat", 21.0245), settings_get_num("weather", "lon", 105.8412));
+             "&timezone=Asia%%2FBangkok&forecast_days=1%s",
+             settings_get_num("weather", "lat", 21.0245), settings_get_num("weather", "lon", 105.8412),
+             unit[0] == 'f' ? "&temperature_unit=fahrenheit" : "");
     esp_http_client_config_t cfg = {.url = url, .crt_bundle_attach = esp_crt_bundle_attach, .timeout_ms = 10000,
                                     .buffer_size = 2048};
     esp_http_client_handle_t c = esp_http_client_init(&cfg);
@@ -78,7 +80,7 @@ static bool fetch_weather(void)
                 s_wx.at = time(NULL);
                 s_wx.valid = true;
                 ok = true;
-                ESP_LOGI(TAG, "weather %.1f C code %d (%d/%d)", s_wx.t, s_wx.code, s_wx.hi, s_wx.lo);
+                ESP_LOGI(TAG, "weather %.1f° code %d (%d/%d)", s_wx.t, s_wx.code, s_wx.hi, s_wx.lo);
             }
             cJSON_Delete(j);
         } else {
@@ -394,6 +396,9 @@ static void clock_tick(lv_timer_t *tmr)
     if (wx) {
         int tc = (int)(s_wx.t + (s_wx.t >= 0 ? 0.5f : -0.5f));
         const char *w = wmo_text(s_wx.code, en);
+        char u[4];
+        settings_get_str("weather", "unit", u, sizeof(u), "c");
+        const char *deg = u[0] == 'f' ? "°F" : "°C";
         switch (th->clock) {
         case THEME_CLOCK_LEFT: /* a 68 px column: like "Âm lịch" next to it, no city or high/low (the web has them) */
             set_text(l_wx_head, en ? "Weather" : "Thời tiết");
@@ -402,11 +407,11 @@ static void clock_tick(lv_timer_t *tmr)
             set_text(l_wx2, w);
             break;
         case THEME_CLOCK_BLOCK:
-            snprintf(buf, sizeof(buf), "%d°C, %s", tc, w);
+            snprintf(buf, sizeof(buf), "%d%s, %s", tc, deg, w);
             set_text(l_wx, buf);
             break;
         case THEME_CLOCK_CENTER:
-            snprintf(buf, sizeof(buf), "%d°C  %s  %d/%d", tc, w, s_wx.hi, s_wx.lo);
+            snprintf(buf, sizeof(buf), "%d%s  %s  %d/%d", tc, deg, w, s_wx.hi, s_wx.lo);
             set_text(l_wx, buf);
             break;
         default:

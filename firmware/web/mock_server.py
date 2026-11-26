@@ -585,8 +585,9 @@ class H(BaseHTTPRequestHandler):
                         tmp["night_mode"] = "auto" if tmp["night"] else "off"
                 if g == "weather":
                     need(-90 <= tmp["lat"] <= 90 and -180 <= tmp["lon"] <= 180 and tmp["unit"] in ("c", "f"))
-                    tmp["now"] = {"t": round(random.uniform(18, 33), 1), "code": random.choice([0, 1, 3, 61, 80, 95]),
-                                  "hi": 31, "lo": 22, "at": int(time.time())}
+                    f = (lambda c: c * 9 / 5 + 32) if tmp["unit"] == "f" else (lambda c: c)  # like the device
+                    tmp["now"] = {"t": round(f(random.uniform(18, 33)), 1), "code": random.choice([0, 1, 3, 61, 80, 95]),
+                                  "hi": round(f(31)), "lo": round(f(22)), "at": int(time.time())}
                 if g == "pc":
                     need(0 < tmp["port"] < 65536)
                 S[g] = tmp

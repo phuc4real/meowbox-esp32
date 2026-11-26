@@ -44,8 +44,6 @@ typedef struct {
 } player_net_t;
 /* false when no network stream is active (stopped, or playing an in-memory sound). */
 bool player_net(player_net_t *o);
-/* Pause output while UI sounds play (sfx hook). */
-void player_hold(bool hold);
 
 #ifdef __cplusplus
 }

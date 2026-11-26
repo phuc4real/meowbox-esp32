@@ -486,8 +486,6 @@ static esp_err_t h_sleep_post(httpd_req_t *req)
     return send_sleep(req);
 }
 
-static void sfx_hook(bool start) { player_hold(start); }
-
 static void radio_cfg_hook(cJSON *doc)
 {
     cJSON_ReplaceItemInObject(doc, "vol", cJSON_CreateNumber(audio_hw_get_volume()));
@@ -508,7 +506,6 @@ static void on_settings(const char *group, void *arg)
 void radio_app_init(void)
 {
     player_init();
-    audio_sfx_set_hook(sfx_hook);
     s_saved_vol = settings_get_int("radio", "vol", 40);
     audio_hw_set_volume(s_saved_vol);
 

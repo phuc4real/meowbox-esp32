@@ -18,8 +18,15 @@ extern "C" {
 esp_err_t audio_hw_init(i2c_master_bus_handle_t bus, int sample_rate);
 int audio_hw_sample_rate(void);
 
-/* Output: 16-bit mono PCM at audio_hw_sample_rate(). Blocks until queued. */
+/* Output: 16-bit mono PCM at audio_hw_sample_rate(). Blocks until queued.
+ * audio_hw_write is the main output (the player, one task at a time); audio_hw_write_fx is for short UI sounds: while
+ * the main output runs they are mixed into it, otherwise they play directly. */
 esp_err_t audio_hw_write(const int16_t *pcm, size_t samples);
+esp_err_t audio_hw_write_fx(const int16_t *pcm, size_t samples);
+/* Lower the main output (about -10 dB, 50 ms ramps) while UI sounds play. */
+void audio_hw_duck(bool on);
+/* esp_timer time of the last sample sent to the codec (to ignore our own sound on the mics). */
+int64_t audio_hw_last_output_us(void);
 void audio_hw_set_volume(int volume); /* 0..100 */
 int audio_hw_get_volume(void);
 void audio_hw_set_mute(bool mute);

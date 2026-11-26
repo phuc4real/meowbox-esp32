@@ -5,10 +5,12 @@
 #include <stdlib.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "freertos/stream_buffer.h"
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_check.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 #include "driver/gpio.h"
 #include "driver/i2s_std.h"
 #include "driver/i2s_tdm.h"
@@ -32,6 +34,21 @@ static bool s_mic_on;
 static volatile bool s_amp_on = true;
 static volatile int64_t s_last_write; /* written by the player, read by the UI task: 64-bit, so under s_amp_mux */
 static portMUX_TYPE s_amp_mux = portMUX_INITIALIZER_UNLOCKED;
+
+/* Mixer. The player is the main writer (audio_hw_write). While it plays, UI sounds (audio_hw_write_fx) go through
+ * s_fx and are added to its samples, and the music is lowered to DUCK_GAIN while audio_hw_duck(true). With no main
+ * output for MAIN_IDLE_US the sounds go straight to the codec. One writer each side: the sfx task and the player. */
+#define FX_CAP       2048 /* samples (~46 ms): the latency a UI sound gets while music plays */
+#define MIX_CHUNK    256
+#define MAIN_IDLE_US 80000
+#define DUCK_GAIN    0.3f          /* about -10 dB */
+#define GAIN_STEP    (1.0f / 2205) /* full swing in 50 ms at 44.1 kHz */
+static StreamBufferHandle_t s_fx;
+static StaticStreamBuffer_t s_fx_sb;
+static int16_t *s_mix, *s_fxbuf;     /* MIX_CHUNK samples each, PSRAM: the player's decode task has a small stack */
+static volatile int64_t s_main_last; /* under s_amp_mux */
+static volatile bool s_duck;
+static float s_gain = 1.0f; /* main writer only */
 
 static esp_err_t create_i2s(int rate)
 {
@@ -124,15 +141,21 @@ esp_err_t audio_hw_init(i2c_master_bus_handle_t bus, int sample_rate)
     esp_codec_dev_sample_info_t fs = {.bits_per_sample = 16, .channel = 1, .sample_rate = sample_rate};
     ESP_RETURN_ON_FALSE(esp_codec_dev_open(s_out, &fs) == ESP_CODEC_DEV_OK, ESP_FAIL, TAG, "open out");
     esp_codec_dev_set_out_vol(s_out, s_volume);
+    uint8_t *fx_mem = heap_caps_malloc(FX_CAP * sizeof(int16_t) + 1, MALLOC_CAP_SPIRAM);
+    s_mix = heap_caps_malloc(2 * MIX_CHUNK * sizeof(int16_t), MALLOC_CAP_SPIRAM);
+    if (fx_mem && s_mix) {
+        s_fxbuf = s_mix + MIX_CHUNK;
+        s_fx = xStreamBufferCreateStatic(FX_CAP * sizeof(int16_t), sizeof(int16_t), fx_mem, &s_fx_sb);
+    }
+    if (!s_fx) ESP_LOGW(TAG, "no mixer: UI sounds will interleave with music");
     ESP_LOGI(TAG, "ES8311 + ES7210 ready, %d Hz", sample_rate);
     return ESP_OK;
 }
 
 int audio_hw_sample_rate(void) { return s_rate; }
 
-esp_err_t audio_hw_write(const int16_t *pcm, size_t samples)
+static esp_err_t hw_out(const int16_t *pcm, size_t samples)
 {
-    if (!s_out) return ESP_ERR_INVALID_STATE;
     int64_t now = esp_timer_get_time();
     taskENTER_CRITICAL(&s_amp_mux);
     s_last_write = now;
@@ -143,6 +166,70 @@ esp_err_t audio_hw_write(const int16_t *pcm, size_t samples)
         vTaskDelay(pdMS_TO_TICKS(AMP_SETTLE_MS));
     }
     return esp_codec_dev_write(s_out, (void *)pcm, samples * sizeof(int16_t)) == ESP_CODEC_DEV_OK ? ESP_OK : ESP_FAIL;
+}
+
+static bool main_active(void)
+{
+    taskENTER_CRITICAL(&s_amp_mux);
+    int64_t last = s_main_last;
+    taskEXIT_CRITICAL(&s_amp_mux);
+    return esp_timer_get_time() - last < MAIN_IDLE_US;
+}
+
+esp_err_t audio_hw_write(const int16_t *pcm, size_t samples)
+{
+    if (!s_out) return ESP_ERR_INVALID_STATE;
+    int64_t now = esp_timer_get_time();
+    taskENTER_CRITICAL(&s_amp_mux);
+    s_main_last = now;
+    taskEXIT_CRITICAL(&s_amp_mux);
+    if (!s_fx || (!s_duck && s_gain >= 1.0f && xStreamBufferIsEmpty(s_fx))) return hw_out(pcm, samples);
+    esp_err_t r = ESP_OK;
+    for (size_t done = 0; done < samples; done += MIX_CHUNK) {
+        size_t n = samples - done < MIX_CHUNK ? samples - done : MIX_CHUNK;
+        size_t got = xStreamBufferReceive(s_fx, s_fxbuf, n * sizeof(int16_t), 0) / sizeof(int16_t);
+        float target = s_duck ? DUCK_GAIN : 1.0f;
+        for (size_t i = 0; i < n; i++) {
+            if (s_gain > target) s_gain = s_gain - GAIN_STEP < target ? target : s_gain - GAIN_STEP;
+            else if (s_gain < target) s_gain = s_gain + GAIN_STEP > target ? target : s_gain + GAIN_STEP;
+            int v = (int)(pcm[done + i] * s_gain) + (i < got ? s_fxbuf[i] : 0);
+            s_mix[i] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
+        }
+        if (hw_out(s_mix, n) != ESP_OK) r = ESP_FAIL;
+    }
+    return r;
+}
+
+esp_err_t audio_hw_write_fx(const int16_t *pcm, size_t samples)
+{
+    if (!s_out) return ESP_ERR_INVALID_STATE;
+    if (!s_fx) return hw_out(pcm, samples);
+    const uint8_t *p = (const uint8_t *)pcm;
+    size_t left = samples * sizeof(int16_t);
+    while (left) {
+        if (main_active()) {
+            size_t sent = xStreamBufferSend(s_fx, p, left, pdMS_TO_TICKS(20));
+            p += sent;
+            left -= sent;
+            continue;
+        }
+        /* the music stopped: play what is still queued, then the rest directly */
+        int16_t tmp[64];
+        size_t got;
+        while ((got = xStreamBufferReceive(s_fx, tmp, sizeof(tmp), 0)) > 0) hw_out(tmp, got / sizeof(int16_t));
+        return hw_out((const int16_t *)p, left / sizeof(int16_t));
+    }
+    return ESP_OK;
+}
+
+void audio_hw_duck(bool on) { s_duck = on; }
+
+int64_t audio_hw_last_output_us(void)
+{
+    taskENTER_CRITICAL(&s_amp_mux);
+    int64_t last = s_last_write;
+    taskEXIT_CRITICAL(&s_amp_mux);
+    return last;
 }
 
 void audio_hw_set_volume(int volume)
@@ -195,7 +282,7 @@ void audio_hw_tone(int freq_hz, int ms, int amplitude_pct)
             phase += step;
             if (phase > 2.0f * (float)M_PI) phase -= 2.0f * (float)M_PI;
         }
-        audio_hw_write(buf, n);
+        audio_hw_write_fx(buf, n);
     }
 }
 

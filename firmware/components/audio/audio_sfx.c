@@ -9,7 +9,6 @@
 
 static QueueHandle_t s_q;
 static volatile bool s_stop, s_busy;
-static audio_sfx_hook_t s_hook;
 
 typedef struct { float f0, f1; int ms; float amp; uint8_t wave; } seg_t; /* wave 0 sine, 1 triangle, 2 noise */
 
@@ -35,7 +34,7 @@ static void play_seg(const seg_t *s)
             else if (total - p < fade) env = (float)(total - p) / fade;
             buf[i] = (int16_t)(v * env * s->amp * 32767.0f);
         }
-        audio_hw_write(buf, n);
+        audio_hw_write_fx(buf, n);
     }
 }
 
@@ -70,10 +69,10 @@ static void sfx_task(void *arg)
     while (xQueueReceive(s_q, &s, portMAX_DELAY)) {
         s_stop = false;
         s_busy = true;
-        if (s_hook) s_hook(true);
+        audio_hw_duck(true);
         play(s);
         if (uxQueueMessagesWaiting(s_q) == 0) {
-            if (s_hook) s_hook(false);
+            audio_hw_duck(false);
             s_busy = false;
         }
     }
@@ -99,4 +98,3 @@ void audio_sfx_stop(void)
 }
 
 bool audio_sfx_busy(void) { return s_busy; }
-void audio_sfx_set_hook(audio_sfx_hook_t hook) { s_hook = hook; }

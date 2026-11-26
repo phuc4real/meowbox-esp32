@@ -33,7 +33,6 @@ static RingbufHandle_t s_rb;
 static volatile uint32_t s_gen;          /* session generation; bump to stop */
 static volatile player_state_t s_state = PLAYER_STOP;
 static volatile fmt_t s_fmt;
-static volatile bool s_hold;
 static volatile bool s_eof;              /* fetcher finished (non-live file) */
 static TaskHandle_t s_dec_task;
 static char s_url[URL_MAX], s_name[64], s_title[128];
@@ -609,7 +608,6 @@ static void decode_task(void *arg)
                 continue;
             }
         }
-        if (s_hold) { vTaskDelay(pdMS_TO_TICKS(20)); continue; }
         /* top up input */
         if (in_len < IN_CAP / 2 || (want_more && in_len < IN_CAP)) {
             size_t n = 0;
@@ -849,4 +847,3 @@ int player_buffer_pct(void)
     return (int)((RB_SIZE - xRingbufferGetCurFreeSize(s_rb)) * 100 / RB_SIZE);
 }
 
-void player_hold(bool hold) { s_hold = hold; }

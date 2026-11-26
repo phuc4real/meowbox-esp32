@@ -22,9 +22,7 @@ void audio_sfx_init(void);
 void audio_sfx_play(sfx_t s);
 void audio_sfx_stop(void);       /* drops queued sounds and cuts the current one short */
 bool audio_sfx_busy(void);
-/* Optional: called (from the sfx task) before/after a sound so a player can duck. */
-typedef void (*audio_sfx_hook_t)(bool start);
-void audio_sfx_set_hook(audio_sfx_hook_t hook);
+/* Sounds are mixed over playing music, which is lowered (ducked) meanwhile (audio_hw_write_fx). */
 
 #ifdef __cplusplus
 }

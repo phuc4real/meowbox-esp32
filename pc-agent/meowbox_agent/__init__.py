@@ -14,7 +14,7 @@ import os
 import sys
 from pathlib import Path
 
-__version__ = "0.2.4"
+__version__ = "0.2.5"
 PROTO = 1  # speaker <-> agent protocol, see MB_PROTO in firmware/components/net/include/net.h
 REPO = "phuc4real/meowbox-esp32"
 APP_DIR = Path(os.environ.get("APPDATA", Path.home())) / "MeowBox"

@@ -3,7 +3,7 @@
 An ESP32-S3 "AI chatbot" speaker sold in Vietnam, freed from its closed-source vendor firmware. It now
 runs **MeowBox**, our own firmware: a desk clock with the Vietnamese lunar calendar and weather, alarms,
 internet radio (including VOV and YouTube through a PC relay), a notification speaker, a PC companion
-screen and a pixel-art virtual cat, all configured from a web page on the speaker, in four UI themes.
+screen and a pixel-art cat that codes along with Claude Code on the PC (Meow Coding), all configured from a web page on the speaker, in four UI themes.
 
 This repo also documents the hardware (reverse-engineered, no schematic) so the board can be reused for
 other projects.
@@ -104,6 +104,9 @@ python -m esptool --port COM10 -b 921600 write-flash 0 backup\speaker_full_16MB.
 - [x] 0.2.4: UI sounds and notifications mixed over the radio, which is lowered meanwhile instead of paused; the
       cat jumps when you clap; the PC screen is skipped while no computer is connected; alarms entered in 24-hour
       time on the web page; built from ESP-IDF `release/v6.1` (the `v6.1.x` tags leave far less RAM)
+- [x] 0.2.5: the cat tile becomes Meow Coding (the cat shows what Claude Code is doing on the PC, its context,
+      tokens and 5-hour limit, and calls you when it waits), replacing the virtual pet; weather in °F when chosen;
+      ~5 KB more internal RAM when idle; new defaults: weather in Ho Chi Minh City, three MP3 radio stations
 - [ ] Open items in [docs/backlog.md](docs/backlog.md): 24 h soak and hands-on checklist, update edge cases
       (rollback, Wi-Fi lost while downloading), internal RAM back over 40 KB, battery calibration, swipe at ≥ 25 FPS,
       mini game, which "free" GPIOs reach pads

@@ -9,7 +9,7 @@ MeowBox biến chiếc loa thành:
 - radio internet (VOV, các đài trên thế giới, YouTube qua máy tính);
 - loa đọc thông báo;
 - màn hình phụ cho máy tính;
-- một chú mèo ảo.
+- chú mèo Meow Coding: mèo "code" cùng Claude Code trên máy tính và báo khi cần bạn.
 
 Mọi cài đặt làm trên trang web của loa.
 
@@ -71,7 +71,7 @@ máy tính phải cùng mạng Wi-Fi với loa.
 | Tổng quan | trạng thái loa, pin, màn hình loa (ảnh chụp thật, tự cập nhật) |
 | Radio | danh sách đài, tìm đài, phát/dừng, âm lượng, hẹn giờ tắt |
 | Báo thức | thêm/sửa báo thức |
-| Mèo | đặt tên, màu lông, độ khó; nhận mèo mới |
+| Mèo | các phiên Claude Code đang chạy, giới hạn 5 giờ và tuần; tên mèo, màu lông, gọi sen, âm thanh, vỗ tay |
 | Thông báo | token, gửi thử, lịch sử 20 tin gần nhất |
 | Máy tính | trạng thái PC agent, địa chỉ relay YouTube |
 | Cài đặt → Giao diện | theme, chế độ đêm, độ sáng ban đêm, hiệu ứng, ngôn ngữ trên loa |
@@ -145,15 +145,20 @@ YouTube. Mỗi loa chỉ nhận một máy tính mỗi lúc. Muốn đổi sang 
 
 Chi tiết: [pc-agent/README.md](pc-agent/README.md).
 
-## 8. Mèo ảo
+## 8. Mèo (Meow Coding)
 
-Mèo sống theo thời gian thật, kể cả lúc loa tắt. Mèo có 4 chỉ số: no, vui, sạch, năng lượng.
-- Trên màn Mèo có các nút **Ăn**, **Chơi**, **Tắm** và **Tắt đèn** để mèo đi ngủ. Chạm vào mèo thì nó kêu "meo".
-- Ban đêm mèo tự ngủ. Lúc mèo ngủ thì không chơi được.
-- Bỏ đói, bỏ bẩn lâu thì mèo ốm, rồi bỏ đi. Khi đó vào trang Mèo trên web để nhận mèo mới.
+Màn Mèo cho biết Claude Code đang làm gì trên máy tính. Cần PC agent (mục 7) và bật **Meow Coding (Claude Code)**
+trong menu ở khay hệ thống. Các phiên Claude Code mở sau đó sẽ hiện lên loa.
+- Mèo gõ laptop khi Claude Code đang làm, giơ dấu "?" khi nó cần bạn (hỏi quyền hoặc hỏi một câu), và vui khi xong.
+- Bên cạnh mèo: tên phiên, việc đang làm ("đang đọc file", "đang chạy bash"...), đã bao lâu, context đã dùng, số
+  token và giới hạn 5 giờ của gói Claude.
+- Khi Claude Code cần bạn, loa tự mở màn Mèo, bật màn hình và kêu chuông. Xong việc thì mèo kêu "meo" (ban đêm không
+  kêu). Tắt được ở trang Mèo ("Gọi sen" và "Âm thanh").
+- Có nhiều phiên thì chạm vào phần chữ để xem phiên tiếp theo. Chạm vào mèo thì nó kêu "meo".
 - Vỗ tay to một cái khi đang mở màn Mèo thì mèo giật mình nhảy lên. Loa chỉ đo độ to, không ghi âm; tắt được ở
   trang Mèo.
-- Đặt tên, màu lông và độ khó ở trang Mèo.
+- Đặt tên và màu lông ở trang Mèo.
+- Loa chỉ nhận nhãn ngắn (tên phiên, thư mục, nhánh, loại việc), không nhận nội dung bạn gõ, lệnh hay file.
 
 ## 9. Giao diện
 
@@ -182,7 +187,7 @@ Mèo sống theo thời gian thật, kể cả lúc loa tắt. Mèo có 4 chỉ 
    **Đừng tắt loa trong lúc đó.**
 3. Bản mới không chạy được thì loa tự quay về bản cũ, và trang web báo lại.
 
-Cài đặt, Wi-Fi, đài, báo thức và mèo đều được giữ nguyên.
+Cài đặt, Wi-Fi, đài và báo thức đều được giữ nguyên.
 
 Loa còn chạy bản 0.1.0 thì chưa có nút cập nhật. Tải file `meowbox-x.y.z.bin` ở Releases, rồi tải lên ở mục
 **Cập nhật firmware** trên trang web.
@@ -203,5 +208,5 @@ Hai nút ở **Cài đặt → Hệ thống**, phải đăng nhập mới dùng 
 
 | Nút | Xoá | Giữ lại |
 |---|---|---|
-| **Xoá dữ liệu** | lịch sử pin, lịch sử thông báo, mèo (có mèo mới, vẫn giữ tên) | cài đặt, Wi-Fi, đài, báo thức, mật khẩu, token |
+| **Xoá dữ liệu** | lịch sử pin, lịch sử thông báo | cài đặt, Wi-Fi, đài, báo thức, mật khẩu, token |
 | **Khôi phục cài đặt gốc** | tất cả, kể cả mật khẩu và token | không giữ gì: loa quay về Wi-Fi cài đặt `MeowBox-XXXX` như lúc mới |

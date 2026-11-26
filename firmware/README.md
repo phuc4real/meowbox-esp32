@@ -125,9 +125,9 @@ PC screen, media keys, YouTube relay and spoken notifications: see [../pc-agent/
 |---|---|---|---|
 | nvs | 0x9000 | 16 KB | Wi-Fi driver settings and PHY calibration (about 10 of 263 entries used) |
 | otadata | 0xd000 | 8 KB | which app slot boots |
-| ota_0 / ota_1 | 0x20000 / 0x560000 | 5.25 MB each | app with the web UI inside (3.19 MB in 0.2.3; OTA, rollback enabled) |
+| ota_0 / ota_1 | 0x20000 / 0x560000 | 5.25 MB each | app with the web UI inside (3.00 MB in 0.2.5; OTA, rollback enabled) |
 | (free) | 0xaa0000 | 4.4 MB | unallocated, see below |
-| data | 0xf00000 | 1 MB | LittleFS: settings, Wi-Fi list, password hash, cat save, battery log (about 30 KB used, the battery log grows to ~200 KB) |
+| data | 0xf00000 | 1 MB | LittleFS: settings, Wi-Fi list, password hash, battery log (about 30 KB used, the battery log grows to ~200 KB) |
 
 Up to 0.2.0 the table also had `phy_init` (unused: calibration is kept in NVS) and `storage`, a 4.4 MB assets
 partition that held the web UI before it moved into the app. Both are gone from `partitions.csv`; every other offset

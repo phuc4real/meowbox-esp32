@@ -10,6 +10,8 @@
 [data-theme=brutal] a:hover{color:var(--link);background:var(--accent)}
 [data-theme=brutal] h1{display:block;width:fit-content;max-width:100%;text-transform:uppercase;letter-spacing:-.02em;font-stretch:100%;background:var(--accent);color:var(--on-accent);border:3px solid var(--line);padding:8px 12px}
 [data-theme=brutal]:not([data-fx=eco]) h1{transform:rotate(-1deg)}
+[data-theme=brutal] .side{--side-h1:25cqi} /* uppercase + box: "RADIO" must fit the column, never split */
+@media (max-width:860px){[data-theme=brutal]{--h1:min(44px,9vw)}} /* "NOTIFICATIONS" on a 390 px phone */
 [data-theme=brutal] .sec>h2{display:inline-block;align-self:start;justify-self:start;background:var(--accent2);color:var(--bg);padding:2px 10px;text-transform:uppercase}
 [data-theme=brutal] .sec{border-top-width:3px}
 [data-theme=brutal] .sec>.b{background:var(--surface)}

@@ -102,14 +102,15 @@ dl.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap
 .kv dd.v{margin-top:4px;font-weight:700;overflow-wrap:anywhere}
 .log{list-style:none;margin:0;padding:0}
 .log li{display:grid;grid-template-columns:64px minmax(0,1fr);gap:16px;padding:10px 0;border-bottom:1px solid var(--soft)}
+.log li.muted{display:block} /* "none yet": one cell, not squeezed into the 64 px time column */
 .log time{color:var(--dim);font:14px var(--font-data);font-variant-numeric:tabular-nums}
 .log .hi time{color:var(--accent)}
 .log .hi span{font-weight:700}
 .brush{display:none}
 /* radio: side column + list column */
 .split{display:flex;flex-wrap:wrap;gap:40px}
-.side{flex:0 1 300px;min-width:0;display:flex;flex-direction:column;gap:24px}
-.side h1{margin:0;font-size:calc(var(--h1)*1.5)}
+.side{flex:0 1 300px;min-width:0;display:flex;flex-direction:column;gap:24px;container-type:inline-size}
+.side h1{margin:0;font-size:min(calc(var(--h1)*1.5),var(--side-h1,30cqi));overflow-wrap:normal}
 .side>p{margin:0;max-width:34ch}
 .side>form,.side>div{display:flex;flex-direction:column;gap:10px;border-top:var(--rule);padding-top:16px}
 .side .fld{margin:0}

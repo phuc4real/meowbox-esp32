@@ -239,16 +239,20 @@ async function pAlarm(){
 const[c,r]=await Promise.all([api('/api/config/alarms'),api('/api/config/radio')]);const box=h('div');
 const sounds=[['chime',t('chime')],...r.st.map(s=>['st'+s.id,'Radio: '+s.name])];
 const addB=btn(t('addAlarm'),()=>{c.al.push({on:true,h:7,m:0,days:31,snd:'chime',st:0});draw()},'ghost');
-const one=(a,i)=>{const tm=h('input',{type:'time',value:pad(a.h)+':'+pad(a.m),required:true,'aria-label':t('nAlarm')+' '+(i+1)});
-tm.oninput=()=>{const[x,y]=tm.value.split(':');if(y){a.h=+x;a.m=+y}};
+const one=(a,i)=>{const hm=()=>pad(a.h)+':'+pad(a.m),tm=h('input',{class:'tm',value:hm(),inputmode:'numeric',maxLength:5,placeholder:'HH:MM',autocomplete:'off','aria-label':t('nAlarm')+' '+(i+1)});
+// always 24 h (type=time follows the browser's locale and may show AM/PM): digits only, ":" added, kept only when valid
+const dig=()=>tm.value.replace(/\D/g,'').slice(0,4),take=(x,y)=>{const ok=x<24&&y<60;if(ok){a.h=x;a.m=y}return ok};
+tm.oninput=()=>{const d=dig();tm.value=d.length>2?d.slice(0,2)+':'+d.slice(2):d;tm.setCustomValidity(d.length==4&&take(+d.slice(0,2),+d.slice(2))?'':'00:00-23:59')};
+tm.onblur=()=>{const d=dig();if(d.length==3)take(+d[0],+d.slice(1));tm.value=hm();tm.setCustomValidity('')};
 const s={v:a.snd=='radio'&&r.st.some(x=>x.id==a.st)?'st'+a.st:'chime'},se=bind(s,'v',{tag:'select',opts:sounds});
 se.addEventListener('change',()=>{if(s.v=='chime'){a.snd='chime';a.st=0}else{a.snd='radio';a.st=+s.v.slice(2)}});
 const days=h('div',{class:'days'},t('days').map((d,b)=>{const e=btn(d,()=>{a.days^=1<<b;e.classList.toggle('on')},a.days>>b&1?'on':'');return e}));
 return h('div',{class:'al'},row(bind(a,'on',{type:'checkbox',class:'sw','aria-label':t('on')}),tm,h('span',{class:'sp'}),btn(ic('x',18),()=>{c.al.splice(i,1);draw()},'ic bd',t('del'))),
 grp('',days),fld(t('sound'),se))};
 const draw=()=>{addB.disabled=c.al.length>=(c.max||5);box.replaceChildren(...c.al.map(one))};draw();
-return[sec(t('maxAl'),h('p',{class:'muted'},t('once')),box,h('div',{class:'row',style:'margin-top:16px'},addB)),sec(t('opts'),h('div',{class:'lim'},fld(t('snooze'),bind(c,'snooze',{type:'number',min:1,max:30})),
-btn(t('save'),async()=>{Object.assign(c,await put('/api/config/alarms',{snooze:c.snooze,al:c.al}));draw();toast(t('saved'))})))]}
+const save=async()=>{Object.assign(c,await put('/api/config/alarms',{snooze:c.snooze,al:c.al}));draw();toast(t('saved'))};
+return[sec(t('maxAl'),h('p',{class:'muted'},t('once')),box,h('div',{class:'row',style:'margin-top:16px'},addB,btn(t('save'),save))),sec(t('opts'),h('div',{class:'lim'},fld(t('snooze'),bind(c,'snooze',{type:'number',min:1,max:30})),
+btn(t('save'),save)))]}
 
 async function pWx(){const c=await api('/api/config/weather'),cur=h('div'),res=h('ul',{class:'list'}),f={q:''};
 const drawC=()=>{const n=c.now;cur.replaceChildren(...[h('div',{class:'stn'},c.name||t('none')),c.lat!=null?h('p',{class:'muted'},c.lat.toFixed(3)+', '+c.lon.toFixed(3)):null,

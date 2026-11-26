@@ -117,7 +117,7 @@ dl.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap
 .side .vol input{max-width:none}
 .rc{flex:999 1 520px;min-width:0}
 .al{padding:16px 0;border-bottom:1px solid var(--soft)}
-.al input[type=time]{width:auto;min-width:9ch;font:var(--fw-head) 36px/1 var(--font-num);font-variant-numeric:tabular-nums;border:0;background:transparent;padding:0 4px}
+.al input.tm{width:5.5ch;min-width:0;font:var(--fw-head) 36px/1 var(--font-num);font-variant-numeric:tabular-nums;border:0;background:transparent;padding:0 4px}
 /* battery chart + table */
 .chart{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 8px;font:12px var(--font-data);color:var(--dim);margin-bottom:24px}
 .chart .ya{display:flex;flex-direction:column;justify-content:space-between;height:120px;text-align:right;margin:-.6em 0}

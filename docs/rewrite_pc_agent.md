@@ -1,6 +1,6 @@
 # Rewrite the PC agent in Rust
 
-Status: phases 0 and 1 done (2026-11-27), crate in `pc-agent-rs/`. Replaces the Python agent in `pc-agent/` (0.2.5, ~3,000 lines) with a
+Status: phases 0–2 done (2026-11-27), crate in `pc-agent-rs/`. Replaces the Python agent in `pc-agent/` (0.2.5, ~3,000 lines) with a
 Rust build that behaves the same for the speaker and the user. Estimate: **20–25 working days**, in 6 phases that
 each end in something that runs.
 
@@ -193,7 +193,7 @@ folder and GitHub buttons.
   that the install works.
 - Same maintenance rules as today: install at agent start if missing, update at most once a day via the
   `yt-dlp.checked` stamp when `auto_update`, errors only logged. The installer still runs `meowbox tools update`.
-- Migration: on first start delete `bin\yt-dlp.pyz` and its `.tmp`.
+- Migration: the installer deletes `bin\yt-dlp.pyz`, `yt-dlp.tmp` and `yt-dlp.checked` at cut-over (phase 5), not the agent: the Python agent may still be using them before that.
 - Started with `CREATE_NO_WINDOW`, inside a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, one job per
   stream (yt-dlp + ffmpeg). Dropping the job kills the tree (replaces `taskkill /T`), and a crashed agent leaves no
   orphan processes.
@@ -259,6 +259,26 @@ Original scope:
   from the speaker) and against `mock_speaker.py`, side by side with the Python agent's output.
 
 ### Phase 2: relay and tools (4 days)
+
+Result (2026-11-27):
+- `relay` (axum: /yt/info, /yt/stream, /yt/ping, allowlist), `relay::yt` (URL check, argv, -J cache, format picks,
+  headers), `relay::mp4adts`, `relay::job` (Job Object per stream), `tools::ytdlp` (onedir, versioned folders, daily
+  maintenance), `tools::ffmpeg`, `meowbox tools status|update`; toasts from the relay reach the tray.
+- mp4adts: same bytes as the Python converter on three synthetic fixtures (`fixtures/`, made by
+  `fixtures/make_fixtures.py`), whole and in random chunk sizes; garbage and truncated input give an error, no panic.
+- Against the mock speaker with real YouTube: video (AAC itag 140 → ADTS, decodes), live (`/@LofiGirl/live`, itag 234
+  → MPEG-TS through ffmpeg, decodes, UTF-8 title with emoji in `icy-name`), 400 for a bad URL, 403 from an IP that is
+  not the speaker, 502 for a finished live. A slow client that disconnects: yt-dlp and its ffmpeg are gone at once.
+- yt-dlp onedir: 24 MB download, 40 MB unpacked, `--version` in ~1 s. ffmpeg: 9.0.2, 14 s to download and unpack.
+- Real speaker: `POST /api/pc/relay_test` → `{"ok":true,"ms":21}` (speaker → PC relay on port 8797), and a YouTube
+  station played through the Rust relay.
+- Found while porting: FFmpeg-Builds (formerly BtbN) renamed its release files (no `-latest-` any more) and moved
+  the repo, so **the Python agent 0.2.5 can no longer download ffmpeg** (its regex finds no asset). The Rust parser
+  takes both names.
+- The old `bin\yt-dlp.pyz` is left alone while the Python agent may still use it; the installer removes it at
+  cut-over (phase 5). The Rust build keeps its own stamp (`bin\yt-dlp\checked`).
+
+Original scope:
 
 - relay server, ytdlp args/cache/picks/headers, mp4adts, Job Objects, tools (yt-dlp onedir, ffmpeg), `meowbox tools`.
 - mp4adts golden tests: synthetic tone files made once with ffmpeg (fragmented like YouTube DASH, and plain with moov

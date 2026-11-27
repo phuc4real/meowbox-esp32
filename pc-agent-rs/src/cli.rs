@@ -219,8 +219,30 @@ pub fn main() {
             println!("Meow Coding: chưa có trong bản Rust này (giai đoạn 3)");
             return;
         }
-        Cmd::Tools { .. } => {
-            println!("yt-dlp: chưa có trong bản Rust này (giai đoạn 2)");
+        Cmd::Tools { action } => {
+            rt().block_on(async {
+                let dir = crate::tools::ytdlp::root();
+                match action {
+                    ToolsAction::Update => match crate::tools::ytdlp::update(|step| println!("… {step}")).await {
+                        Ok(v) => println!("yt-dlp {v} -> {}", dir.display()),
+                        Err(e) => fail(format!("yt-dlp: {e}"), 1),
+                    },
+                    ToolsAction::Status => {
+                        let v = crate::tools::ytdlp::version().unwrap_or_else(|| "chưa cài".into());
+                        let latest = crate::tools::ytdlp::latest().await.unwrap_or_else(|| "?".into());
+                        println!("yt-dlp: {v} ({}), mới nhất trên GitHub: {latest}", dir.display());
+                        let ff = crate::tools::ffmpeg::status();
+                        match ff.path {
+                            Some(p) => println!(
+                                "ffmpeg: {} ({})",
+                                crate::tools::ffmpeg::version().unwrap_or_default(),
+                                p.display()
+                            ),
+                            None => println!("ffmpeg: chưa có (tự tải khi phát YouTube live lần đầu)"),
+                        }
+                    }
+                }
+            });
             return;
         }
         _ => {}

@@ -19,20 +19,24 @@ path = "src/bin/tray.rs"
 
 [dependencies]
 anyhow = "1.0.105"
+axum = { version = "0.8.9", default-features = false, features = ["tokio", "http1", "query", "json"] }
 clap = { version = "4.6.10", features = ["derive"] }
 eframe = { version = "0.37.0", default-features = false, features = ["default_fonts", "glow", "accesskit"] }
 futures-util = "0.3.34"
+hex = "0.4.3"
 reqwest = { version = "0.13.5", default-features = false, features = ["native-tls", "json", "charset", "http2"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["preserve_order"] }
+sha2 = "0.11.2"
 sysinfo = { version = "0.40.4", default-features = false, features = ["system", "disk", "network"] }
 tiny-skia = { version = "0.12.0", default-features = false, features = ["std", "simd"] }
 tokio = { version = "1.54.1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-tungstenite = "0.30.0"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "env-filter", "std"] }
-windows = { version = "0.62.2", features = ["Foundation", "Media_Control", "Media_Core", "Media_SpeechSynthesis", "Storage_Streams", "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_Networking_NetworkListManager", "Win32_Networking_WinSock", "Win32_Security", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_LibraryLoader", "Win32_System_Ole", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_System_Variant", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.62.2", features = ["Foundation", "Media_Control", "Media_Core", "Media_SpeechSynthesis", "Storage_Streams", "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_Networking_NetworkListManager", "Win32_Networking_WinSock", "Win32_Security", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_JobObjects", "Win32_System_LibraryLoader", "Win32_System_Ole", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_System_Variant", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 winreg = "0.56.0"
+zip = { version = "9.8.2", default-features = false, features = ["deflate"] }
 
 [build-dependencies]
 winresource = "0.1.34"

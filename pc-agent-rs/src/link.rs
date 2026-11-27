@@ -52,6 +52,42 @@ struct Shared {
     /// IPs the relay serves besides the connected speaker (the one the connect wizard is testing).
     extra_allowed: Arc<Mutex<HashSet<String>>>,
     coding: Arc<Tracker>,
+    /// Toasts for the tray (set by the tray; the CLI only logs them).
+    toast: Arc<Mutex<Option<crate::relay::Toast>>>,
+}
+
+impl Shared {
+    fn new(cfg: SharedConfig, state: SharedState) -> Self {
+        Self {
+            cfg,
+            state,
+            kick: Arc::new(Notify::new()),
+            take: Arc::new(AtomicBool::new(false)),
+            extra_allowed: Arc::default(),
+            coding: Arc::default(),
+            toast: Arc::default(),
+        }
+    }
+
+    fn toast(&self) -> crate::relay::Toast {
+        let t = self.toast.clone();
+        Arc::new(move |text: String| {
+            tracing::info!("toast: {text}");
+            if let Some(f) = t.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+                f(text);
+            }
+        })
+    }
+
+    /// The connected speaker's IP plus the one the connect wizard tests.
+    fn allowed(&self) -> HashSet<String> {
+        let mut ips = self.extra_allowed.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let st = self.state.get();
+        if st.connected && !st.ip().is_empty() {
+            ips.insert(st.ip().to_owned());
+        }
+        ips
+    }
 }
 
 pub struct CoreHandle {
@@ -74,14 +110,7 @@ fn runtime() -> tokio::runtime::Runtime {
 impl CoreHandle {
     /// Start the core in its own thread.
     pub fn start(cfg: SharedConfig, state: SharedState, opts: Options) -> Self {
-        let shared = Shared {
-            cfg,
-            state,
-            kick: Arc::new(Notify::new()),
-            take: Arc::new(AtomicBool::new(false)),
-            extra_allowed: Arc::default(),
-            coding: Arc::default(),
-        };
+        let shared = Shared::new(cfg, state);
         let (stop, stop_rx) = watch::channel(false);
         let (rt_tx, rt_rx) = std::sync::mpsc::channel();
         let sh = shared.clone();
@@ -105,6 +134,11 @@ impl CoreHandle {
             self.shared.take.store(true, Ordering::SeqCst);
         }
         self.shared.kick.notify_waiters();
+    }
+
+    /// Where the core's short messages go (the tray's balloon).
+    pub fn set_toast(&self, f: impl Fn(String) + Send + Sync + 'static) {
+        *self.shared.toast.lock().unwrap_or_else(|e| e.into_inner()) = Some(Arc::new(f));
     }
 
     pub fn allow_ip(&self, ip: &str) {
@@ -155,14 +189,7 @@ impl Drop for CoreHandle {
 /// CLI `run`: the core on this thread until Ctrl+C.
 pub fn run_forever(cfg: SharedConfig, state: SharedState, opts: Options) {
     crate::win::com_init();
-    let shared = Shared {
-        cfg,
-        state,
-        kick: Arc::new(Notify::new()),
-        take: Arc::new(AtomicBool::new(false)),
-        extra_allowed: Arc::default(),
-        coding: Arc::default(),
-    };
+    let shared = Shared::new(cfg, state);
     let (stop, stop_rx) = watch::channel(false);
     let rt = runtime();
     rt.block_on(async move {
@@ -176,9 +203,30 @@ pub fn run_forever(cfg: SharedConfig, state: SharedState, opts: Options) {
 }
 
 async fn run(sh: Shared, opts: Options, mut stop: watch::Receiver<bool>) {
-    let _ = opts; // relay and yt-dlp maintenance come in phase 2
+    let mut port = if opts.relay { sh.cfg.get().relay_port } else { 0 };
+    if port > 0 {
+        let s2 = sh.clone();
+        let ctx = crate::relay::Ctx::new(Arc::new(move || s2.allowed()), sh.toast());
+        match crate::relay::start(port, ctx).await {
+            Ok(_) => {
+                sh.state.update(|s| s.relay_port = port);
+                if opts.ytdlp_update {
+                    let daily = sh.cfg.get().auto_update;
+                    tokio::spawn(crate::tools::ytdlp::maintain(daily));
+                }
+            }
+            Err(e) => {
+                tracing::error!("relay port {port} busy: {e}");
+                sh.state.update(|s| {
+                    s.error = LinkError::Port;
+                    s.relay_port = 0;
+                });
+                port = 0;
+            }
+        }
+    }
     tokio::select! {
-        _ = link_loop(&sh, 0) => {}
+        _ = link_loop(&sh, port) => {}
         _ = stop.wait_for(|s| *s) => {}
     }
     tracing::info!("core stopped");

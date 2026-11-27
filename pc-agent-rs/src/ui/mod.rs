@@ -96,10 +96,16 @@ impl TrayApp {
         let tray = Tray::new(tray::make_icon(&icon::cat_rgba(size, Some(icon::GREY)), size), s::APP)?;
         let waker = tray.waker();
         core.on_state_change(move || waker.wake());
+        let toasts: Arc<Mutex<VecDeque<String>>> = Arc::default();
+        let (q, w) = (toasts.clone(), tray.waker());
+        core.set_toast(move |text| {
+            q.lock().unwrap_or_else(|e| e.into_inner()).push_back(text);
+            w.wake();
+        });
         let mut app = Self {
             core,
             tray,
-            toasts: Arc::default(),
+            toasts,
             last_line: String::new(),
             open_request: None,
             quit: false,

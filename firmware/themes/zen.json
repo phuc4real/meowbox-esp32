@@ -9,7 +9,7 @@
   "web": {"ui": "'Be Vietnam Pro', system-ui, sans-serif", "display": "'Cormorant Garamond', Georgia, serif", "data": "'Be Vietnam Pro', system-ui, sans-serif",
           "fonts": ["cormorant-garamond-300-vi.woff2", "cormorant-garamond-500-vi.woff2", "cormorant-garamond-600-italic-vi.woff2", "be-vietnam-pro-light-vi.woff2"], "light": true},
   "shape": {"radius": 20, "border": 1, "btn": "text", "shadow": [0, 0], "hover_shadow": [0, 0]},
-  "fx": {"aberration": false, "scanline": false, "grid": false, "hud": false, "enso": true, "tilt": false, "segments": false},
+  "fx": {"aberration": false, "scanline": false, "grid": false, "hud": false, "tilt": false, "segments": false, "shadow": false},
   "clock": {"layout": "enso"},
   "cat": {"palette": "sumi"}
 }

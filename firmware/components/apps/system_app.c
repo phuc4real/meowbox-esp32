@@ -420,8 +420,9 @@ static esp_err_t h_themes(httpd_req_t *req)
         cJSON_AddStringToObject(d, "en", t->desc_en);
         cJSON_AddBoolToObject(o, "default", strcmp(t->id, g_theme_default) == 0);
         /* true when the "Effects: full/saver" setting changes something for this theme (screen and web) */
-        cJSON_AddBoolToObject(o, "fx", t->fx_aberration || t->fx_scanline || t->fx_grid || t->fx_hud || t->fx_tilt ||
-                                           t->fx_segments || t->btn == THEME_BTN_RAW);
+        cJSON_AddBoolToObject(o, "fx",
+                              t->fx_aberration || t->fx_scanline || t->fx_grid || t->fx_hud || t->fx_tilt || t->fx_segments ||
+                                  t->fx_shadow);
         char p[48];
         snprintf(p, sizeof(p), "/themes/%s.png", t->id);
         cJSON_AddStringToObject(o, "preview", p);

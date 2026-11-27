@@ -104,10 +104,22 @@ chủ chuyển mã luồng nhạc như trên.
 - The cat follows night mode with a darker, warmer palette.
 - Swipe FPS measured (see [backlog.md](backlog.md)); the ≥ 25 FPS goal is not met yet.
 
+### Done after v0.2.5
+- The Effects saver (`display.fx = eco`) means the same on the speaker and the web page: it turns off what the theme
+  lists under `fx` in `themes/<id>.json` (keys in `FX_KEYS`, `tools/gen_themes.py`, which rejects unknown ones). Brutal's
+  hard shadows are a flag (`shadow`) instead of being implied by `btn: raw`; the unused `enso` flag is gone (the Zen
+  clock is a layout).
+
+  | Theme | eco turns off | speaker at night (any mode) |
+  |---|---|---|
+  | Cyberpunk | RGB split, scanlines, HUD corners, segmented bars | RGB split and scanlines already off |
+  | Brutalism | grid, hard shadows, tilted heading (web only: nothing is tilted on the speaker) | grid and shadows already off |
+  | Swiss, Zen | nothing (the web hides the setting). Zen's paper grain and Swiss's hover shadow are part of the look | |
+
+  The web page now also drops Cyberpunk's HUD corners and segmented bars and Brutal's grid and shadows in eco. The
+  hint and `API.md` no longer say eco switches on by itself on battery: nothing in the firmware does that.
+
 ### Still to do
-- Make the eco effects mode mean the same on the web page and on the speaker: on the web only Cyberpunk and Brutal
-  have effects (`fx` in `web/themes.json`), on the speaker `fx_segments` / `fx_hud` in `components/ui/ui.c` differ per
-  theme. Decide per theme what eco turns off and use the same list on both.
 - Swipe at ≥ 25 FPS while the radio plays: in [backlog.md](backlog.md) (Performance).
 
 ---

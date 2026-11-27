@@ -9,7 +9,7 @@
   "web": {"ui": "'Chakra Petch', system-ui, sans-serif", "display": "'VT323', monospace", "data": "'JetBrains Mono', monospace",
           "fonts": ["chakra-petch-400-vi.woff2", "chakra-petch-600-vi.woff2", "chakra-petch-700-vi.woff2", "jetbrains-mono-vi.woff2", "vt323-digits.woff2"], "light": false},
   "shape": {"radius": 0, "border": 0, "btn": "cut", "shadow": [0, 0], "hover_shadow": [0, 0]},
-  "fx": {"aberration": true, "scanline": true, "grid": false, "hud": true, "enso": false, "tilt": false, "segments": true},
+  "fx": {"aberration": true, "scanline": true, "grid": false, "hud": true, "tilt": false, "segments": true, "shadow": false},
   "clock": {"layout": "center"},
   "cat": {"palette": "neon"}
 }

@@ -142,7 +142,7 @@ lv_obj_t *ui_button(lv_obj_t *parent, const char *txt, bool primary, int w, int 
         lv_obj_set_style_border_width(b, t->border, 0);
         lv_obj_set_style_border_color(b, ui_lc(UI_C_LINE), 0);
         lv_obj_set_style_bg_color(b, ui_lc(primary ? UI_C_ALERT : UI_C_SURFACE), 0);
-        if (ui_fx() && !ui_is_night()) {
+        if (t->fx_shadow && ui_fx() && !ui_is_night()) {
             lv_obj_set_style_shadow_width(b, 1, 0);
             lv_obj_set_style_shadow_spread(b, 0, 0);
             lv_obj_set_style_shadow_offset_x(b, 3, 0);

@@ -1,10 +1,13 @@
 /* MeowBox web UI: brutal theme flourishes. Loaded only while this theme is active (index.html, setTheme in app.js).
    Colours/fonts come from themes.css; layout is shared in app.css. */
-/* ---------- Brutalism: system fonts, visible grid, 3px borders, hard shadows, blue underlined links, no transitions, tilted h1 */
+/* ---------- Brutalism: system fonts, visible grid, 3px borders, hard shadows, blue underlined links, no transitions, tilted h1.
+   Effects saver (data-fx=eco) drops what themes/brutal.json lists under "fx" (grid, tilt, shadows), as the speaker does. */
 [data-theme=brutal]{--soft:var(--line);--fw-head:700;--h2:28px;--big:64px;--stn:24px;--btn-bg:var(--surface);--btn-fg:var(--text);--btn-bd:var(--line);--gh-bd:var(--line);
 --sel-bg:var(--accent);--sel-fg:var(--on-accent);--focus:var(--alert);--chart:var(--text);--dot:var(--alert);--link:var(--accent2);--t:0s;--gap:40px}
 [data-theme=brutal] *{transition:none!important}
-[data-theme=brutal] body{font-size:18px;background-image:linear-gradient(color-mix(in srgb,var(--line) 11%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--line) 11%,transparent) 1px,transparent 1px);background-size:24px 24px}
+[data-theme=brutal][data-fx=eco]{--shadow:none;--hover-shadow:none}
+[data-theme=brutal] body{font-size:18px}
+[data-theme=brutal]:not([data-fx=eco]) body{background-image:linear-gradient(color-mix(in srgb,var(--line) 11%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--line) 11%,transparent) 1px,transparent 1px);background-size:24px 24px}
 [data-theme=brutal] :focus-visible{outline:4px solid var(--focus);outline-offset:0}
 [data-theme=brutal] a{text-decoration:underline}
 [data-theme=brutal] a:hover{color:var(--link);background:var(--accent)}
@@ -29,7 +32,8 @@
 [data-theme=brutal] nav a.on::before,[data-theme=brutal] .subnav a.on::before{content:"["}
 [data-theme=brutal] nav a.on::after,[data-theme=brutal] .subnav a.on::after{content:"]"}
 [data-theme=brutal] .subnav{border-bottom:3px solid var(--line)}
-[data-theme=brutal] .side>form{background:var(--accent);border:3px solid var(--line);padding:14px;box-shadow:8px 8px 0 var(--line)}
+[data-theme=brutal] .side>form{background:var(--accent);border:3px solid var(--line);padding:14px}
+[data-theme=brutal]:not([data-fx=eco]) .side>form{box-shadow:8px 8px 0 var(--line)}
 [data-theme=brutal] .side>form small{color:var(--text)}
 [data-theme=brutal] nav a .i{display:none}
 [data-theme=brutal] button,[data-theme=brutal] .btn{border-width:3px;box-shadow:var(--shadow);min-height:48px}
@@ -51,7 +55,8 @@
 [data-theme=brutal] .kv>div{border:2px solid var(--line);padding:8px 10px;background:var(--surface)}
 [data-theme=brutal] input,[data-theme=brutal] select,[data-theme=brutal] textarea{border-width:3px;font-family:var(--font-data)}
 [data-theme=brutal] input[type=range]{accent-color:var(--accent2)}
-[data-theme=brutal] .shot{border:3px solid var(--line);box-shadow:10px 10px 0 var(--line)}
+[data-theme=brutal] .shot{border:3px solid var(--line)}
+[data-theme=brutal]:not([data-fx=eco]) .shot{box-shadow:10px 10px 0 var(--line)}
 [data-theme=brutal] .np{border-top-width:3px}
 [data-theme=brutal] #banner{max-width:none;background:var(--alert);color:var(--text);font-weight:700;border-bottom:3px solid var(--line);padding-left:24px}
 [data-theme=brutal] #banner::before{display:none}

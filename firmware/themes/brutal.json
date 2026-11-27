@@ -9,7 +9,7 @@
   "web": {"ui": "'Times New Roman', Times, serif", "display": "'Times New Roman', Times, serif", "data": "'Courier New', Courier, monospace",
           "fonts": [], "light": true},
   "shape": {"radius": 0, "border": 3, "btn": "raw", "shadow": [5, 5], "hover_shadow": [5, 5]},
-  "fx": {"aberration": false, "scanline": false, "grid": true, "hud": false, "enso": false, "tilt": true, "segments": false},
+  "fx": {"aberration": false, "scanline": false, "grid": true, "hud": false, "tilt": true, "segments": false, "shadow": true},
   "clock": {"layout": "block"},
   "cat": {"palette": "fur"}
 }

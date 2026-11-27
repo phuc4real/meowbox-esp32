@@ -270,8 +270,10 @@ The UI looks the city up itself at `https://geocoding-api.open-meteo.com/v1/sear
   Night uses the active theme's own night variant.
 - `night`: legacy bool, mirrors `night_mode != "off"`. A PUT with only `night` maps `true` → `auto`, `false` → `off`;
   when both are sent, `night_mode` wins.
-- `fx`: `full` (the theme's minimal effects) | `eco` (no RGB split, scanlines or tilted blocks; also switched on by
-  itself on battery). The web page applies the same setting to itself (`data-fx` on `<html>`).
+- `fx`: `full` (the theme's effects) | `eco` (turns off the decorations the theme lists under `fx` in
+  `themes/<id>.json`: Cyberpunk RGB split, scanlines, HUD corners, segmented bars; Brutalism grid, hard shadows, tilted
+  heading (web only)). The speaker also drops RGB split, scanlines, grid and shadows at night. The web page applies the
+  same setting to itself (`data-fx` on `<html>`).
 - `lang`: device screen language `vi` | `en`. `tz` is read-only (always `ICT-7`).
 
 ### `PUT /api/config/display`
@@ -288,7 +290,7 @@ Session auth. Theme list for **Settings → Appearance**; the web builds its car
  ],"current":"swiss"}
 ```
 Order = display order. `fonts` = web font files in `/fonts/` used by that theme. `fx` = the `display.fx` setting
-(full/saver) changes something for this theme (RGB split, scanlines, grid, HUD, tilt, segments, hard shadows); the web
+(full/saver) changes something for this theme (any of its `fx` flags is set); the web
 UI hides that setting for themes with `fx:false`. The same data is in `web/themes.json`
 (written by `tools/gen_themes.py`).
 

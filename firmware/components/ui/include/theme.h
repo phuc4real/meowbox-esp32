@@ -27,7 +27,8 @@ typedef struct {
     int8_t shadow_x, shadow_y;
     theme_btn_t btn;
     theme_clock_t clock;
-    bool fx_aberration, fx_scanline, fx_grid, fx_hud, fx_enso, fx_tilt, fx_segments;
+    /* decorations display.fx = eco turns off (tools/gen_themes.py FX_KEYS); tilt is web-only */
+    bool fx_aberration, fx_scanline, fx_grid, fx_hud, fx_tilt, fx_segments, fx_shadow;
     const char *cat_palette; /* "fur" = the user's fur colour, otherwise a cat_sprites palette name */
     const char *web_fonts;   /* comma-separated woff2 files under /fonts/ used by the web UI */
 } theme_def_t;

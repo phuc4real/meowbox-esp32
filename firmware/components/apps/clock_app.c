@@ -571,7 +571,7 @@ static void build_block(lv_obj_t *t) /* Brutalism */
 {
     ui_header(t, ui_tr("đồng_hồ", "clock"), "");
     lv_obj_t *blk = plain_box(t, 16, 30, 212, 90, UI_C_ACCENT, 3);
-    if (ui_fx() && !ui_is_night()) {
+    if (ui_theme()->fx_shadow && ui_fx() && !ui_is_night()) {
         lv_obj_set_style_shadow_width(blk, 1, 0);
         lv_obj_set_style_shadow_offset_x(blk, 5, 0);
         lv_obj_set_style_shadow_offset_y(blk, 5, 0);

@@ -9,7 +9,7 @@
   "web": {"ui": "'Archivo', system-ui, sans-serif", "display": "'Archivo', system-ui, sans-serif", "data": "'Archivo', system-ui, sans-serif",
           "fonts": ["archivo-vi.woff2"], "display_stretch": "72%", "light": true},
   "shape": {"radius": 0, "border": 1, "btn": "fill", "shadow": [0, 0], "hover_shadow": [4, 4]},
-  "fx": {"aberration": false, "scanline": false, "grid": false, "hud": false, "enso": false, "tilt": false, "segments": false},
+  "fx": {"aberration": false, "scanline": false, "grid": false, "hud": false, "tilt": false, "segments": false, "shadow": false},
   "clock": {"layout": "left"},
   "cat": {"palette": "fur"}
 }

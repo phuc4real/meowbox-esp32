@@ -19,6 +19,9 @@ FONTS_DIR = ROOT / "components" / "fonts"
 FALLBACK = {"small": "mb_font_14", "body": "mb_font_20", "title": "mb_font_20_bold", "clock": "mb_font_clock_64"}
 COLOR_KEYS = ["bg", "surface", "text", "dim", "line", "accent", "accent2", "on_accent", "ok", "warn", "alert"]
 BTN = {"fill": "THEME_BTN_FILL", "cut": "THEME_BTN_CUT", "text": "THEME_BTN_TEXT", "raw": "THEME_BTN_RAW"}
+# Decorations the "Effects: saver" setting (display.fx = eco) turns off, on the speaker and on the web page alike.
+# A theme lists the ones it has under "fx"; tilt is web-only (the speaker has nothing tilted).
+FX_KEYS = ("aberration", "scanline", "grid", "hud", "tilt", "segments", "shadow")
 CLOCK = {"left": "THEME_CLOCK_LEFT", "center": "THEME_CLOCK_CENTER", "enso": "THEME_CLOCK_ENSO", "block": "THEME_CLOCK_BLOCK"}
 
 
@@ -54,6 +57,8 @@ def main():
                                                        "alert": t["night"].get("accent"), "accent2": t["night"].get("accent")},
                  **t["night"]}
         fx = t.get("fx", {})
+        if set(fx) - set(FX_KEYS):
+            raise SystemExit(f"{t['id']}: unknown fx {sorted(set(fx) - set(FX_KEYS))} (known: {', '.join(FX_KEYS)})")
         sh = t["shape"].get("shadow", [0, 0])
 
         def colors(c):
@@ -69,10 +74,7 @@ def main():
         out.append(f"        .radius = {t['shape'].get('radius', 0)}, .border = {t['shape'].get('border', 0)}, "
                    f".shadow_x = {sh[0]}, .shadow_y = {sh[1]},")
         out.append(f"        .btn = {BTN[t['shape'].get('btn', 'fill')]}, .clock = {CLOCK[t['clock']['layout']]},")
-        out.append("        .fx_aberration = %s, .fx_scanline = %s, .fx_grid = %s, .fx_hud = %s, .fx_enso = %s, "
-                   ".fx_tilt = %s, .fx_segments = %s," % tuple(
-                       "true" if fx.get(k) else "false"
-                       for k in ["aberration", "scanline", "grid", "hud", "enso", "tilt", "segments"]))
+        out.append("        " + " ".join(f".fx_{k} = {'true' if fx.get(k) else 'false'}," for k in FX_KEYS))
         out.append(f"        .cat_palette = {c_str(t['cat']['palette'])},")
         out.append(f"        .web_fonts = {c_str(','.join(t.get('web', {}).get('fonts', [])))},")
         out.append("    },")
@@ -103,9 +105,8 @@ def main():
 
     # theme list for the web (GET /api/themes is built from the same data in firmware; this is for the mock)
     # "fx": the Effects full/saver setting changes something for this theme (same rule as /api/themes in firmware)
-    fx_keys = ("aberration", "scanline", "grid", "hud", "tilt", "segments")
     meta = [{"id": t["id"], "name": t["name"], "desc": t["desc"], "default": bool(t.get("default")),
-             "fx": any(t.get("fx", {}).get(k) for k in fx_keys) or t["shape"].get("btn", "fill") == "raw",
+             "fx": any(t.get("fx", {}).get(k) for k in FX_KEYS),
              "preview": f"/themes/{t['id']}.png", "fonts": t.get("web", {}).get("fonts", [])} for t in themes]
     (ROOT / "web" / "themes.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"{len(themes)} themes: {', '.join(t['id'] for t in themes)} (default {defaults[0]})")

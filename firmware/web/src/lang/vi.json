@@ -218,7 +218,7 @@
   "full": "Đầy đủ",
   "eco": "Tiết kiệm"
  },
- "fxHint": "Tiết kiệm: tắt lệch màu, scanline và khối nghiêng, tự bật khi chạy pin.",
+ "fxHint": "Tiết kiệm tắt trang trí của theme, cả trên loa: lệch màu, scanline, góc HUD, thanh vạch (Cyberpunk); lưới, bóng đổ, tiêu đề nghiêng (Brutalism).",
  "web": "Trang web",
  "webs": {
   "device": "Theo theme của loa",

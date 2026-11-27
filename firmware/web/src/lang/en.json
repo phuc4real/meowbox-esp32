@@ -218,7 +218,7 @@
   "full": "Full",
   "eco": "Saver"
  },
- "fxHint": "Saver: no RGB split, scanlines or tilted blocks; turns on by itself on battery.",
+ "fxHint": "Saver turns off the theme's decorations, on the speaker too: RGB split, scanlines, HUD corners, segmented bars (Cyberpunk); grid, hard shadows, tilted heading (Brutalism).",
  "web": "Web page",
  "webs": {
   "device": "Follow the speaker theme",

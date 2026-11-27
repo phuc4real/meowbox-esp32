@@ -41,7 +41,8 @@ other projects.
 | [docs/ui_redesign.md](docs/ui_redesign.md) | UI review, theme system, per-theme rules (in Vietnamese) |
 | [firmware/README.md](firmware/README.md) | build, flash, use, regenerate assets, partitions |
 | [firmware/web/API.md](firmware/web/API.md) | REST API of the speaker |
-| [pc-agent/README.md](pc-agent/README.md) | PC agent: install, tray menu, YouTube relay, command line (in Vietnamese) |
+| [pc-agent/README.md](pc-agent/README.md) | PC agent (Rust): install, tray menu, YouTube relay, Meow Coding, command line, build |
+| [docs/rewrite_pc_agent.md](docs/rewrite_pc_agent.md) | the PC agent's rewrite from Python to Rust (0.3.0): plan, decisions, results per phase |
 
 ## Hardware at a glance
 

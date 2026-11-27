@@ -47,16 +47,23 @@ py -3.14 firmware/tools/memwatch.py --host $MEOWBOX_HOST --every 5 --minutes 6 -
 - **Web API / web page:** `py -3.14 firmware/web/mock_server.py --port 8099`, then the driver with
   `MEOWBOX_HOST=localhost:8099` (`wait-up`, `status`, `theme`, `radio`, `notify`, `shot`, `api` work). The web page is
   at http://localhost:8099.
-- **PC agent:** from `pc-agent/` in Git Bash (it maps `/tmp` to the Windows temp folder; in PowerShell use a real
-  path), a mock speaker plus the agent from source with a throw-away config:
+- **PC agent** (Rust): from `pc-agent/` in Git Bash, a mock speaker plus the agent built from source in a scratch
+  profile. The profile variables go on the agent's command only: with them the real installed agent's settings,
+  Claude Code hooks and `%LOCALAPPDATA%` tools stay untouched; on `py` they would hide its packages (aiohttp).
   ```bash
-  py -3.14 mock_speaker.py --port 8098 --token test --quiet          # background; prints every [ws] message
-  py -3.14 -m meowbox_agent --config /tmp/agent.json config --set-host 127.0.0.1:8098 --token test --relay-port 8797
-  py -3.14 -m meowbox_agent --config /tmp/agent.json notify "Agent test" "from run skill"   # -> 200 queued
-  (timeout 15 py -3.14 -m meowbox_agent --config /tmp/agent.json run > /tmp/agent.log 2>&1 &); sleep 6
+  cargo build --release -q
+  S=$(cygpath -m /tmp)/mbx; mkdir -p $S/{home,appdata,local}
+  P="USERPROFILE=$S/home APPDATA=$S/appdata LOCALAPPDATA=$S/local"; B=target/release/meowbox.exe
+  py -3.14 mock_speaker.py --port 8098 --token test --quiet &       # background; prints every [ws] message
+  env $P $B config --set-host 127.0.0.1:8098 --token test --relay-port 8797
+  env $P $B notify "Agent test" "from run skill"                    # -> 200 {"ok": true, ...}
+  (env $P timeout 15 $B run --no-update > $S/agent.log 2>&1 &); sleep 6
   curl -s "http://127.0.0.1:8098/mock/cmd?cmd=vol_up"   # -> {"sent":"vol_up","agent":"<PC name>"} while run is up
-  grep -a "connected\|media_cmd" /tmp/agent.log         # "connected to MeowBox-MOCK", "media_cmd vol_up"
+  grep -a "connected\|media_cmd" $S/agent.log           # "connected to MeowBox-MOCK", "media_cmd vol_up"
   ```
+  The tray app the same way: `env $P target/release/MeowBoxAgent.exe --dev --open` (`--dev`: runs next to the
+  installed agent). Its window answers UI Automation (accesskit), so buttons can be pressed by name from PowerShell 7
+  (`pwsh`, which reads scripts as UTF-8: Windows PowerShell 5 garbles the Vietnamese button names).
 - Web UI tests: from `firmware/web/`, `node --check src/app.js` and `py -3.14 test_api.py` (prints `ALL PASSED`).
 
 ## Gotchas
@@ -76,8 +83,9 @@ py -3.14 firmware/tools/memwatch.py --host $MEOWBOX_HOST --every 5 --minutes 6 -
   the driver (`api PUT ... '{...}'`) or Python, never curl, when it contains non-ASCII.
 - **The console is cp1252**: `print()` of Vietnamese raises UnicodeEncodeError in ad-hoc scripts. The driver
   reconfigures stdout to UTF-8; in your own one-liners print `ascii(x)`.
-- **A real PC agent already runs on this PC** and owns relay port 8765: give a test agent `--relay-port 8797`, or it
-  logs `relay port 8765 busy`.
+- **A real PC agent already runs on this PC** and owns relay port 8765 and Meow Coding port 8767: give a test agent
+  `--relay-port 8797` (and another `coding_port` in its `agent.json` if it must serve hooks), or it logs `port … busy`.
+  Run it in a scratch profile (above): with the real one it rewrites the real Claude Code hooks to its own port.
 - Radio start takes 2-4 s (`st` goes `buf` -> `play`); poll `status` instead of sleeping a fixed time. The alarm card
   and screen-off are invisible to `shot`: check them by eye or in the serial log (`clock: alarm HH:MM ringing`,
   `ui: screen sleep`).

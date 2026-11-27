@@ -13,8 +13,7 @@ firmware/sdkconfig.old
 firmware/web/screens/
 firmware/dist/
 pc-agent/packaging/build/
-pc-agent/packaging/vendor/
-pc-agent/.venv/
+pc-agent/target/
 firmware/tools/cat_sprites/preview/
 firmware/tools/fonts/node_modules/
 

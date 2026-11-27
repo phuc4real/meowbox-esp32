@@ -138,6 +138,11 @@ Hiện 4 theme dùng chung bố cục và code, chỉ khác CSS. Những chỗ l
 
 ## 2. PC Agent: tray icon và file cài đặt
 
+> Since 0.3.0 the agent is written in Rust: same files, settings, protocol and installer, but egui instead of
+> tkinter, its own tray code instead of pystray, `cargo build` instead of PyInstaller, and yt-dlp's onedir build
+> instead of the zipapp. This section is the 0.2.x (Python) design as planned; the Rust port, its decisions and its
+> results are in [rewrite_pc_agent.md](rewrite_pc_agent.md), current usage in [pc-agent/README.md](../pc-agent/README.md).
+
 ### Hiện trạng
 - Agent là một file `pc-agent/agent.py` (asyncio), phải cài Python và pip, chạy bằng `pythonw` qua Task Scheduler
   (`install_autostart.ps1`). Không có UI nên không biết nó đang chạy hay đã chết, chỉ xem được trong `agent.log`.

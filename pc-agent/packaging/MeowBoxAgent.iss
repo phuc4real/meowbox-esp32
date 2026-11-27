@@ -1,5 +1,6 @@
 ; Inno Setup 6 script for MeowBox Agent (docs/firmware_v0.2.0.md, 2.11). Built by build.ps1:
-;   iscc /DAppVersion=0.2.0 MeowBoxAgent.iss   ->  build\MeowBoxAgent-Setup-0.2.0.exe
+;   iscc /DAppVersion=0.3.0 MeowBoxAgent.iss   ->  build\MeowBoxAgent-Setup-0.3.0.exe
+; Two exes from `cargo build --release`: MeowBoxAgent.exe (tray) and meowbox.exe (command line).
 ; Installs for the whole machine (Program Files, admin) so it can add the firewall rules itself.
 
 #ifndef AppVersion
@@ -19,7 +20,7 @@ DefaultGroupName=MeowBox Agent
 UninstallDisplayIcon={app}\MeowBoxAgent.exe
 OutputDir=build
 OutputBaseFilename=MeowBoxAgent-Setup-{#AppVersion}
-SetupIconFile=build\meowbox.ico
+SetupIconFile=..\assets\meowbox.ico
 Compression=lzma2/max
 SolidCompression=yes
 PrivilegesRequired=admin
@@ -36,6 +37,14 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "autostart"; Description: "Run MeowBox Agent when Windows starts"
 Name: "addpath"; Description: "Add meowbox.exe to PATH (meowbox notify ""Build done"" in any terminal)"; Flags: unchecked
+
+[InstallDelete]
+; left by the Python agent (0.2.x, PyInstaller): its runtime folder, and the yt-dlp zipapp it ran (0.3 uses the
+; onedir build in bin\yt-dlp\<version>\)
+Type: filesandordirs; Name: "{app}\_internal"
+Type: files; Name: "{localappdata}\MeowBox\bin\yt-dlp.pyz"
+Type: files; Name: "{localappdata}\MeowBox\bin\yt-dlp.tmp"
+Type: files; Name: "{localappdata}\MeowBox\bin\yt-dlp.checked"
 
 [Files]
 Source: "{#Dist}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

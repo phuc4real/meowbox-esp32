@@ -30,7 +30,7 @@ in the range and still be wrong, so step 2 matters more.
 Read `git log --format='%h %s%n%b' <tag>..HEAD` and, for each commit that changes behaviour, the diff
 (`git show --stat <h>`, then the relevant hunks). Commit messages describe intent; the docs must describe what the
 code does now, so confirm each fact in the current source before writing it: a default in `settings.c`, a key in
-`lang/*.json`, a GPIO in `hw/ostb_xiaozhi_3st.h`, an argparse option in `pc-agent/meowbox_agent/cli.py`, a route in
+`lang/*.json`, a GPIO in `hw/ostb_xiaozhi_3st.h`, a clap option in `pc-agent/src/cli.rs`, a route in
 `web_register(...)`. Later commits often revert or refine earlier ones, so the final state wins.
 
 Note numbers from the code or measurements (sizes, RAM, timeouts, limits), not from memory: `idf.py size` or the

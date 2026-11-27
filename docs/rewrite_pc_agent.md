@@ -1,6 +1,6 @@
 # Rewrite the PC agent in Rust
 
-Status: phases 0–4 done (2026-11-27), crate in `pc-agent-rs/`. Replaces the Python agent in `pc-agent/` (0.2.5, ~3,000 lines) with a
+Status: phases 0–5 done, phase 6 skipped (2026-11-27); the crate is `pc-agent/`. Replaces the Python agent in `pc-agent/` (0.2.5, ~3,000 lines) with a
 Rust build that behaves the same for the speaker and the user. Estimate: **20–25 working days**, in 6 phases that
 each end in something that runs.
 
@@ -342,6 +342,24 @@ Original scope:
 
 ### Phase 5: packaging and cut-over (2 days)
 
+Result (2026-11-27):
+- `pc-agent/` is now the Rust crate (moved from `pc-agent-rs/` with history); the Python agent (`meowbox_agent/`,
+  `agent.py`, `requirements.txt`, `test_agent.py`, `install_autostart.ps1`, the PyInstaller files) is gone.
+  `mock_speaker.py` stays. The mp4adts fixtures script takes the Python converter from git history.
+- `build.ps1`: `cargo test` → `cargo build --release` → both exes into `packaging\build\dist\MeowBoxAgent\` → Inno
+  Setup. `MeowBoxAgent.iss`: same AppId, firewall rules and Run key; icon from `assets\`; `[InstallDelete]` removes
+  the PyInstaller `_internal\` folder and the old `yt-dlp.pyz` / `.tmp` / `.checked`.
+- **Installer: 5.5 MB** (0.2.5: 20.6 MB). Exes: `MeowBoxAgent.exe` 9.5 MB, `meowbox.exe` 4.5 MB.
+- Docs: `pc-agent/README.md` rewritten in English for the Rust agent; `README.md` docs table; a note at the top of
+  the agent section of `docs/firmware_v0.2.0.md`; `CLAUDE.md` (cargo test / clippy / fmt, and how to keep test and
+  dev runs off this PC's profile); `run-meowbox` skill (agent from source in a scratch profile, UI Automation);
+  `release-docs` skill and `doc_check.py` (CLI commands from `src/cli.rs`, version from `Cargo.toml`).
+- `README_vi.md` needed no change (its agent section describes what the user sees, which is the same).
+- Open: the agent is 0.3.0, the firmware's PROJECT_VER is still 0.2.5 (`doc_check.py` flags the mismatch); they
+  are released together with one number.
+
+Original scope:
+
 - `build.ps1`: `cargo build --release` → copy both exes to `packaging\build\dist\MeowBoxAgent\` → Inno Setup.
   `MeowBoxAgent.iss`: same AppId and rules; `[InstallDelete]` for the old PyInstaller files
   (`{app}\_internal`, `{app}\*.pyd`, `{app}\python*.dll`).
@@ -353,7 +371,12 @@ Original scope:
   `pc-agent/`, Python ≥ 3.11 note removed), `.claude/skills/run-meowbox` and `release-docs` skills.
 - `firmware/tools/release.py`: build the agent with cargo if it builds the agent today.
 
-### Phase 6: soak and device test (2–3 days)
+### Phase 6: soak and device test (2–3 days) — skipped
+
+Skipped by the owner's decision (2026-11-27): no upgrade test over 0.2.5, no fresh-PC test, no 24 h soak. What
+the earlier phases checked on the real speaker: link, stats, notify, say, wifi-setup, relay_test, YouTube playback.
+
+Original scope:
 
 - Upgrade test: install 0.2.5, configure, install the Rust build over it: speaker, token, autostart, Meow Coding hooks
   and firewall rules all still work; uninstall removes everything as before.

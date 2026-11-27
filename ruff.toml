@@ -1,4 +1,4 @@
-# Python lint for tools/, firmware/tools, firmware/web, pc-agent. Run: python -m ruff check .
+# Python lint for tools/, firmware/tools, firmware/web, pc-agent (mock_speaker.py, fixtures/). Run: python -m ruff check .
 line-length = 120
 target-version = "py311"
 extend-exclude = ["backup", "firmware/managed_components", "firmware/build"]

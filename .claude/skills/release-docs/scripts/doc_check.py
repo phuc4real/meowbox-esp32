@@ -151,9 +151,21 @@ def lang():
 
 def cli():
     section("6. PC agent CLI in the docs")
-    src = read("pc-agent/meowbox_agent/cli.py")
-    cmds = set(re.findall(r'add_parser\("([\w-]+)"', src))
-    cmds |= set(re.findall(r'argv\[:1\] == \["([\w-]+)"\]', src))  # hidden commands handled before argparse
+    src = read("pc-agent/src/cli.rs")
+    # clap subcommands: the variants of `enum Cmd` (CamelCase -> kebab-case) unless renamed with #[command(name = ...)]
+    body = re.search(r"pub enum Cmd \{(.*?)\n\}", src, re.S)
+    body = body.group(1) if body else ""
+    cmds = set()
+    renamed = None
+    for line in body.splitlines():
+        r = re.match(r'\s*#\[command\(name = "([\w-]+)"\)\]', line)
+        if r:
+            renamed = r.group(1)
+            continue
+        v = re.match(r"    ([A-Z]\w*)\b", line)
+        if v:
+            cmds.add(renamed or re.sub(r"(?<!^)([A-Z])", r"-\1", v.group(1)).lower())
+            renamed = None
     print(f"Commands: {', '.join(sorted(cmds))}\n")
     hits = []
     for f in md_files():
@@ -170,9 +182,9 @@ def cli():
 def versions():
     section("7. Versions")
     fw = re.search(r'PROJECT_VER\s+"([^"]+)"', read("firmware/CMakeLists.txt"))
-    ag = re.search(r'__version__\s*=\s*"([^"]+)"', read("pc-agent/meowbox_agent/__init__.py"))
+    ag = re.search(r'^version\s*=\s*"([^"]+)"', read("pc-agent/Cargo.toml"), re.M)
     fw, ag = fw.group(1) if fw else "?", ag.group(1) if ag else "?"
-    print(f"- firmware PROJECT_VER `{fw}`, agent `__version__` `{ag}`" + ("" if fw == ag else "  **MISMATCH**"))
+    print(f"- firmware PROJECT_VER `{fw}`, agent Cargo.toml `version` `{ag}`" + ("" if fw == ag else "  **MISMATCH**"))
     tags = git("tag", "--sort=-v:refname").split()
     print(f"- latest tag: `{tags[0] if tags else 'none'}`")
     cur = tuple(int(x) for x in re.findall(r"\d+", fw)[:3]) if fw != "?" else None

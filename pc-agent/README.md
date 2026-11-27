@@ -1,57 +1,68 @@
 # MeowBox PC agent
 
-App nhỏ chạy trên PC Windows, làm mấy việc này cho loa MeowBox:
+A small Windows app that does this for the MeowBox speaker:
 
-- Gửi số liệu máy (CPU, RAM, GPU, nhiệt độ, mạng, ổ đĩa) lên loa mỗi giây, qua WebSocket `ws://<loa>/ws/pc`.
-- Gửi bài đang phát (Spotify, Chrome, Edge...) và nhận lệnh ⏮ ⏯ ⏭ 🔉 🔊 từ loa.
-- Gửi thông báo từ dòng lệnh (`notify`), hoặc đọc thành tiếng bằng TTS Windows (`say`).
-- Bật lại Wi-Fi cài đặt `MeowBox-XXXX` trên loa (`wifi-setup`).
-- Làm **YouTube relay**: loa xin `http://<pc>:8765/yt/stream?url=...` thì agent dùng yt-dlp lấy audio AAC rồi
-  stream về như một đài radio (không mã hoá lại, xem mục YouTube bên dưới). Chỉ loa đang nối mới dùng được relay,
-  máy khác nhận 403.
+- Sends the PC's stats (CPU, RAM, GPU, temperatures, network, disk) to the speaker every second over the WebSocket
+  `ws://<speaker>/ws/pc`.
+- Sends what is playing (Spotify, Chrome, Edge...) and takes ⏮ ⏯ ⏭ 🔉 🔊 back from the speaker.
+- Sends notifications from the command line (`notify`), or reads them aloud with Windows text-to-speech (`say`).
+- Turns the speaker's setup Wi-Fi `MeowBox-XXXX` back on (`wifi-setup`).
+- Is the **YouTube relay**: the speaker asks `http://<pc>:8765/yt/stream?url=...`, the agent gets the AAC audio with
+  yt-dlp and streams it back like a radio station (no re-encoding, see YouTube below). Only the connected speaker may
+  use the relay; anything else gets 403.
+- Shows what Claude Code is doing on the speaker's cat screen (Meow Coding, below).
 
-## Cài bằng file cài đặt (khuyên dùng)
+Since 0.3.0 the agent is written in Rust (it was Python up to 0.2.x; `docs/rewrite_pc_agent.md`). Same settings,
+same files, same protocol: installing 0.3 over 0.2 keeps the speaker, token, autostart and Meow Coding.
 
-Tải `MeowBoxAgent-Setup-x.y.z.exe` ở [Releases](https://github.com/phuc4real/meowbox-esp32/releases), chạy, bấm Next.
-Không cần Python. Bộ cài:
+## Install (recommended)
 
-- cài vào `Program Files\MeowBox Agent` (hỏi quyền admin), có shortcut ở Start Menu;
-- mở tường lửa cho agent trên mạng **Private** (relay YouTube);
-- tùy chọn: chạy cùng Windows (mặc định bật), thêm `meowbox.exe` vào PATH;
-- tải yt-dlp bản mới nhất về `%LOCALAPPDATA%\MeowBox\bin` (không đóng gói kèm, để luôn cập nhật được);
-- gỡ bản cũ chạy bằng Python (task "MeowBox Agent" trong Task Scheduler, shortcut Startup), giữ cấu hình cũ.
+Download `MeowBoxAgent-Setup-x.y.z.exe` (~6 MB) from
+[Releases](https://github.com/phuc4real/meowbox-esp32/releases), run it, click Next. The installer:
 
-Cài xong agent chạy luôn, hiện icon con mèo ở khay hệ thống, và lần đầu tự mở cửa sổ **Kết nối loa**:
+- installs into `Program Files\MeowBox Agent` (asks for admin), with a Start Menu shortcut;
+- opens the firewall for the agent on **Private** networks (YouTube relay);
+- options: run at Windows start (on by default), add `meowbox.exe` to PATH;
+- downloads the latest yt-dlp into `%LOCALAPPDATA%\MeowBox\bin\yt-dlp` (not bundled, so it can always be updated);
+- removes what the Python agent left (its `_internal` folder, `yt-dlp.pyz`), keeping the settings.
 
-1. **IP loa**: nhập IP hiện trên tile Hệ thống của loa, bấm Thử (agent gọi `/api/ping`).
-2. **Token**: dán token ở trang Thông báo của loa rồi bấm Kiểm tra. Bắt buộc từ 0.2.7: loa chỉ nhận agent gửi đúng
-   token (số liệu máy, nhạc, YouTube, `notify`, `say`, `wifi-setup`).
-3. **Kiểm tra**: loa thử gọi relay trên máy này. Lỗi trên mạng Windows xếp là Public thì có nút
-   "Cho phép trên mạng này" (hỏi quyền admin, chỉ thêm rule cho đúng loại mạng đó).
+After installing, the agent starts, shows a cat in the system tray, and the first time opens the **Kết nối loa**
+(connect speaker) window:
 
-Chấm trên icon: xanh = đã nối loa, xám = đang nối, đỏ = lỗi (di chuột vào icon để xem). Menu chuột phải có
-mở trang cài đặt của loa, gửi thông báo thử, tạm dừng gửi số liệu, kết nối loa, nối lại ngay, chạy cùng Windows,
-thư mục log. Loa đang nối với PC khác thì có "Giành quyền nối loa". Có agent mới trên GitHub thì menu hiện
-"Có bản x.y.z".
+1. **IP loa**: type the IP shown on the speaker's System tile, click Thử (the agent calls `/api/ping`).
+2. **Token**: paste the token from the speaker's Notifications page and click Kiểm tra. Required: the speaker only
+   accepts an agent with the right token (stats, media, YouTube, `notify`, `say`, `wifi-setup`).
+3. **Kiểm tra**: the speaker tries to call the relay on this PC. If that fails on a network Windows calls Public,
+   a "Cho phép trên mạng này" button adds a firewall rule for that network type only (asks for admin).
 
-Agent không dò loa trong mạng (không mDNS, không UDP broadcast): phần mềm bảo mật ở máy công ty hay chặn hoặc báo
-động kiểu quét này. Nó chỉ nối tới IP đã nhập (`host`) hoặc IP lần trước nối được (`last_host`), và kiểm tra **tên**
-loa (`MeowBox-1A2B`) qua `/api/ping` để nhà có hai loa không nối nhầm. Loa đổi IP thì nhập lại trong **Kết nối loa**
-(hoặc `meowbox config --set-host IP`); nên đặt IP cố định cho loa trên router. Mỗi lúc một loa chỉ nhận một PC.
+The dot on the icon: green = connected, grey = connecting, red = error (hover the icon to see which). The right-click
+menu: open the speaker's web page, send a test notification, pause stats, Meow Coding, connect speaker, settings,
+reconnect now, run at Windows start, log folder. When the speaker is held by another PC, "Giành quyền nối loa" takes
+it over. When GitHub has a newer agent, the menu shows "Có bản x.y.z".
 
-Cấu hình: `%APPDATA%\MeowBox\agent.json`. Log: `%APPDATA%\MeowBox\agent.log` (xoay vòng 1 MB × 3).
+The agent does not look for the speaker on the network (no mDNS, no UDP broadcast): security software on company
+PCs blocks or flags that kind of scan. It only connects to the IP you typed (`host`) or the last one that worked
+(`last_host`), and checks the speaker's **name** (`MeowBox-1A2B`) through `/api/ping` so a home with two speakers
+does not connect to the wrong one. When the speaker's IP changes, type it again in **Kết nối loa** (or
+`meowbox config --set-host IP`); better, give the speaker a fixed IP on the router. A speaker takes one PC at a time.
 
-**Cài đặt…** (menu tray): phiên bản và cập nhật của agent (tải bộ cài mới rồi tự chạy), yt-dlp, ffmpeg; tự kiểm tra
-mỗi ngày; chạy cùng Windows; cổng relay; thư mục log.
+Settings: `%APPDATA%\MeowBox\agent.json`. Log: `%APPDATA%\MeowBox\agent.log` (rotated at 1 MB × 3).
+
+**Cài đặt…** (tray menu, the second page of the same window): agent version and update (downloads the new installer
+and runs it), yt-dlp, ffmpeg; daily update check; run at Windows start; relay port; log folder.
 
 ### YouTube
 
-- Video thường: yt-dlp tải audio AAC (m4a, itag 140, ~128 kbps), agent bỏ vỏ MP4 thành ADTS cho loa. Không mã hoá lại,
-  không cần ffmpeg.
-- Live: yt-dlp không tải luồng live HLS nếu không có ffmpeg, nên lần đầu phát live agent tự tải ffmpeg bản LGPL
-  (BtbN `win64-lgpl-shared`, ~75 MB, kiểm tra SHA-256) về `%LOCALAPPDATA%\MeowBox\bin\ffmpeg`. Âm thanh chỉ được chép
-  nguyên (AAC trong MPEG-TS). Trong lúc tải loa tự thử lại, tray hiện thông báo. Máy có ffmpeg trong PATH thì dùng luôn.
-- yt-dlp là bản zip thuần Python (~3 MB) chạy bằng `meowbox.exe ytdlp …`; xem/cập nhật: `meowbox tools status|update`.
+- Videos: yt-dlp downloads the AAC audio (m4a, itag 140, ~128 kbps), the agent strips the MP4 container into ADTS for
+  the speaker. No re-encoding, no ffmpeg.
+- Live: yt-dlp will not download live HLS without ffmpeg, so the first time a live stream is played the agent
+  downloads an LGPL ffmpeg (FFmpeg-Builds `win64-lgpl-shared`, ~75 MB, SHA-256 checked) into
+  `%LOCALAPPDATA%\MeowBox\bin\ffmpeg`. The audio is only copied (AAC in MPEG-TS). The speaker retries by itself
+  meanwhile and the tray shows a notification. An ffmpeg already in PATH is used as is.
+- yt-dlp is the official onedir build (`yt-dlp_win.zip`, ~24 MB), one folder per version under `bin\yt-dlp\`, so an
+  update never touches files a running stream uses. Check/update: `meowbox tools status|update`, or Cài đặt.
+- Each stream runs in its own Windows job: when the speaker disconnects (or the agent quits or crashes), yt-dlp and
+  ffmpeg end with it.
 
 ## Meow Coding (Claude Code)
 
@@ -64,95 +75,111 @@ wakes the screen and chimes), and is happy when a turn is done. Next to it: the 
   This adds hooks to `~/.claude/settings.json` (other hooks and settings are kept; the file as it was before is
   saved once as `settings.json.meowbox.bak`). Sessions started after that show up.
 - Each hook runs `curl` in the background (`async`) and sends the event to `http://127.0.0.1:8767/hook`
-  (`coding_port` in `agent.json`, this PC only). Claude Code never waits for it, and when the agent is not running
-  the hook still ends without an error (`|| exit 0`), so no "hook failed" messages. Install again after updating the
-  agent: it replaces the HTTP hooks of the first Meow Coding builds.
+  (`coding_port` in `agent.json`, this PC only) with a per-install key (`%APPDATA%\MeowBox\hook.key`), so a web page
+  or another program cannot feed the cat. Claude Code never waits for it, and when the agent is not running the hook
+  still ends without an error (`|| exit 0`). Hooks written by an older agent are rewritten when the agent starts.
 - The agent reads each session's transcript (`~/.claude/projects/…/*.jsonl`) for the title, model, tokens and
   context.
 - The 5-hour and weekly usage of your Claude plan come from Claude Code's status line: `install` sets one
-  (`curl … http://127.0.0.1:8767/status`, it shows `MeowBox · 5h 23% · 7d 41%`) unless you already have your own,
-  which it never replaces. The speaker shows `5h 23%` next to the tokens. API-key sessions have no plan limits.
+  (`curl … http://127.0.0.1:8767/status`, it shows `=^.^= MeowBox · 5h 23% · 7d 41%`) unless you already have your
+  own, which it never replaces. The speaker shows `5h 23%` next to the tokens. API-key sessions have no plan limits.
 - Only short labels go to the speaker: title, project folder, branch, and the kind of action (`read`, `bash`,
   `image`...). No prompts, commands, file names or contents.
 
-## Dòng lệnh
+## Command line
 
-Sau khi cài (và chọn thêm vào PATH), hoặc `python agent.py ...` khi chạy từ source:
+After installing (with "add to PATH"), or `target\release\meowbox.exe` from a build:
 
 ```powershell
-meowbox notify "Build xong" "esp32-playground OK" --sound chime --priority high
-meowbox say "Build xong rồi nha"            # TTS Windows → WAV → /api/notify/audio
-meowbox say "test" --save test.wav           # chỉ lưu file, không gửi
-meowbox wifi-setup [on|off|status]           # Wi-Fi cài đặt MeowBox-XXXX (mật khẩu hiện trên màn hình loa)
-meowbox coding install                       # Meow Coding: hook Claude Code (uninstall | status)
-meowbox config --set-host 192.168.1.50      # IP loa (tile Hệ thống)
+meowbox notify "Build done" "esp32-playground OK" --sound chime --priority high
+meowbox say "Build xong rồi nha"            # Windows TTS → WAV → /api/notify/audio
+meowbox say "test" --save test.wav           # only save the file
+meowbox wifi-setup [on|off|status]           # setup Wi-Fi MeowBox-XXXX (password on the speaker's screen)
+meowbox coding install                       # Meow Coding: Claude Code hooks (uninstall | status)
+meowbox tools status                         # yt-dlp and ffmpeg versions (update: latest yt-dlp)
+meowbox config --set-host 192.168.1.50      # speaker IP (System tile)
 meowbox config --token <token> --speaker MeowBox-1A2B
-meowbox run                                  # agent không có icon (như bản cũ), --no-relay, --no-update
+meowbox run                                  # the agent without a tray icon, --no-relay, --no-update
+meowbox tray                                 # starts MeowBoxAgent.exe
 ```
 
-`say` ưu tiên giọng tiếng Việt (Microsoft An) nếu máy có. Chưa có thì vào *Settings → Time & language →
-Speech → Add voices* cài gói tiếng Việt.
+`--config <file>` and `--host IP[:port]` work with every command; `-v` logs more.
 
-Nhiệt độ CPU/GPU: chạy [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor), bật
-*Options → Remote Web Server* (cổng 8085). Máy có card NVIDIA thì agent cũng đọc `nvidia-smi`.
+`say` picks a Vietnamese voice (Microsoft An) when Windows has one. If not: *Settings → Time & language → Speech →
+Add voices*, add Vietnamese.
 
-## Chạy từ source
+CPU/GPU temperatures: run [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) with
+*Options → Remote Web Server* on (port 8085). With an NVIDIA card the agent also reads `nvidia-smi`.
 
-Python 3.11+ (đã test 3.14). yt-dlp: `python agent.py tools update` (vào `%LOCALAPPDATA%\MeowBox\bin`).
+## Build from source
+
+Rust stable (MSVC toolchain, `rustup default stable-x86_64-pc-windows-msvc`). From `pc-agent/`:
 
 ```powershell
-cd pc-agent
-python -m pip install --user -r requirements.txt
-python agent.py tray        # icon ở khay hệ thống
-python agent.py run -v      # không icon, log ra console
+cargo run --bin MeowBoxAgent -- --dev --open   # tray + window, next to an installed agent (no single-instance check)
+cargo run --bin meowbox -- run -v              # headless, log to the console
+cargo test                                     # unit + integration tests (fake speaker, relay, Meow Coding)
+cargo clippy --all-targets -- -D warnings
+cargo fmt
 ```
 
-Code nằm trong `meowbox_agent/` (xem docstring của `meowbox_agent/__init__.py`). `agent.py` chỉ gọi `cli.main()` để
-các lệnh cũ vẫn chạy.
+`MeowBoxAgent.exe` dev flags: `--dev` (skip the single-instance check), `--open` (open the window at start),
+`--selftest-dialog N` (open and close the window N times, then quit), `-v`.
+
+Layout (`src/`): `link.rs` (the `/ws/pc` link and the core), `discovery.rs`, `stats.rs`, `media.rs`, `tts.rs`,
+`relay/` (YouTube relay, MP4 → ADTS, job objects), `tools/` (yt-dlp, ffmpeg), `coding/` (Meow Coding), `ui/` (tray,
+egui window), `win/` (Windows bits), `cli.rs`, `config.rs`, `log.rs`. Tests that need the network or touch a real
+profile are off by default (`cargo test -- --ignored` downloads ffmpeg into `%LOCALAPPDATA%`, point it somewhere
+disposable).
 
 ### YouTube relay
 
 ```
 GET http://<pc>:8765/yt/info?url=<link>                → JSON: type, title, duration, is_live, entries (playlist)
-GET http://<pc>:8765/yt/stream?url=<link>              → audio/aac (live: video/mp2t), header icy-name = tên bài
-GET http://<pc>:8765/yt/stream?url=<playlist>&index=N  → bài thứ N trong playlist (đếm từ 0)
-GET http://<pc>:8765/yt/ping                           → {"ok":true} (loa dùng cho relay_test)
+GET http://<pc>:8765/yt/stream?url=<link>              → audio/aac (live: video/mp2t), header icy-name = title
+GET http://<pc>:8765/yt/stream?url=<playlist>&index=N  → item N of the playlist (from 0)
+GET http://<pc>:8765/yt/ping                           → {"ok":true} (the speaker's relay_test)
 ```
 
-Chỉ IP của loa đang nối được phép, máy khác nhận 403. `url` phải là link YouTube `http(s)://` (youtube.com, youtu.be),
-nếu không thì 400.
+Only the connected speaker's IP may use it, anything else gets 403. `url` must be a YouTube `http(s)://` link
+(youtube.com, youtu.be), else 400.
 
-## Build file cài đặt
+## Build the installer
 
-Cần PyInstaller (`pip install --user pyinstaller`) và Inno Setup 6 (`winget install JRSoftware.InnoSetup`).
+Rust and Inno Setup 6 (`winget install JRSoftware.InnoSetup`).
 
 ```powershell
-.\build.ps1          # icon + PyInstaller (MeowBoxAgent.exe + meowbox.exe) + Inno Setup
-.\build.ps1 -Venv    # build trong .venv sạch
+.\build.ps1             # cargo test + cargo build --release (MeowBoxAgent.exe + meowbox.exe) + Inno Setup
+.\build.ps1 -SkipTests
 ```
 
-Ra `packaging\build\MeowBoxAgent-Setup-<version>.exe` (~20 MB, không kèm yt-dlp hay ffmpeg). Phiên bản lấy từ
-`meowbox_agent/__init__.py` (`__version__`, chung số với firmware).
+Output: `packaging\build\MeowBoxAgent-Setup-<version>.exe` (~6 MB, no yt-dlp or ffmpeg inside). The version is
+`version` in `Cargo.toml` (the same number as the firmware).
 
-## Test không cần loa (mock)
+## Test without a speaker (mock)
 
-`mock_speaker.py` giả làm loa: `/ws/pc` (một PC mỗi lúc, `busy`, `take`), `/api/ping`, `/api/notify*`,
-`/api/pc/relay_test` như firmware (không có mDNS/UDP vì agent không dùng).
+`mock_speaker.py` (Python, aiohttp) plays the speaker: `/ws/pc` (one PC at a time, `busy`, `take`), `/api/ping`,
+`/api/notify*`, `/api/pc/relay_test` as the firmware does (no mDNS/UDP: the agent does not use them).
 
 ```powershell
-python mock_speaker.py --port 8081 --name MeowBox-AAAA
-python mock_speaker.py --port 8082 --name MeowBox-BBBB     # loa thứ hai: test kiểm tra tên loa
-python agent.py --config test.json config --set-host 127.0.0.1:8081 --token test --speaker MeowBox-AAAA
-python agent.py --config test.json run
-curl "http://127.0.0.1:8081/mock/cmd?cmd=vol_up"     # loa giả gửi media_cmd cho agent
+py -3.14 mock_speaker.py --port 8081 --name MeowBox-AAAA
+py -3.14 mock_speaker.py --port 8082 --name MeowBox-BBBB     # a second speaker: tests the name check
+meowbox --config test.json config --set-host 127.0.0.1:8081 --token test --speaker MeowBox-AAAA --relay-port 8797
+meowbox --config test.json run
+curl "http://127.0.0.1:8081/mock/cmd?cmd=vol_up"             # the mock sends a media_cmd to the agent
 ```
 
-## Giới hạn
+A test agent next to an installed one: give it another `--relay-port` and `coding_port`, and run it with `APPDATA`,
+`LOCALAPPDATA` and `USERPROFILE` pointing to a scratch folder, or it uses (and refreshes) the real settings, tools and
+Claude Code hooks.
 
-- Chỉ chạy trên Windows (Media Session, pycaw, SAPI).
-- Không có LibreHardwareMonitor hay nvidia-smi thì không có GPU % và nhiệt độ (gửi `null`).
-- `pos`/`len` của bài hát tuỳ app. Chrome với video live thì báo 0.
-- Relay chỉ dùng cá nhân. YouTube đổi cách chặn thì cập nhật yt-dlp trong Cài đặt (hoặc chờ lần tự kiểm tra hằng ngày).
-- yt-dlp cảnh báo thiếu runtime JavaScript (deno): một số định dạng YouTube có thể thiếu. Video thường vẫn có AAC.
-- Hai agent cùng chạy trên một máy (ví dụ `meowbox run` khi bản tray đang chạy) sẽ giành loa qua lại.
-- File cài đặt chưa ký số: SmartScreen sẽ báo "Unknown publisher", bấm *More info → Run anyway*.
+## Limits
+
+- Windows only (Media Session, Core Audio, WinRT text-to-speech, Network List Manager).
+- Without LibreHardwareMonitor or nvidia-smi there is no GPU % and no temperatures (sent as `null`).
+- A song's `pos`/`len` depend on the app. Chrome reports 0 for live videos.
+- The relay is for personal use. When YouTube changes, update yt-dlp in Cài đặt (or wait for the daily check).
+- Two agents on one PC (say `meowbox run` while the tray app runs) take the speaker from each other.
+- The installer is not code-signed: SmartScreen says "Unknown publisher", click *More info → Run anyway*.
+- The settings window draws with OpenGL; while it is open it uses ~125 MB (the graphics driver), back to a few MB
+  when it closes.

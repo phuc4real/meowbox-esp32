@@ -21,7 +21,7 @@ Overview and layout: @README.md. Build, flash, asset generators, partitions: @fi
   esptool (`firmware/README.md`, "Build in Docker"): containers can't reach COM10.
 - The `build/` folder remembers the project path and the IDF it was configured with. After the repo moves or IDF
   changes, run `idf.py fullclean` first (it keeps `sdkconfig`).
-- Run repo scripts with `py -3.14` (it has Pillow, pyserial, ruff and the agent's packages).
+- Run repo scripts with `py -3.14` (it has Pillow, pyserial, ruff and aiohttp for `pc-agent/mock_speaker.py`).
 - The speaker is on **COM10** (native USB-Serial/JTAG, no buttons needed). COM13 is an unrelated ESP8266.
 - You may build and flash / OTA the speaker without asking (`/flash-speaker`). `backup/` holds the vendor flash
   dump; never overwrite or delete it. Drive the running speaker (screenshots, radio, notifications, memory, frozen-UI
@@ -67,6 +67,7 @@ Commit the regenerated outputs together with their source.
 ## Lint
 
 - Python: `py -3.14 -m ruff check .` (config `ruff.toml`). Don't add new findings; the existing B904s are known.
+- Rust (`pc-agent/`): `cargo clippy --all-targets -- -D warnings` must be clean; `cargo fmt` formats the crate.
 - C: format only the lines you changed (`git clang-format`, config `.clang-format`). Never reformat whole files:
   the code packs short statements on one line on purpose. Generated files are in `.clang-format-ignore`.
   On this machine `git clang-format` is not a git command; call the script directly (Git Bash):
@@ -80,5 +81,11 @@ Commit the regenerated outputs together with their source.
 - Docs and code comments in English. The only Vietnamese doc is `README_vi.md`, a user guide (how to use the speaker).
   Some existing docs are still in Vietnamese; write new content in English.
 - Commit messages: one plain English sentence in the imperative, describing the user-visible change.
-- `pc-agent/` is Windows-only (Media Session, pycaw, SAPI); Python ≥ 3.11. After touching the relay, the
-  speaker link or the Meow Coding hooks: `python test_agent.py` from `pc-agent/` (must print `ALL PASSED`).
+- `pc-agent/` is Rust (stable, MSVC), Windows-only (Media Session, Core Audio, WinRT TTS). After touching it, from
+  `pc-agent/`: `cargo test`, `cargo clippy --all-targets -- -D warnings` and `cargo fmt` (`rustfmt.toml`, 120
+  columns). `mock_speaker.py` stays Python (`py -3.14`).
+- A test or dev run of the agent must not use this PC's profile: the installed agent owns ports 8765/8767, and the
+  core refreshes the Claude Code hooks in the real `~/.claude/settings.json` and downloads yt-dlp into the real
+  `%LOCALAPPDATA%`. Integration tests start the core with `Options { relay, ytdlp_update, update_check, coding: false
+  }`; manual runs set `APPDATA`, `LOCALAPPDATA` and `USERPROFILE` to a scratch folder (Git Bash `VAR=… cmd`; in
+  PowerShell `$env:VAR = …`, not `set`).

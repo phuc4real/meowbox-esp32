@@ -1,18 +1,25 @@
-"""Make the mp4adts test fixtures: short synthetic tones (no real audio) as MP4/M4A in the layouts YouTube serves,
-plus the ADTS the Python agent's Mp4ToAdts makes from each (the reference the Rust port must match byte for byte).
+r"""Make the mp4adts test fixtures: short synthetic tones (no real audio) as MP4/M4A in the layouts YouTube serves,
+plus the ADTS the Python agent's Mp4ToAdts (0.2.x) makes from each: the reference the Rust port must match byte for
+byte. The Python agent is gone from the tree; take its converter from git history:
 
-    py -3.14 fixtures/make_fixtures.py        (from pc-agent-rs/; needs ffmpeg with the aac encoder)
+    git show 17bb863:pc-agent/meowbox_agent/mp4adts.py > %TEMP%\mp4adts.py
+    py -3.14 fixtures/make_fixtures.py %TEMP%\mp4adts.py      (from pc-agent/; needs ffmpeg with the aac encoder)
 
 Run again only if a fixture is added; the outputs are committed.
 """
+import importlib.util
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).parent
-sys.path.insert(0, str(HERE.parent.parent / "pc-agent"))
-from meowbox_agent.mp4adts import Mp4ToAdts  # noqa: E402
+if len(sys.argv) != 2:
+    sys.exit(__doc__)
+_spec = importlib.util.spec_from_file_location("mp4adts", sys.argv[1])
+_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
+Mp4ToAdts = _mod.Mp4ToAdts
 
 FF = shutil.which("ffmpeg") or str(Path.home() / "AppData/Local/MeowBox/bin/ffmpeg/ffmpeg.exe")
 TONE = ["-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-f", "lavfi", "-i", "sine=frequency=660:duration=2"]

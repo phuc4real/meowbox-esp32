@@ -7,7 +7,7 @@ Các ý tưởng để dành, chưa xếp vào bản nào. Khi quyết định l
 |---|---|---|
 | MeowBox Cloud (Cloudflare Worker) | khi số liệu ở mục 4 của v0.2.0 cho thấy vẫn thiếu băng thông (đo ở chỗ Wi-Fi yếu: [backlog.md](backlog.md), "Checks on the device"), hoặc cần thông báo khi loa ở ngoài | để dành |
 | Tối ưu lại các theme về UI/UX | sau v0.2.0 | done except Brutalism's swipe FPS ("Still to do" below) |
-| PC agent UI/UX | after v0.2.0 (v0.2.0 ships the agent functionally complete) | parked |
+| PC agent UI/UX | v0.3.1 | planned: [enhance_agent.md](enhance_agent.md) part B |
 
 ---
 
@@ -130,6 +130,9 @@ chủ chuyển mã luồng nhạc như trên.
 ---
 
 ## PC agent UI/UX
+
+Planned in [enhance_agent.md](enhance_agent.md) (part B), updated for the Rust/egui agent of 0.3.0; the list below is
+the original note.
 
 ### Why
 v0.2.0 focuses on what the agent does (discovery, relay, installer, updates). Its windows and menus are plain

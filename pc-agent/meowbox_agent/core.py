@@ -29,6 +29,14 @@ from .tools import maintain_ytdlp
 log = logging.getLogger("meowbox")
 compact = functools.partial(json.dumps, ensure_ascii=False, separators=(",", ":"))
 
+
+def unique_keys(pairs: list) -> dict:
+    """json.loads object_pairs_hook: refuse an object with a repeated key instead of keeping the last value."""
+    d = dict(pairs)
+    if len(d) != len(pairs):
+        raise ValueError("repeated key")
+    return d
+
 # ---------------------------------------------------------------- stats
 
 
@@ -413,8 +421,8 @@ class Core:
                 if msg.type != aiohttp.WSMsgType.TEXT:
                     continue
                 try:
-                    data = json.loads(msg.data)
-                except ValueError:
+                    data = json.loads(msg.data, object_pairs_hook=unique_keys)
+                except ValueError:  # also a message with a repeated key: it could mean two different things
                     continue
                 t = data.get("t")
                 if t == "busy":   # another PC holds the speaker (or just took it over from us)

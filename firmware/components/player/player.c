@@ -82,6 +82,8 @@ static void set_err(uint32_t gen, const char *fmt, int v)
 }
 
 static int stream_kbps(void) { return s_icy_br > 0 ? s_icy_br : s_dec_br > 0 ? s_dec_br : 128; }
+/* A bitrate from a header or the decoder, in kbps; values outside 8..1000 are ignored (0) */
+static int kbps_ok(long v) { return v >= 8 && v <= 1000 ? (int)v : 0; }
 
 static size_t pre_bytes(void)
 {
@@ -169,8 +171,10 @@ static esp_err_t on_http_evt(esp_http_client_event_t *e)
 {
     if (e->event_id == HTTP_EVENT_ON_HEADER && e->header_key && e->header_value) {
         if (strcasecmp(e->header_key, "Content-Type") == 0) snprintf(s_hdrs.ctype, sizeof(s_hdrs.ctype), "%s", e->header_value);
-        else if (strcasecmp(e->header_key, "icy-metaint") == 0) s_hdrs.metaint = atoi(e->header_value);
-        else if (strcasecmp(e->header_key, "icy-br") == 0) s_icy_br = atoi(e->header_value);
+        else if (strcasecmp(e->header_key, "icy-metaint") == 0) {
+            long mi = strtol(e->header_value, NULL, 10); /* bytes between metadata blocks: 0 (no metadata) if odd */
+            s_hdrs.metaint = mi > 0 && mi <= 65536 ? (int)mi : 0;
+        } else if (strcasecmp(e->header_key, "icy-br") == 0) s_icy_br = kbps_ok(strtol(e->header_value, NULL, 10));
     }
     return ESP_OK;
 }
@@ -503,6 +507,7 @@ static void write_pcm(const int16_t *in, int frames, int ch, int rate, float *po
 {
     /* downmix to mono and resample (linear) to the output rate */
     static int16_t out[1024];
+    if (frames <= 0) return;
     const int orate = audio_hw_sample_rate();
     float step = (float)rate / orate;
     int n = 0;
@@ -650,11 +655,12 @@ static void decode_task(void *arg)
         if (o.decoded_size > 0) {
             if (info.sample_rate == 0) {
                 esp_audio_simple_dec_get_info(dec, &info);
-                if (info.bitrate >= 8000) s_dec_br = info.bitrate / 1000;
+                if (info.bitrate >= 8000) s_dec_br = kbps_ok(info.bitrate / 1000);
                 ESP_LOGI(TAG, "decoding %lu Hz, %u ch, %u bit, %lu kbps", (unsigned long)info.sample_rate, info.channel,
                          info.bits_per_sample, (unsigned long)(info.bitrate / 1000));
             }
-            if (info.bits_per_sample == 16 && info.channel >= 1 && info.sample_rate) {
+            /* resample only from a sane rate (a WAV header can say anything) */
+            if (info.bits_per_sample == 16 && info.channel >= 1 && info.sample_rate >= 8000 && info.sample_rate <= 96000) {
                 int frames = o.decoded_size / (2 * info.channel);
                 write_pcm((int16_t *)out, frames, info.channel, info.sample_rate, &pos, &last);
             }
@@ -831,7 +837,7 @@ bool player_net(player_net_t *o)
     size_t pre = pre_bytes();
     o->kbps = s_kbps;
     o->br = s_icy_br > 0 ? s_icy_br : s_dec_br;
-    o->buf_ds = (uint16_t)(avail * 8 / (stream_kbps() * 100)); /* bits / (kbit/s * 100) = 0.1 s units */
+    o->buf_ds = (uint16_t)((uint64_t)avail * 8 / ((uint64_t)stream_kbps() * 100)); /* bits / (kbit/s * 100) = 0.1 s */
     o->pre_s = PRE_S[s_lvl];
     o->under = s_under;
     o->reconn = s_reconn;

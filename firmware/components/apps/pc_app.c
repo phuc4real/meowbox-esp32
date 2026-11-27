@@ -111,6 +111,20 @@ static void send_to(int fd, const char *msg)
     httpd_ws_send_frame_async(web_server(), fd, &f);
 }
 
+/* {"t":"busy","pc":"<name>"}, built with cJSON: the name comes from another agent's hello */
+static void send_busy(int fd, const char *name)
+{
+    char nm[41];
+    utf8_copy(nm, sizeof(nm), name);
+    cJSON *m = cJSON_CreateObject();
+    cJSON_AddStringToObject(m, "t", "busy");
+    cJSON_AddStringToObject(m, "pc", nm);
+    char *txt = cJSON_PrintUnformatted(m);
+    cJSON_Delete(m);
+    if (txt) send_to(fd, txt);
+    cJSON_free(txt);
+}
+
 /* One PC at a time (docs/firmware_v0.2.0.md, 2.4): while one is online, another one's hello gets
  * {"t":"busy","pc":"<name>"} and is closed, unless it says "take":true ("Take over" in the tray); then the old one
  * gets the busy message instead. An agent with a protocol older than MB_PROTO_MIN gets {"t":"proto","need":N}. */
@@ -133,16 +147,14 @@ static bool admit(int fd, cJSON *j)
         if (!hello || (!cJSON_IsTrue(take) && !same_pc)) {
             if (hello) {
                 const char *nm = cJSON_GetStringValue(cJSON_GetObjectItem(j, "name"));
-                snprintf(msg, sizeof(msg), "{\"t\":\"busy\",\"pc\":\"%.40s\"}", s_agent_name[0] ? s_agent_name : s_peer);
-                send_to(fd, msg);
+                send_busy(fd, s_agent_name[0] ? s_agent_name : s_peer);
                 httpd_sess_trigger_close(web_server(), fd);
                 ESP_LOGI(TAG, "%s refused: busy with %s", nm ? nm : "agent", s_agent_name);
             }
             return false;
         }
         const char *nm = cJSON_GetStringValue(cJSON_GetObjectItem(j, "name"));
-        snprintf(msg, sizeof(msg), "{\"t\":\"busy\",\"pc\":\"%.40s\"}", nm ? nm : "?");
-        send_to(s_fd, msg);
+        send_busy(s_fd, nm ? nm : "?");
         httpd_sess_trigger_close(web_server(), s_fd);
         ESP_LOGI(TAG, "%s takes over from %s", nm ? nm : "agent", s_agent_name);
     }

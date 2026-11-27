@@ -99,6 +99,9 @@ try:
         c, j = req("POST", "/api/radio/play", b)
         check(f"radio/play {b}", c == 200 and keys(j, "ok", "vol", "play"))
     check("radio/play unknown id -> 404", req("POST", "/api/radio/play", {"cmd": "play", "id": 999})[0] == 404)
+    for u in ("youtu.be/abc", "ftp://ice.example/live.mp3"):
+        c, j = req("POST", "/api/radio/play", {"cmd": "play", "url": u})
+        check(f"radio/play url {u!r} -> 400", c == 400 and j.get("err") == "bad_value")
     c, j = req("POST", "/api/sleep", {"min": 30}); check("sleep set", 1795 <= j.get("left", 0) <= 1800)
     c, j = req("GET", "/api/sleep"); check("sleep get", keys(j, "left"))
     c, j = req("POST", "/api/sleep", {"min": 0}); check("sleep cancel", j.get("left") == 0)
@@ -237,6 +240,13 @@ try:
     bat = set(re.findall(r"\bB\('([A-Za-z_]+)'", js))
     check(f"every B('...') key exists in 'bat' (missing {sorted(bat - set(langs['vi'].get('bat', {})))})",
           bat <= set(langs["vi"].get("bat", {})))
+
+    print("login lockout (last: it locks this client out for 30 s)")
+    check("password over 64 chars -> 401", req("POST", "/api/login", {"user": "meowbox", "pass": "x" * 5000})[0] == 401)
+    for _ in range(4):
+        req("POST", "/api/login", {"user": "meowbox", "pass": "wrong"})
+    c, j = req("POST", "/api/login", {"user": "meowbox", "pass": "m3owb0x2026"})
+    check("5 failures -> 429 even with the right password", c == 429 and j.get("err") == "too_many")
 finally:
     proc.terminate()
 

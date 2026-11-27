@@ -118,7 +118,8 @@ GET http://<pc>:8765/yt/stream?url=<playlist>&index=N  → bài thứ N trong pl
 GET http://<pc>:8765/yt/ping                           → {"ok":true} (loa dùng cho relay_test)
 ```
 
-Chỉ IP của loa đang nối được phép, máy khác nhận 403.
+Chỉ IP của loa đang nối được phép, máy khác nhận 403. `url` phải là link YouTube `http(s)://` (youtube.com, youtu.be),
+nếu không thì 400.
 
 ## Build file cài đặt
 

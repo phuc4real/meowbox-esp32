@@ -17,6 +17,7 @@
 #include "esp_mac.h"
 #include "esp_ota_ops.h"
 #include "psa/crypto.h"
+#include "lwip/sockets.h"
 #include "nvs.h"
 #include "settings.h"
 #include "webui.h"
@@ -30,6 +31,7 @@ static const char *TAG = "web";
 #define MAX_SESS 4
 #define SESS_TTL_US (24LL * 3600 * 1000000)
 #define MAX_BODY 8192
+#define MAX_PASS 64 /* longer passwords are refused before hashing (new ones: 6-32) */
 
 static httpd_handle_t s_srv;
 static web_json_hook_t s_status_hook;
@@ -59,8 +61,8 @@ esp_err_t web_send_err(httpd_req_t *req, int status, const char *code)
 {
     static const struct { int s; const char *t; } st[] = {
         {400, "400 Bad Request"}, {401, "401 Unauthorized"}, {403, "403 Forbidden"}, {404, "404 Not Found"},
-        {413, "413 Payload Too Large"}, {429, "429 Too Many Requests"}, {500, "500 Internal Server Error"},
-        {503, "503 Service Unavailable"}};
+        {408, "408 Request Timeout"}, {413, "413 Payload Too Large"}, {429, "429 Too Many Requests"},
+        {500, "500 Internal Server Error"}, {503, "503 Service Unavailable"}};
     const char *line = "500 Internal Server Error";
     for (size_t i = 0; i < sizeof(st) / sizeof(st[0]); i++)
         if (st[i].s == status) line = st[i].t;
@@ -71,6 +73,21 @@ esp_err_t web_send_err(httpd_req_t *req, int status, const char *code)
     return httpd_resp_sendstr(req, body);
 }
 
+int64_t web_body_deadline(httpd_req_t *req)
+{
+    return esp_timer_get_time() + (15LL + (int64_t)(req->content_len / 16384)) * 1000000;
+}
+
+int web_recv(httpd_req_t *req, char *buf, size_t len, int64_t deadline)
+{
+    int r;
+    do {
+        if (esp_timer_get_time() >= deadline) return HTTPD_SOCK_ERR_TIMEOUT;
+        r = httpd_req_recv(req, buf, len);
+    } while (r == HTTPD_SOCK_ERR_TIMEOUT);
+    return r;
+}
+
 cJSON *web_read_json(httpd_req_t *req)
 {
     if (req->content_len > MAX_BODY) {
@@ -78,12 +95,17 @@ cJSON *web_read_json(httpd_req_t *req)
         return NULL;
     }
     char *buf = malloc(req->content_len + 1);
+    if (!buf) {
+        web_send_err(req, 503, "busy");
+        return NULL;
+    }
+    int64_t deadline = web_body_deadline(req);
     int got = 0;
     while (got < (int)req->content_len) {
-        int r = httpd_req_recv(req, buf + got, req->content_len - got);
-        if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
+        int r = web_recv(req, buf + got, req->content_len - got, deadline);
         if (r <= 0) {
             free(buf);
+            if (r == HTTPD_SOCK_ERR_TIMEOUT) web_send_err(req, 408, "timeout");
             return NULL;
         }
         got += r;
@@ -153,8 +175,58 @@ typedef struct { char id[33]; int64_t last; } sess_t;
 static sess_t s_sess[MAX_SESS];
 static char s_salt[33], s_hash[65];
 static bool s_def_pw;
-static int s_fail_count;
-static int64_t s_lock_until;
+
+/* Login lockout per client address, so another device on the network cannot lock the owner out: 5 wrong passwords
+ * lock that address for 30 s, each further one doubles the wait (up to 15 min); 15 min without a failure forgets it. */
+#define LOCK_SLOTS 8
+#define LOCK_FORGET_US (15LL * 60 * 1000000)
+typedef struct { uint8_t ip[16]; uint8_t fails; int64_t until, last; } lock_t; /* last == 0: free */
+static lock_t s_locks[LOCK_SLOTS];
+
+static void peer_key(httpd_req_t *req, uint8_t key[16]) /* IPv4 as IPv4-mapped IPv6 */
+{
+    struct sockaddr_storage a;
+    socklen_t al = sizeof(a);
+    memset(key, 0, 16);
+    if (getpeername(httpd_req_to_sockfd(req), (struct sockaddr *)&a, &al) != 0) return;
+    if (a.ss_family == AF_INET6) memcpy(key, &((struct sockaddr_in6 *)&a)->sin6_addr, 16);
+    else if (a.ss_family == AF_INET) {
+        key[10] = key[11] = 0xff;
+        memcpy(key + 12, &((struct sockaddr_in *)&a)->sin_addr, 4);
+    }
+}
+
+static lock_t *lock_find(const uint8_t key[16], int64_t now)
+{
+    for (int i = 0; i < LOCK_SLOTS; i++) {
+        lock_t *l = &s_locks[i];
+        if (!l->last || memcmp(l->ip, key, 16)) continue;
+        if (now >= l->until && now - l->last > LOCK_FORGET_US) {
+            l->last = 0;
+            return NULL;
+        }
+        return l;
+    }
+    return NULL;
+}
+
+/* The client's slot, else a new one: a free or the least recently used unlocked one (all locked: the soonest free) */
+static lock_t *lock_get(const uint8_t key[16], int64_t now)
+{
+    lock_t *l = lock_find(key, now);
+    if (l) return l;
+    lock_t *free_slot = NULL, *oldest = NULL, *soonest = NULL;
+    for (int i = 0; i < LOCK_SLOTS && !free_slot; i++) {
+        lock_t *c = &s_locks[i];
+        if (!c->last) free_slot = c;
+        else if (now >= c->until) { if (!oldest || c->last < oldest->last) oldest = c; }
+        else if (!soonest || c->until < soonest->until) soonest = c;
+    }
+    l = free_slot ? free_slot : oldest ? oldest : soonest;
+    memset(l, 0, sizeof(*l));
+    memcpy(l->ip, key, 16);
+    return l;
+}
 
 static void hex(const uint8_t *in, size_t n, char *out)
 {
@@ -168,14 +240,19 @@ static void random_hex(char *out, size_t bytes)
     hex(b, bytes, out);
 }
 
-static void hash_pw(const char *salt, const char *pw, char out[65])
+/* false (out = "") if salt + password do not fit or hashing failed: a password never matches then */
+static bool hash_pw(const char *salt, const char *pw, char out[65])
 {
     char buf[128];
     int n = snprintf(buf, sizeof(buf), "%s%s", salt, pw);
     uint8_t h[32];
     size_t hl = 0;
-    psa_hash_compute(PSA_ALG_SHA_256, (const uint8_t *)buf, n, h, sizeof(h), &hl);
+    out[0] = 0;
+    if (n < 0 || n >= (int)sizeof(buf)) return false;
+    if (psa_hash_compute(PSA_ALG_SHA_256, (const uint8_t *)buf, n, h, sizeof(h), &hl) != PSA_SUCCESS || hl != 32)
+        return false;
     hex(h, 32, out);
+    return true;
 }
 
 static void auth_save(void)
@@ -187,8 +264,14 @@ static void auth_save(void)
 
 static void auth_set_password(const char *pw)
 {
-    random_hex(s_salt, 16);
-    hash_pw(s_salt, pw, s_hash);
+    char salt[33], h[65];
+    random_hex(salt, 16);
+    if (!hash_pw(salt, pw, h)) {
+        ESP_LOGE(TAG, "password hash failed, keeping the old password");
+        return;
+    }
+    strcpy(s_salt, salt);
+    strcpy(s_hash, h);
     s_def_pw = strcmp(pw, DEFAULT_PASS) == 0;
     auth_save();
 }
@@ -235,8 +318,8 @@ static void auth_init(void)
 static bool auth_check_pw(const char *pw)
 {
     char h[65];
-    hash_pw(s_salt, pw, h);
-    return strcmp(h, s_hash) == 0;
+    if (strlen(pw) > MAX_PASS) return false;
+    return hash_pw(s_salt, pw, h) && strcmp(h, s_hash) == 0;
 }
 
 static sess_t *find_session(httpd_req_t *req)
@@ -306,21 +389,29 @@ httpd_handle_t web_server(void) { return s_srv; }
 static esp_err_t h_login(httpd_req_t *req)
 {
     int64_t now = esp_timer_get_time();
-    if (now < s_lock_until) return web_send_err(req, 429, "too_many");
+    uint8_t key[16];
+    peer_key(req, key);
+    lock_t *l = lock_find(key, now);
+    if (l && now < l->until) return web_send_err(req, 429, "too_many");
     cJSON *j = web_read_json(req);
     if (!j) return ESP_OK;
     const char *user = cJSON_GetStringValue(cJSON_GetObjectItem(j, "user"));
     const char *pass = cJSON_GetStringValue(cJSON_GetObjectItem(j, "pass"));
     bool ok = user && pass && strcmp(user, DEFAULT_USER) == 0 && auth_check_pw(pass);
     cJSON_Delete(j);
+    now = esp_timer_get_time();
     if (!ok) {
-        if (++s_fail_count >= 5) {
-            s_fail_count = 0;
-            s_lock_until = now + 30LL * 1000000;
+        l = lock_get(key, now);
+        l->last = now;
+        if (l->fails < 100) l->fails++;
+        if (l->fails >= 5) {
+            int64_t s = 30LL << (l->fails - 5 < 5 ? l->fails - 5 : 5);
+            l->until = now + (s < 900 ? s : 900) * 1000000;
         }
         return web_send_err(req, 401, "auth");
     }
-    s_fail_count = 0;
+    l = lock_find(key, now);
+    if (l) l->last = 0;
     int slot = 0;
     for (int i = 0; i < MAX_SESS; i++) {
         if (!s_sess[i].id[0]) { slot = i; break; }
@@ -616,11 +707,15 @@ static esp_err_t h_ota(httpd_req_t *req)
     esp_ota_handle_t h;
     if (esp_ota_begin(part, OTA_WITH_SEQUENTIAL_WRITES, &h) != ESP_OK) return web_send_err(req, 500, "busy");
     char *buf = malloc(4096);
+    if (!buf) {
+        esp_ota_abort(h);
+        return web_send_err(req, 503, "busy");
+    }
+    int64_t deadline = web_body_deadline(req);
     int left = req->content_len;
     bool first = true, ok = true;
     while (left > 0) {
-        int r = httpd_req_recv(req, buf, left < 4096 ? left : 4096);
-        if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
+        int r = web_recv(req, buf, left < 4096 ? left : 4096, deadline);
         if (r <= 0) { ok = false; break; }
         if (first && (uint8_t)buf[0] != 0xE9) { ok = false; break; }
         first = false;

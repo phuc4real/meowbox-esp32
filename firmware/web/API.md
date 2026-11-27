@@ -7,13 +7,14 @@ The mock in `web/mock_server.py` implements exactly this document.
 
 - Transport: plain HTTP on port 80 (`http://meowbox-xxxx.local` or the device IP). JSON bodies are UTF-8,
   `Content-Type: application/json`. Request bodies are at most **8 KB**, except `/api/ota` and
-  `/api/notify/audio`.
+  `/api/notify/audio`. A body must arrive within 15 s plus 1 s per 16 KB, else `408 {"err":"timeout"}` (or the
+  connection is closed).
 - Shapes are kept flat and short so the firmware can parse them with cJSON. Booleans are JSON `true`/`false`.
   Unknown fields are ignored, and a missing field in a `PUT` keeps its current value.
 - Success: HTTP 200 with a JSON object (`{"ok":true}` when there is nothing else to return).
 - Error: HTTP 4xx/5xx with `{"err":"<code>"}`. Codes: `auth` (401), `forbidden` (403), `bad_json` (400),
   `bad_value` (400), `not_found` (404), `too_large` (413), `too_many` (429), `busy` (503), `bad_image` (400),
-  `bad_old` (403), `queue_full` (429).
+  `bad_old` (403), `queue_full` (429), `timeout` (408).
 - Times are Unix seconds (UTC). The device always uses the `ICT-7` time zone; the UI shows local times in ICT.
 
 ### Static files
@@ -53,7 +54,9 @@ In SoftAP mode any unknown host redirects to `/` (captive portal).
   A device still on the pre-2026-11-23 default (`meowbox`) is moved to the new default on boot.
 - Sessions: random 128-bit id, max 4 at a time (oldest dropped), expire after 24 h without use. Kept in RAM,
   so a reboot logs everyone out.
-- 5 failed logins in a row → `429 too_many` for 30 s.
+- Failed logins are counted per client address: after 5 in a row that address gets `429 too_many` for 30 s, and each
+  further failure doubles the wait (up to 15 min). A correct login, or 15 min without a failure, resets it. Other
+  devices are not affected. Passwords longer than 64 characters never match.
 - Missing or invalid session → `401 {"err":"auth"}`; the UI then shows the login screen.
 
 ---
@@ -191,7 +194,8 @@ One command per call:
 {"cmd":"vol","vol":55}
 ```
 `{"cmd":"play"}` without `id`/`url` resumes the last station (`last`). `play` with `url` is a preview of a search result (not saved, `play.id` = 0). `vol` 0–100.
-→ `{"ok":true,"vol":55,"play":{...same as status.play...}}`. Unknown id → `404 not_found`.
+→ `{"ok":true,"vol":55,"play":{...same as status.play...}}`. Unknown id → `404 not_found`. A `url` that does not start
+with `http://` or `https://` → `400 bad_value`.
 
 ### `GET /api/sleep`
 → `{"left":1200}` (seconds, 0 = off)

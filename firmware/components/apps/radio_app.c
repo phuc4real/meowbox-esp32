@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -85,12 +86,17 @@ bool radio_relay_hostport(char *hp, size_t len)
     return true;
 }
 
-/* Build the URL the player should open. Returns false if a YouTube station has no relay. */
+static bool is_http_url(const char *url)
+{
+    return url && (strncasecmp(url, "http://", 7) == 0 || strncasecmp(url, "https://", 8) == 0);
+}
+
+/* Build the URL the player should open. Returns false if the URL is not http(s) or a YouTube station has no relay. */
 static bool station_url(const cJSON *st, char *out, size_t len)
 {
     const char *url = cJSON_GetStringValue(cJSON_GetObjectItem(st, "url"));
     const char *type = cJSON_GetStringValue(cJSON_GetObjectItem(st, "type"));
-    if (!url) return false;
+    if (!is_http_url(url)) return false;
     if (type && strcmp(type, "youtube") == 0) {
         char hp[80];
         if (!radio_relay_hostport(hp, sizeof(hp))) return false; /* same choice of relay as above */
@@ -430,7 +436,8 @@ static esp_err_t h_play(httpd_req_t *req)
     else if (!strcmp(cmd, "play")) {
         cJSON *id = cJSON_GetObjectItem(j, "id");
         const char *url = cJSON_GetStringValue(cJSON_GetObjectItem(j, "url"));
-        if (url) {
+        if (url && !is_http_url(url)) rc = -3;
+        else if (url) {
             const char *nm = cJSON_GetStringValue(cJSON_GetObjectItem(j, "name"));
             cJSON *tmp = cJSON_CreateObject();
             cJSON_AddStringToObject(tmp, "url", url);

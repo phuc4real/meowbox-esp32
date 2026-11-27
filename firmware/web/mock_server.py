@@ -5,7 +5,7 @@ Usage:  python mock_server.py [--port 8080] [--dir src]
 Then open http://localhost:8080  (meowbox / m3owb0x2026)
 Stdlib only.
 """
-import argparse, copy, hashlib, json, os, random, secrets, string, struct, sys, threading, time
+import argparse, copy, hashlib, json, os, random, re, secrets, string, struct, sys, threading, time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlsplit, parse_qs
 
@@ -61,7 +61,7 @@ def fresh_state():
 
 S = fresh_state()
 SESS = {}          # sid -> last use
-FAILS = {"n": 0, "until": 0}
+FAILS: dict[str, dict] = {}  # login lockout per client IP: {"n": failures, "until": locked until, "last": last failure}
 NO_AUTH = False  # --no-auth: every request counts as logged in (dev/headless tests)
 NO_SHOT = False  # --no-screenshot: /api/screenshot -> 404 (test the web fallback)
 
@@ -347,20 +347,27 @@ class H(BaseHTTPRequestHandler):
     # ---- API
     def api(self, m, p, q):
         if p == "/api/login" and m == "POST":
-            if time.time() < FAILS["until"]:
+            ip, now = self.client_address[0], time.time()
+            f = FAILS.get(ip)
+            if f and now >= f["until"] and now - f["last"] > 900:  # 15 min without a failure: forgotten
+                del FAILS[ip]
+                f = None
+            if f and now < f["until"]:
                 raise Err(429, "too_many")
             b = self.body()
-            if b.get("user") == DEFAULT_USER and pw_hash(S["salt"], str(b.get("pass", ""))) == S["pw"]:
-                FAILS["n"] = 0
+            pw = str(b.get("pass", ""))
+            if b.get("user") == DEFAULT_USER and len(pw) <= 64 and pw_hash(S["salt"], pw) == S["pw"]:
+                FAILS.pop(ip, None)
                 sid = secrets.token_hex(16)
                 SESS[sid] = time.time()
                 while len(SESS) > 4:
                     SESS.pop(min(SESS, key=SESS.get))
                 return self.send_json({"ok": True, "def_pw": S["def_pw"]},
                                       headers=[("Set-Cookie", f"sid={sid}; Path=/; HttpOnly; SameSite=Strict")])
-            FAILS["n"] += 1
-            if FAILS["n"] >= 5:
-                FAILS["n"], FAILS["until"] = 0, time.time() + 30
+            f = FAILS.setdefault(ip, {"n": 0, "until": 0, "last": 0})
+            f["n"], f["last"] = min(f["n"] + 1, 100), now
+            if f["n"] >= 5:  # 30 s, doubling with each further failure, at most 15 min
+                f["until"] = now + min(30 << min(f["n"] - 5, 5), 900)
             raise Err(401, "auth")
 
         if p == "/api/theme" and m == "GET":  # no auth: lets the login page use the theme
@@ -489,6 +496,8 @@ class H(BaseHTTPRequestHandler):
             cmd = b.get("cmd")
             pl = S["play"]
             if cmd == "play":
+                if b.get("url") and not re.match(r"https?://", str(b["url"]), re.I):
+                    raise Err(400, "bad_value")
                 if b.get("url"):
                     pl.update(st="play", id=0, name=str(b.get("name") or b["url"])[:48], title="")
                 else:

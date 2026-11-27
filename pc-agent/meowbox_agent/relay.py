@@ -42,16 +42,28 @@ def ytdlp_args() -> list[str]:
     return [*ytdlp_command(), "--no-warnings", "--quiet", "--no-progress"]
 
 
+# The relay only plays YouTube links; yt-dlp gets the link after "--"
+YT_URL = re.compile(r"https?://([a-z0-9-]+\.)*(youtube\.com|youtu\.be)(/|$)", re.IGNORECASE)
+
+
+def check_url(url: str) -> str:
+    if not YT_URL.match(url or "") or any(c.isspace() for c in url):
+        raise web.HTTPBadRequest(text="url must be a YouTube http(s) link")
+    return url
+
+
 async def ytjson(url: str, single: bool) -> dict:
+    url = check_url(url)
     key = (url, single)
     hit = _info_cache.get(key)
     if hit and time.monotonic() - hit[0] < 1800:
         return hit[1]
-    args = [*ytdlp_args(), "-J", "--flat-playlist", *(["--no-playlist"] if single else []), url]
+    args = [*ytdlp_args(), "-J", "--flat-playlist", *(["--no-playlist"] if single else []), "--", url]
     p = await asyncio.create_subprocess_exec(*args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=NOWIN)
     out, err = await asyncio.wait_for(p.communicate(), 90)
     if p.returncode:
-        raise web.HTTPBadGateway(text=f"yt-dlp: {err.decode(errors='replace').strip()[-500:]}")
+        log.warning("yt-dlp failed for %s: %s", url, err.decode(errors="replace").strip()[-500:])
+        raise web.HTTPBadGateway(text="yt-dlp could not read this link (details in the agent log)")
     info = json.loads(out)
     _info_cache[key] = (time.monotonic(), info)
     return info
@@ -75,9 +87,7 @@ async def resolve_video(url: str, index: int | None) -> tuple[dict, int | None, 
 
 
 async def yt_info(req: web.Request) -> web.Response:
-    url = req.query.get("url") or ""
-    if not url:
-        raise web.HTTPBadRequest(text="missing url")
+    url = check_url(req.query.get("url") or "")
     info = await ytjson(url, single=False)
     res = {"type": info.get("_type", "video"), "title": info.get("fulltitle") or info.get("title"),
            "duration": info.get("duration"), "is_live": bool(info.get("is_live")),
@@ -169,9 +179,7 @@ async def yt_stream(req: web.Request) -> web.StreamResponse:
     """yt-dlp downloads (it handles YouTube's throttling, retries and link refresh) and writes to stdout; the relay
     only changes the container. Video: m4a -> ADTS (Mp4ToAdts), no ffmpeg. Live: yt-dlp + ffmpeg copy the AAC into
     MPEG-TS (ffmpeg downloaded on first use). A video without AAC (rare): ffmpeg encodes AAC."""
-    url = req.query.get("url") or ""
-    if not url:
-        raise web.HTTPBadRequest(text="missing url")
+    url = check_url(req.query.get("url") or "")
     index = int(req.query["index"]) if req.query.get("index", "").isdigit() else None
     info, i, count = await resolve_video(url, index)
     title = re.sub(r"[\r\n]+", " ", info.get("fulltitle") or info.get("title") or "YouTube")

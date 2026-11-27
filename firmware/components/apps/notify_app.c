@@ -154,10 +154,10 @@ static esp_err_t h_audio(httpd_req_t *req)
     if (req->content_len == 0 || req->content_len > 1024 * 1024) return web_send_err(req, 413, "too_large");
     uint8_t *buf = heap_caps_malloc(req->content_len, MALLOC_CAP_SPIRAM);
     if (!buf) return web_send_err(req, 503, "busy");
+    int64_t deadline = web_body_deadline(req);
     size_t got = 0;
     while (got < req->content_len) {
-        int r = httpd_req_recv(req, (char *)buf + got, req->content_len - got);
-        if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
+        int r = web_recv(req, (char *)buf + got, req->content_len - got, deadline);
         if (r <= 0) {
             free(buf);
             return ESP_FAIL;

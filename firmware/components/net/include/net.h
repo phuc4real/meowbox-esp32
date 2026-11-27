@@ -69,6 +69,11 @@ esp_err_t web_send_json(httpd_req_t *req, cJSON *json); /* takes ownership */
 esp_err_t web_send_ok(httpd_req_t *req);
 esp_err_t web_send_err(httpd_req_t *req, int status, const char *code);
 cJSON *web_read_json(httpd_req_t *req);     /* NULL + error already sent on failure */
+/* Receiving a request body: web_body_deadline() when the handler starts, then web_recv() instead of httpd_req_recv().
+ * It retries receive timeouts until the deadline (15 s + 1 s per 16 KB), so a stalled or trickling client cannot hold
+ * the web server; returns the bytes read, or <= 0 on error (HTTPD_SOCK_ERR_TIMEOUT once the deadline passed). */
+int64_t web_body_deadline(httpd_req_t *req);
+int web_recv(httpd_req_t *req, char *buf, size_t len, int64_t deadline);
 bool web_query(httpd_req_t *req, const char *key, char *out, size_t len); /* URL-decoded */
 
 /* Hooks so feature modules can add live data to core endpoints */

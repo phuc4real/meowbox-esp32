@@ -354,7 +354,7 @@ Authorization: Bearer q7Lw2xK9pR4tY8vZ
 {"title":"Build xong","text":"esp32-playground OK","sound":"chime","priority":"normal","duration":10}
 ```
 - `text` required (≤ 200 bytes), `title` optional (≤ 48 bytes).
-- `sound`: `chime` | `alert` | `none` (default `chime`). `priority`: `low` | `normal` | `high` (default `normal`).
+- `sound`: `chime` (a short cat trill) | `alert` (two insistent meows) | `none` (default `chime`). `priority`: `low` | `normal` | `high` (default `normal`).
   `high` turns the screen on and sounds even at night. `duration`: seconds (default `dur`, 1–300).
 - → `{"ok":true,"id":17}`. Queue holds 10; when full → `429 queue_full`.
 

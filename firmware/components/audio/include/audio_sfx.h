@@ -1,4 +1,4 @@
-/* Synthesised UI sounds, played on their own task (non-blocking, thread-safe). */
+/* UI sounds, all synthesised cat voices (cat_voice.c), played on their own task (non-blocking, thread-safe). */
 #pragma once
 
 #include <stdbool.h>
@@ -8,12 +8,12 @@ extern "C" {
 #endif
 
 typedef enum {
-    SFX_BEEP_HI,
-    SFX_BEEP_LO,
-    SFX_BOOT,
-    SFX_CHIME,  /* notification */
-    SFX_ALERT,  /* urgent notification */
-    SFX_ALARM,  /* one ~2 s cycle of the alarm pattern; repeat for ringing */
+    SFX_BEEP_HI, /* volume up: "mip" */
+    SFX_BEEP_LO, /* volume down: "mup" */
+    SFX_BOOT,    /* "mrrrp-mew" */
+    SFX_CHIME,   /* notification: a questioning trill "mrrp?" */
+    SFX_ALERT,   /* urgent notification: "mrrAOW! mrrAOW!" */
+    SFX_ALARM,   /* one ~2 s cycle of the alarm, "meow... MEEOOW!"; repeat for ringing */
     SFX_MEOW,
     SFX_PURR,
 } sfx_t;

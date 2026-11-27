@@ -129,7 +129,7 @@ PC screen, media keys, YouTube relay and spoken notifications: see [../pc-agent/
 |---|---|
 | `main/main.c` | start-up order, buttons, `/api/status` hook |
 | `components/board` | pins (from `../hw/ostb_xiaozhi_3st.h`), LCD + LVGL, touch, buttons, backlight, battery |
-| `components/audio` | ES8311/ES7210 duplex I2S (`audio_hw`), synthesised UI sounds (`audio_sfx`) |
+| `components/audio` | ES8311/ES7210 duplex I2S (`audio_hw`), UI sounds (`audio_sfx`), all synthesised cat voices (`cat_voice`: trill, meow, purr; `tools/cat_voice/render.c` writes them to WAV to listen on a PC) |
 | `components/player` | HTTP/HLS streaming player (esp_audio_codec), resampling to 44.1 kHz mono |
 | `components/net` | Wi-Fi manager + captive portal, mDNS `meowbox-xxxx.local`, UDP discovery, SNTP, HTTP server, auth, OTA |
 | `components/webui` | the web UI pack (`web.pack`, generated) embedded in the app, file lookup with ETags |
@@ -142,7 +142,7 @@ PC screen, media keys, YouTube relay and spoken notifications: see [../pc-agent/
 | `components/fonts` | LVGL fonts with Vietnamese glyphs: base Be Vietnam Pro + 4 per theme (generated) |
 | `components/cat_sprites` | pixel-art cat (generated, see `tools/cat_sprites`) |
 | `web/` | web UI source, REST contract [`API.md`](web/API.md), mock server, tests |
-| `tools/` | asset generators (themes, fonts, sprites, ensō), `memwatch.py` (memory/CPU log), `release.py` |
+| `tools/` | asset generators (themes, fonts, sprites, ensō), `cat_voice/` (renders the UI sounds to WAV), `memwatch.py` (memory/CPU log), `release.py` |
 
 ## Partitions
 

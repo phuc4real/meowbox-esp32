@@ -112,7 +112,8 @@ máy tính phải cùng mạng Wi-Fi với loa.
 
 ## 6. Thông báo
 
-Loa hiện thông báo lên màn hình và kêu một tiếng. Đang phát radio thì nhạc vẫn chạy, chỉ nhỏ đi trong lúc kêu. Thông báo gửi được từ bất kỳ máy nào trong mạng, ví dụ script, máy
+Loa hiện thông báo lên màn hình và kêu như mèo: "mrrp?" cho thông báo thường, hai tiếng "meo!" gắt cho thông báo
+khẩn (`alert`). Báo thức cũng là tiếng mèo đòi ăn sáng. Đang phát radio thì nhạc vẫn chạy, chỉ nhỏ đi trong lúc kêu. Thông báo gửi được từ bất kỳ máy nào trong mạng, ví dụ script, máy
 chủ hay Home Assistant. Mỗi lần gửi cần **token** lấy ở trang Thông báo.
 
 ```bash

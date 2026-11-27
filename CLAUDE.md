@@ -16,6 +16,9 @@ Overview and layout: @README.md. Build, flash, asset generators, partitions: @fi
   shell; activate it in the same PowerShell command that uses it:
   `. C:\Espressif\tools\Microsoft.release-v6.1.PowerShell_profile.ps1 *> $null; cd firmware; idf.py build`
   EIM's `v6.1` / `v6.1.1` installs next to it are the tags: don't build with them.
+- Without that IDF (another machine): `firmware\docker\idf.ps1` (or `idf.sh`) runs `idf.py` in Kiri or Docker with
+  the same pinned IDF (`firmware/docker/Dockerfile`), output in `firmware/build-docker/`. Flash from the host with
+  esptool (`firmware/README.md`, "Build in Docker"): containers can't reach COM10.
 - The `build/` folder remembers the project path and the IDF it was configured with. After the repo moves or IDF
   changes, run `idf.py fullclean` first (it keeps `sdkconfig`).
 - Run repo scripts with `py -3.14` (it has Pillow, pyserial, ruff and the agent's packages).

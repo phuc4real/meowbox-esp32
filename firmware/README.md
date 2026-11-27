@@ -12,6 +12,7 @@ the speaker. Plan and status: [../docs/firmware_v0.2.0.md](../docs/firmware_v0.2
   for streaming. Component versions are pinned in `main/idf_component.yml` and `dependencies.lock`; `idf.py build`
   downloads them into `managed_components/`.
 - Python 3 with Pillow for the asset generators (`tools/`), Node.js only to regenerate fonts.
+- Or, instead of installing ESP-IDF: Docker or Kiri (see [Build in Docker](#build-in-docker)).
 
 ## Build & flash
 
@@ -36,6 +37,30 @@ the gzipped first page load is over 30 KB), then rebuild and flash the **app**. 
 
 If the speaker last updated itself over the air it boots from `ota_1`, and `app-flash` writes `ota_0`: use the OTA
 upload above (or a full `flash`) so the new image is the one that boots.
+
+### Build in Docker
+
+On a machine without ESP-IDF, `docker/` builds with the same IDF as the releases: the `espressif/idf:release-v6.1`
+image, checked out at the commit pinned in `docker/Dockerfile` (amd64 and arm64). The scripts use
+[Kiri](https://github.com/libracoder/kiri) when it is installed, otherwise `docker`; set `MEOWBOX_DOCKER` to pick
+another Docker-compatible CLI. The first run downloads about 4 GB and builds the image `meowbox-idf:<hash of the
+Dockerfile>`; later runs reuse it, and a changed Dockerfile builds a new one (remove old tags with `image rm`).
+
+```powershell
+docker\idf.ps1               # Windows PowerShell; any idf.py arguments work: docker\idf.ps1 fullclean
+./docker/idf.sh              # Linux, macOS, Git Bash
+```
+
+The output goes to `build-docker/` (with its own `sdkconfig`), so it never mixes with a native `build/`. Docker can't
+reach the serial port on Windows or macOS, so flash from the host with esptool (`pip install esptool`), or upload
+`build-docker/meowbox.bin` over the air as above:
+
+```powershell
+cd build-docker
+python -m esptool --chip esp32s3 -p COM10 -b 921600 write_flash "@flash_args"   # bootloader + partitions + app, boots ota_0
+```
+
+For a release, pass `--bin build-docker/meowbox.bin` to `tools/release.py`.
 
 ## Releases and updates from GitHub
 

@@ -65,5 +65,6 @@ python build.py --dist out/   # thêm: ghi các file đã build ra out/ để xe
   khoá như `vi.json` (`test_api.py` kiểm tra hai file cùng bộ khoá và mọi khoá `t('…')` trong code đều có).
   Ngôn ngữ trên màn loa chỉnh riêng ở trang Hiển thị.
 - Không dùng `alert()`/`confirm()`: mọi hộp thoại là modal trong trang.
-- Còn dùng mật khẩu mặc định `meowbox` thì có banner nhắc đổi.
+- Loa còn dùng mật khẩu mặc định (công khai) thì sau khi đăng nhập trang chỉ hiện ô đổi mật khẩu; API trả
+  `403 def_pw` cho mọi thứ khác tới khi đổi xong.
 - Tên thành phố từ open-meteo đôi khi dùng chữ `Ð` (U+00D0); trang web đổi sang `Đ` (U+0110) cho khớp font trên loa.

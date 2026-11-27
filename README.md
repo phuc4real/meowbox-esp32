@@ -109,6 +109,11 @@ python -m esptool --port COM10 -b 921600 write-flash 0 backup\speaker_full_16MB.
 - [x] 0.2.5: the cat tile becomes Meow Coding (the cat shows what Claude Code is doing on the PC, its context,
       tokens and 5-hour limit, and calls you when it waits), replacing the virtual pet; weather in °F when chosen;
       ~5 KB more internal RAM when idle; new defaults: weather in Ho Chi Minh City, three MP3 radio stations
+- [x] 0.3.0: the PC agent rewritten in Rust (5.5 MB installer instead of 20.6 MB, ~19 MB of RAM in the tray instead of
+      ~57 MB, same settings, upgrades 0.2.x in place); the agent pairs with the notify token; a new web password is
+      asked before first use and each speaker has its own setup-hotspot password; every sound is a cat; the screen stays
+      on while charging; the effects saver turns off the same decorations on the speaker and the web page; swiping
+      at ~26 FPS with the radio playing
 - [ ] Open items in [docs/backlog.md](docs/backlog.md): 24 h soak and hands-on checklist, update edge cases
       (rollback, Wi-Fi lost while downloading), internal RAM back over 40 KB, battery calibration, swipe FPS in Brutalism,
       mini game, which "free" GPIOs reach pads

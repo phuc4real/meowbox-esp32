@@ -26,7 +26,7 @@ const char *wifi_mgr_hostname(void);        /* meowbox-xxxx (mDNS: meowbox-xxxx.
 
 /* PC agent <-> speaker protocol (docs/firmware_v0.2.0.md, 2.6). Bump MB_PROTO when the WebSocket messages or the API
  * the agent uses change; raise MB_PROTO_MIN when older agents can no longer work. Agents before 0.2.0 send no proto (0). */
-#define MB_PROTO 2     /* 2 (0.2.7): the hello carries the notify token */
+#define MB_PROTO 2     /* 2 (0.3.0): the hello carries the notify token */
 #define MB_PROTO_MIN 2
 #define MB_DISCOVERY_PORT 8766              /* UDP: "MEOWBOX?" -> {"name","ip","ver","proto"}; the same JSON is broadcast to 8767 every 2 s */
 const char *wifi_mgr_ap_pass(void);         /* WPA2 password of that hotspot */

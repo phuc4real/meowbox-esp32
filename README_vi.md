@@ -172,8 +172,9 @@ trong menu ở khay hệ thống. Các phiên Claude Code mở sau đó sẽ hi�
 - **4 theme**: Swiss (mặc định), Cyberpunk, Zen, Brutalism. Theme nào cũng có bản ban đêm.
 - **Chế độ đêm**: đổi sang bản ban đêm của theme và giảm độ sáng. Mặc định tự bật từ 22 giờ tới 7 giờ; có thể đổi
   giờ, để luôn bật hoặc tắt hẳn.
-- **Hiệu ứng**: "đầy đủ" hoặc "tiết kiệm". Tiết kiệm thì tắt lệch màu, scanline, khối nghiêng. Chế độ này tự bật khi
-  loa chạy pin.
+- **Hiệu ứng**: "đầy đủ" hoặc "tiết kiệm". Tiết kiệm tắt các chi tiết trang trí của theme, cả trên loa và trang web:
+  lệch màu, scanline, góc HUD, thanh vạch (Cyberpunk); lưới, bóng đổ, tiêu đề nghiêng (Brutalism). Ban đêm loa cũng
+  tự bỏ lệch màu, scanline, lưới và bóng đổ.
 - **Ngôn ngữ trên loa**: tiếng Việt hoặc tiếng Anh, không phụ thuộc ngôn ngữ của trang web.
 
 ## 10. Pin

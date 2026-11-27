@@ -433,9 +433,9 @@ Session auth. Why the speaker last started, and its error/warning log lines (Sys
   `int_min` of an entry are filled in at the next start (0 for the current one).
 
 ### `/ws/pc` protocol (agent ↔ speaker)
-- Agent → speaker first message: `{"t":"hello","name":"DESKTOP-MEO","ver":"0.2.7","proto":2,"token":"<notify token>",
+- Agent → speaker first message: `{"t":"hello","name":"DESKTOP-MEO","ver":"0.3.0","proto":2,"token":"<notify token>",
   "relay":"http://ip:8765"}`, optional `"take":true`. Then `stats` / `media` every second, `notify`, `coding`.
-  Protocol 2 (0.2.7): the hello must carry the notify token, else `{"t":"auth"}` and close; any other first message
+  Protocol 2 (0.3.0): the hello must carry the notify token, else `{"t":"auth"}` and close; any other first message
   closes the connection. `relay` is used only if its IP is the agent's own address, and only while that agent stays
   connected. A WebSocket upgrade with an `Origin` header (a web page) is refused.
 - `coding` (Meow Coding, agent 0.2.4+): `{"t":"coding","s":[{"id":"085ba2bd","ag":"claude","name":"…","dir":"meowbox",

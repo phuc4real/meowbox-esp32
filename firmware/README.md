@@ -84,7 +84,7 @@ server. API: [web/API.md](web/API.md) "Update".
 
 | Where | What |
 |---|---|
-| Screen | swipe left/right: **Clock → Radio → PC → Cat → System** (PC is skipped while no agent is connected). Turns off after 5 idle minutes (web: Appearance → "Screen off after", 0 = never); a button, a touch, an alarm or a notification wakes it, and that press does nothing else |
+| Screen | swipe left/right: **Clock → Radio → PC → Cat → System** (PC is skipped while no agent is connected). Turns off after 5 idle minutes (web: Appearance → "Screen off after", 0 = never), but not while on USB power; a button, a touch, an alarm or a notification wakes it, and that press does nothing else |
 | Middle button | power only: holding it switches the speaker off (hardware). The firmware can't see it |
 | Volume buttons | click ±5, hold to repeat. During an alarm: click = snooze, hold ~1 s = stop |
 | Cat corner on the clock | tap to open the Cat tile |

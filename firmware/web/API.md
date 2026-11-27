@@ -259,7 +259,8 @@ The UI looks the city up itself at `https://geocoding-api.open-meteo.com/v1/sear
  "lang":"vi","tz":"ICT-7","theme":"swiss","fx":"full"}
 ```
 - `bri`, `idle_bri`, `n_bri`: 0–100. `idle_s`: dim after this many seconds without touch (0 = never).
-- `sleep_s`: screen sleep after this many seconds without touch or a button (default 300, 0 = never). Backlight and
+- `sleep_s`: screen sleep after this many seconds without touch or a button (default 300, 0 = never); never while
+  on USB power (plugging in or out counts as activity). Backlight and
   panel off, drawing paused, mics off, amplifier off after 3 s of silence, CPU at 80 MHz unless audio plays. Wi-Fi,
   alarms, notifications and playback keep running; a card (alarm, notification) wakes the screen. The press or touch
   that wakes it does nothing else.

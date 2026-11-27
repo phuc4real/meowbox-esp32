@@ -180,6 +180,7 @@ trong menu ở khay hệ thống. Các phiên Claude Code mở sau đó sẽ hi�
 - **Tắt màn hình**: không bấm nút hay chạm vào loa 5 phút thì màn tắt hẳn cho đỡ tốn pin. Wi-Fi, báo thức, thông
   báo và nhạc đang phát vẫn chạy; có báo thức hay thông báo thì màn tự bật. Bấm nút bất kỳ hoặc chạm vào màn để bật
   lại; lần bấm hay chạm đó chỉ bật màn, không làm gì khác. Đổi thời gian (hoặc tắt tính năng) ở *Cài đặt → Giao diện*.
+  Đang cắm sạc thì màn không tắt (chỉ tối bớt); rút sạc ra thì 5 phút sau mới tắt.
 - Rút sạc ra dùng bình thường. Loa ghi pin mỗi phút và ước tính thời gian còn lại. Số này hiện trên đồng hồ, màn Hệ
   thống và trang Tổng quan.
 - Loa nhớ 10 lần dùng pin gần nhất: dùng bao lâu, tốn bao nhiêu %, đầy pin thì dùng được bao lâu.

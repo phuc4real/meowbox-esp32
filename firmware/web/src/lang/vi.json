@@ -192,7 +192,7 @@
  "bri": "Độ sáng",
  "idleBri": "Độ sáng khi không dùng",
  "idleS": "Giảm sáng sau (giây, 0 = không)",
- "sleepS": "Tắt màn hình sau (giây, 0 = không)",
+ "sleepS": "Tắt màn hình sau (giây, 0 = không; cắm sạc thì không tắt)",
  "sleepHint": "Màn tắt hẳn để tiết kiệm pin; Wi-Fi, báo thức, thông báo và nhạc vẫn chạy. Bấm nút hoặc chạm để bật lại.",
  "h24": "Đồng hồ 24 giờ",
  "night": "Chế độ đêm",

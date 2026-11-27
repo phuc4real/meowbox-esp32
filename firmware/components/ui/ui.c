@@ -734,9 +734,17 @@ static void ui_timer(lv_timer_t *tmr)
         }
     }
     tiles_apply();
+    /* on USB power the screen never sleeps (it still dims); plugging in or out counts as activity, so unplugging
+     * starts the sleep timer again instead of turning the screen off at once */
+    static int8_t s_usb = -1;
+    bool usb = board_is_charging();
+    if (usb != s_usb) {
+        if (s_usb >= 0) lv_display_trigger_activity(NULL);
+        s_usb = usb;
+    }
     uint32_t idle_ms = lv_display_get_inactive_time(NULL);
     int sleep_s = settings_get_int("display", "sleep_s", 300);
-    bool want = sleep_s > 0 && idle_ms > (uint32_t)sleep_s * 1000 && !s_ov && esp_timer_get_time() >= s_force_until;
+    bool want = sleep_s > 0 && !usb && idle_ms > (uint32_t)sleep_s * 1000 && !s_ov && esp_timer_get_time() >= s_force_until;
     if (want != s_asleep) set_asleep(want);
     if (s_sleep_hook) s_sleep_hook(s_asleep);
     apply_brightness();

@@ -122,6 +122,43 @@ impl Config {
     }
 }
 
+/// The config shared by the core thread and the UI: changes are saved to `path` right away.
+#[derive(Clone)]
+pub struct SharedConfig {
+    inner: std::sync::Arc<std::sync::Mutex<Config>>,
+    path: PathBuf,
+}
+
+impl SharedConfig {
+    pub fn new(cfg: Config, path: PathBuf) -> Self {
+        Self { inner: std::sync::Arc::new(std::sync::Mutex::new(cfg)), path }
+    }
+
+    pub fn load(path: PathBuf) -> Self {
+        Self::new(Config::load(&path), path)
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn get(&self) -> Config {
+        self.inner.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+
+    /// Change and save (only if something changed). A failed save is logged; the change stays in memory.
+    pub fn update(&self, f: impl FnOnce(&mut Config)) {
+        let mut c = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let before = c.clone();
+        f(&mut c);
+        if *c != before
+            && let Err(e) = c.save(&self.path)
+        {
+            tracing::warn!("could not save {}: {e}", self.path.display());
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

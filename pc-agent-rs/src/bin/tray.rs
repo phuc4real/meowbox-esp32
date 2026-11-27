@@ -1,7 +1,9 @@
 //! MeowBoxAgent.exe: the tray app (windowed, no console).
 #![windows_subsystem = "windows"]
 
-use meowbox_agent::{config::Config, state::SharedState, ui::TrayApp};
+use meowbox_agent::config::{Config, SharedConfig};
+use meowbox_agent::link::{CoreHandle, Options};
+use meowbox_agent::{state::SharedState, ui::TrayApp};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -30,8 +32,8 @@ fn main() {
         return;
     }
     tracing::info!("MeowBox Agent {} starting (tray)", meowbox_agent::VERSION);
-    let cfg = Config::load(&cfg_path);
-    let mut app = match TrayApp::new(cfg, cfg_path, SharedState::default()) {
+    let core = CoreHandle::start(SharedConfig::load(cfg_path), SharedState::default(), Options::default());
+    let mut app = match TrayApp::new(core) {
         Ok(a) => a,
         Err(e) => {
             tracing::error!("tray: {e}");

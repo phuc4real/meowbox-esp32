@@ -1,6 +1,6 @@
 # Rewrite the PC agent in Rust
 
-Status: phase 0 done (2026-11-27), crate in `pc-agent-rs/`. Replaces the Python agent in `pc-agent/` (0.2.5, ~3,000 lines) with a
+Status: phases 0 and 1 done (2026-11-27), crate in `pc-agent-rs/`. Replaces the Python agent in `pc-agent/` (0.2.5, ~3,000 lines) with a
 Rust build that behaves the same for the speaker and the user. Estimate: **20–25 working days**, in 6 phases that
 each end in something that runs.
 
@@ -227,6 +227,29 @@ Original scope:
   exe sizes noted.
 
 ### Phase 1: headless core (6–7 days)
+
+Result (2026-11-27):
+- `discovery`, `link` (CoreHandle / run_forever), `stats`, `media`, `tts`, `speaker_api`, `json`, `cli`, `win`
+  (autostart, network category through Network List Manager + GetAdaptersAddresses, Wi-Fi name, firewall rule,
+  local IP); `coding` is a stub that sends `{"t":"coding","s":[]}` like the Python agent with no session.
+- The tray runs the core: status dot and tooltip follow the link, "Nối lại loa ngay", "Giành quyền nối loa",
+  "Gửi thông báo thử" (balloon on failure), "Tạm dừng gửi số liệu", "Chạy cùng Windows".
+- Tests: 25 unit (incl. real TTS, GSMTC and Network List Manager on this PC) + 3 integration against a fake speaker
+  (`tests/link.rs`: hello/token, coding/stats/media, media_cmd answered at once, repeated-key message ignored, take
+  over, auth → 60 s, busy, not found).
+- Against `mock_speaker.py`: hello, stats every second, media on change / 5 s, media_cmd, `notify`, `say` (WAV),
+  config saved with last_host and speaker.
+- Sizes (release): `MeowBoxAgent.exe` 7.9 MB, `meowbox.exe` 3.3 MB. Tray + core idle: 19 MB working set, 8 MB
+  private, 8 threads.
+- Differences from Python, on purpose: `--config` / `--host` also accepted after the command; a message that is not a
+  JSON object is ignored (Python's link loop crashed on it); a "Search now" during the IP check is dropped (same as
+  Python, which cleared it before waiting).
+- Real speaker (firmware 0.2.5): link held, `notify`, `say`, `wifi-setup status` → 200; the tray app connected and
+  ran 10 min. Not yet seen on the device: a media_cmd from the speaker's buttons (no button press reached the log).
+  Only one agent per speaker at a time: both builds use the PC name, so the speaker lets either in and they would
+  take turns.
+
+Original scope:
 
 - discovery, link, stats, media, TTS, speaker_api, win utils (autostart, single instance, netlist, wifi, firewall).
 - CLI: `run`, `notify`, `say`, `wifi-setup`, `config`, `coding status` stub.

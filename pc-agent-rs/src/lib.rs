@@ -3,9 +3,18 @@
 //! Same files and protocol as the Python agent 0.2.x: `%APPDATA%\MeowBox\agent.json`, `agent.log`, `hook.key`,
 //! `%LOCALAPPDATA%\MeowBox\bin`, and `/ws/pc` protocol 2.
 
+pub mod cli;
+pub mod coding;
 pub mod config;
+pub mod discovery;
+pub mod json;
+pub mod link;
 pub mod log;
+pub mod media;
+pub mod speaker_api;
 pub mod state;
+pub mod stats;
+pub mod tts;
 pub mod ui;
 pub mod win;
 

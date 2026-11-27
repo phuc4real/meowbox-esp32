@@ -31,3 +31,14 @@ pub const CONNECTED: &str = "đã kết nối";
 pub const PAGE_CONNECT: &str = "Kết nối loa";
 pub const PAGE_SETTINGS: &str = "Cài đặt";
 pub const CLOSE: &str = "Đóng";
+
+pub const TEST_NOTIFY_TEXT: &str = "Thông báo thử từ máy tính";
+pub const T_NO_SPEAKER: &str = "Chưa nối loa hoặc chưa có token: mở 'Kết nối loa…'";
+
+pub fn t_speaker_error(code: u16) -> String {
+    format!("Loa trả lỗi {code} (token sai?)")
+}
+
+pub fn t_send_failed(e: &dyn std::fmt::Display) -> String {
+    format!("Không gửi được: {e}")
+}

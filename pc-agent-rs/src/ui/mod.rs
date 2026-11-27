@@ -8,9 +8,11 @@ pub mod strings;
 pub mod tray;
 
 use crate::config::Config;
-use crate::state::{AgentState, LinkError, SharedState};
+use crate::link::CoreHandle;
+use crate::state::{AgentState, LinkError};
 use eframe::egui;
-use std::path::PathBuf;
+use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 use strings as s;
 use tray::{MenuItem, Tray, TrayEvent};
 
@@ -75,10 +77,10 @@ mod id {
 }
 
 pub struct TrayApp {
-    pub cfg: Config,
-    pub cfg_path: PathBuf,
-    pub state: SharedState,
+    pub core: CoreHandle,
     tray: Tray,
+    /// Toasts queued by other threads (shown on the next wake).
+    toasts: Arc<Mutex<VecDeque<String>>>,
     last_line: String,
     /// A page the user asked for; opened by the outer loop, or switched to if a dialog is already open.
     open_request: Option<Page>,
@@ -89,15 +91,15 @@ pub struct TrayApp {
 }
 
 impl TrayApp {
-    pub fn new(cfg: Config, cfg_path: PathBuf, state: SharedState) -> anyhow::Result<Self> {
-        let (line, color) = status_line(&state.get(), &cfg);
+    pub fn new(core: CoreHandle) -> anyhow::Result<Self> {
         let size = tray::tray_icon_size();
-        let tray = Tray::new(tray::make_icon(&icon::cat_rgba(size, Some(color)), size), s::APP)?;
+        let tray = Tray::new(tray::make_icon(&icon::cat_rgba(size, Some(icon::GREY)), size), s::APP)?;
+        let waker = tray.waker();
+        core.on_state_change(move || waker.wake());
         let mut app = Self {
-            cfg,
-            cfg_path,
-            state,
+            core,
             tray,
+            toasts: Arc::default(),
             last_line: String::new(),
             open_request: None,
             quit: false,
@@ -105,12 +107,27 @@ impl TrayApp {
             dialogs_opened: 0,
         };
         app.refresh();
-        let _ = line;
+        if app.cfg().speaker.is_empty() {
+            app.open_request = Some(Page::Connect); // first run: the connect window opens by itself
+        }
         Ok(app)
     }
 
-    pub fn waker(&self) -> tray::Waker {
-        self.tray.waker()
+    pub fn cfg(&self) -> Config {
+        self.core.cfg().get()
+    }
+
+    pub fn state(&self) -> AgentState {
+        self.core.state().get()
+    }
+
+    /// A toast from any thread.
+    fn toaster(&self) -> impl Fn(String) + Send + Sync + 'static {
+        let (q, w) = (self.toasts.clone(), self.tray.waker());
+        move |text| {
+            q.lock().unwrap_or_else(|e| e.into_inner()).push_back(text);
+            w.wake();
+        }
     }
 
     pub fn open_page(&mut self, page: Page) {
@@ -126,8 +143,8 @@ impl TrayApp {
 
     /// Icon dot and tooltip follow the state.
     fn refresh(&mut self) {
-        let st = self.state.get();
-        let (line, color) = status_line(&st, &self.cfg);
+        let st = self.state();
+        let (line, color) = status_line(&st, &self.cfg());
         if line == self.last_line {
             return;
         }
@@ -144,8 +161,9 @@ impl TrayApp {
     }
 
     fn menu(&self) -> Vec<MenuItem> {
-        let st = self.state.get();
-        let mut m = vec![MenuItem::label(status_line(&st, &self.cfg).0)];
+        let st = self.state();
+        let cfg = self.cfg();
+        let mut m = vec![MenuItem::label(status_line(&st, &cfg).0)];
         if st.error == LinkError::Busy {
             m.push(MenuItem::item(id::TAKE_OVER, s::M_TAKE_OVER));
         }
@@ -153,13 +171,13 @@ impl TrayApp {
             MenuItem::Separator,
             MenuItem::default(id::OPEN_WEB, s::M_OPEN_WEB),
             MenuItem::item(id::TEST_NOTIFY, s::M_TEST_NOTIFY),
-            MenuItem::check(id::PAUSE, s::M_PAUSE, self.cfg.paused),
+            MenuItem::check(id::PAUSE, s::M_PAUSE, cfg.paused),
             MenuItem::check(id::CODING, s::M_CODING, false), // phase 3
             MenuItem::Separator,
             MenuItem::item(id::CONNECT, s::M_CONNECT),
             MenuItem::item(id::SETTINGS, s::M_SETTINGS),
             MenuItem::item(id::RECONNECT, s::M_RECONNECT),
-            MenuItem::check(id::AUTOSTART, s::M_AUTOSTART, false), // phase 1
+            MenuItem::check(id::AUTOSTART, s::M_AUTOSTART, crate::win::autostart_enabled()),
             MenuItem::item(id::LOG_DIR, s::M_LOG_DIR),
             MenuItem::Separator,
         ]);
@@ -175,8 +193,8 @@ impl TrayApp {
     }
 
     fn open_web(&mut self) {
-        let st = self.state.get();
-        let h = if st.host.is_empty() { self.cfg.known_host().to_owned() } else { st.host };
+        let st = self.state();
+        let h = if st.host.is_empty() { self.cfg().known_host().to_owned() } else { st.host };
         if h.is_empty() {
             self.open_request = Some(Page::Connect);
         } else {
@@ -187,11 +205,13 @@ impl TrayApp {
     fn command(&mut self, cmd: u32) {
         match cmd {
             id::OPEN_WEB => self.open_web(),
-            id::TEST_NOTIFY => self.tray.notify("Thông báo thử từ MeowBox Agent (bản Rust)", s::TOAST_TITLE),
-            id::PAUSE => {
-                self.cfg.paused = !self.cfg.paused;
-                if let Err(e) = self.cfg.save(&self.cfg_path) {
-                    tracing::warn!("save config: {e}");
+            id::TAKE_OVER => self.core.reconnect_now(true),
+            id::RECONNECT => self.core.reconnect_now(false),
+            id::TEST_NOTIFY => self.test_notify(),
+            id::PAUSE => self.core.cfg().update(|c| c.paused = !c.paused),
+            id::AUTOSTART => {
+                if let Err(e) = crate::win::set_autostart(!crate::win::autostart_enabled()) {
+                    tracing::warn!("autostart: {e}");
                 }
             }
             id::CONNECT => self.open_request = Some(Page::Connect),
@@ -203,9 +223,28 @@ impl TrayApp {
             id::QUIT => {
                 tracing::info!("quit");
                 self.quit = true;
+                self.core.stop();
             }
             other => tracing::debug!("menu item {other}: not in this build yet"),
         }
+    }
+
+    /// "Gửi thông báo thử": a test notification through the speaker's API, toast on failure.
+    fn test_notify(&self) {
+        let (host, token) = (self.state().host, self.cfg().token);
+        let toast = self.toaster();
+        if host.is_empty() || token.is_empty() {
+            toast(s::T_NO_SPEAKER.into());
+            return;
+        }
+        self.core.spawn(async move {
+            let body = serde_json::json!({"title": "MeowBox Agent", "text": s::TEST_NOTIFY_TEXT, "sound": "chime"});
+            match crate::speaker_api::notify(&host, &token, &body).await {
+                Ok((code, _)) if code >= 400 => toast(s::t_speaker_error(code)),
+                Ok(_) => {}
+                Err(e) => toast(s::t_send_failed(&e)),
+            }
+        });
     }
 
     /// Handle everything queued by the tray window. Safe to call from the dialog's frame: it never opens a dialog
@@ -220,7 +259,13 @@ impl TrayApp {
                         self.command(cmd);
                     }
                 }
-                TrayEvent::Wake => self.refresh(),
+                TrayEvent::Wake => {
+                    self.refresh();
+                    let q: Vec<String> = self.toasts.lock().unwrap_or_else(|e| e.into_inner()).drain(..).collect();
+                    for t in q {
+                        self.tray.notify(&t, s::TOAST_TITLE);
+                    }
+                }
                 TrayEvent::TaskbarCreated => self.tray.add(),
             }
         }
@@ -277,7 +322,8 @@ impl TrayApp {
         if self.selftest_reopen > 0 {
             self.selftest_reopen -= 1;
             if self.selftest_reopen > 0 {
-                self.open_request = Some(if self.selftest_reopen.is_multiple_of(2) { Page::Connect } else { Page::Settings });
+                self.open_request =
+                    Some(if self.selftest_reopen.is_multiple_of(2) { Page::Connect } else { Page::Settings });
             } else {
                 self.quit = true;
             }
@@ -323,7 +369,7 @@ impl eframe::App for Dialog<'_> {
                 }
                 Page::Settings => {
                     ui.label(format!("Phiên bản {}", crate::VERSION));
-                    let mut paused = self.app.cfg.paused;
+                    let mut paused = self.app.cfg().paused;
                     if ui.checkbox(&mut paused, s::M_PAUSE).changed() {
                         self.app.command(id::PAUSE);
                     }

@@ -80,4 +80,5 @@ Commit the regenerated outputs together with their source.
 - Docs and code comments in English. The only Vietnamese doc is `README_vi.md`, a user guide (how to use the speaker).
   Some existing docs are still in Vietnamese; write new content in English.
 - Commit messages: one plain English sentence in the imperative, describing the user-visible change.
-- `pc-agent/` is Windows-only (Media Session, pycaw, SAPI); Python ≥ 3.11.
+- `pc-agent/` is Windows-only (Media Session, pycaw, SAPI); Python ≥ 3.11. After touching the relay or how the
+  agent reads speaker messages: `python test_relay.py` from `pc-agent/` (must print `ALL PASSED`).

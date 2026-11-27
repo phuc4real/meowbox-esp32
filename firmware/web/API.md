@@ -352,7 +352,8 @@ Short form for scripts/phones. Optional `title`, `sound`, `priority`, `duration`
 
 ### `POST /api/notify/audio`
 Body = raw WAV or MP3 file (≤ 1 MB), `Content-Type: audio/wav` or `audio/mpeg`, Bearer token. Optional
-`?title=&text=` to also show an overlay. → `{"ok":true,"id":18}`; too big → `413 too_large`.
+`?title=&text=` to also show an overlay. → `{"ok":true,"id":18}`; too big → `413 too_large`. WAV must be 16-bit PCM
+at 8–96 kHz; other WAVs play nothing.
 
 ### `GET /api/notify/history`
 Last 20, newest first (RAM only):

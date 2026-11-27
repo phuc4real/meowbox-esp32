@@ -77,7 +77,8 @@ idf.py build
 idf.py -p COM10 -b 921600 flash
 ```
 
-Replace `COM10` with your serial port. Then open `http://meowbox-xxxx.local` (login `meowbox` / `m3owb0x2026`, change it after the first login). With no known Wi-Fi the speaker opens the hotspot `MeowBox-XXXX`, password `meowbox2026`. Details: [firmware/README.md](firmware/README.md).
+Replace `COM10` with your serial port. No ESP-IDF installed? `firmware\docker\idf.ps1` (or `idf.sh`) builds in Kiri
+or Docker with the same IDF; see [Build in Docker](firmware/README.md#build-in-docker). Then open `http://meowbox-xxxx.local` (login `meowbox` / `m3owb0x2026`, change it after the first login). With no known Wi-Fi the speaker opens the hotspot `MeowBox-XXXX`, password `meowbox2026`. Details: [firmware/README.md](firmware/README.md).
 
 **Before flashing a new device, back it up** so the vendor firmware can be restored:
 

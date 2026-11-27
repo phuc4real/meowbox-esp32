@@ -62,7 +62,9 @@ thì màn Máy tính được bỏ qua: vuốt từ Radio sang thẳng Mèo.
 Mở `http://meowbox-xxxx.local` (4 ký tự giống tên Wi-Fi cài đặt), hoặc IP hiện trên màn Hệ thống. Điện thoại hoặc
 máy tính phải cùng mạng Wi-Fi với loa.
 
-- Đăng nhập mặc định: **`meowbox`** / **`m3owb0x2026`**. Đổi mật khẩu ở trang Hệ thống.
+- Đăng nhập mặc định: **`meowbox`** / **`m3owb0x2026`**. Nên đổi mật khẩu ngay ở trang Hệ thống.
+- Nhập sai mật khẩu 5 lần thì máy đó phải chờ 30 giây mới thử lại được, sai tiếp thì chờ lâu hơn (tối đa 15 phút).
+  Máy khác vẫn đăng nhập bình thường.
 - Một số Android và mạng công ty không mở được tên `.local`: dùng IP.
 - Trang web có tiếng Việt và tiếng Anh. Giao diện trang web đổi theo theme của loa.
 
@@ -82,7 +84,7 @@ máy tính phải cùng mạng Wi-Fi với loa.
 ## 4. Radio
 
 - **Thêm đài**: ở trang Radio, tìm theo tên hoặc thể loại (dữ liệu từ Radio Browser), bấm "Nghe thử", rồi thêm vào
-  danh sách. Có link stream sẵn thì dùng "Thêm đài bằng link".
+  danh sách. Có link stream sẵn thì dùng "Thêm đài bằng link" (link bắt đầu bằng `http://` hoặc `https://`).
 - **Loại đài loa phát được**: MP3, AAC, HLS (`.m3u8`, ví dụ VOV), danh sách `.pls`/`.m3u`. Link YouTube (video,
   playlist, live) cần máy tính bật PC agent (mục 7).
 - Đài phát theo thứ tự trong danh sách.

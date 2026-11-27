@@ -23,6 +23,8 @@ use windows::core::{PCWSTR, w};
 
 const WM_TRAY: u32 = WM_APP + 1;
 const WM_WAKE: u32 = WM_APP + 2;
+/// Posted to ourselves so the main loop's GetMessage returns and drains the event queue (see `push_sent`).
+const WM_DRAIN: u32 = WM_APP + 3;
 const ICON_ID: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,6 +55,16 @@ fn push(ev: TrayEvent) {
     });
 }
 
+/// For events that arrive as *sent* messages: Explorer delivers the icon's mouse messages and TaskbarCreated with
+/// SendNotifyMessage, which runs the window procedure inside GetMessage without making GetMessage return. Without a
+/// posted message after it, the main loop would not see the event until something else is posted (a state change),
+/// and once the speaker is connected nothing is: clicks on the icon did nothing (0.3.0).
+fn push_sent(hwnd: HWND, ev: TrayEvent) {
+    push(ev);
+    // SAFETY: posting to our own window.
+    let _ = unsafe { PostMessageW(Some(hwnd), WM_DRAIN, WPARAM(0), LPARAM(0)) };
+}
+
 /// Next queued event (main thread only).
 pub fn pop() -> Option<TrayEvent> {
     EVENTS.with(|q| q.borrow_mut().pop_front())
@@ -66,12 +78,12 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
     match msg {
         WM_TRAY => {
             match lp.0 as u32 {
-                WM_LBUTTONUP => push(TrayEvent::Click),
+                WM_LBUTTONUP => push_sent(hwnd, TrayEvent::Click),
                 WM_RBUTTONUP | WM_CONTEXTMENU => {
                     let mut pt = POINT::default();
                     // SAFETY: pt is a valid out pointer.
                     let _ = unsafe { GetCursorPos(&mut pt) };
-                    push(TrayEvent::Menu(pt.x, pt.y));
+                    push_sent(hwnd, TrayEvent::Menu(pt.x, pt.y));
                 }
                 _ => {}
             }
@@ -81,8 +93,10 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
             push(TrayEvent::Wake);
             LRESULT(0)
         }
+        WM_DRAIN => LRESULT(0), // only there to make GetMessage return
+
         m if m != 0 && m == TASKBAR_CREATED.with(|c| c.get()) => {
-            push(TrayEvent::TaskbarCreated);
+            push_sent(hwnd, TrayEvent::TaskbarCreated);
             LRESULT(0)
         }
         // SAFETY: default handling for everything else.
@@ -152,6 +166,38 @@ pub fn tray_icon_size() -> u32 {
     if n > 0 { n as u32 } else { 16 }
 }
 
+/// The hidden window that receives the icon's messages (and wake-ups from other threads). Main thread only: the
+/// window belongs to the calling thread.
+fn create_window() -> windows::core::Result<HWND> {
+    // SAFETY: standard window class registration and creation; the class name is a static string.
+    unsafe {
+        let inst = GetModuleHandleW(None)?;
+        let class = w!("MeowBoxAgentTray");
+        let wc = WNDCLASSW {
+            lpfnWndProc: Some(wndproc),
+            hInstance: inst.into(),
+            lpszClassName: class,
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
+        TASKBAR_CREATED.with(|c| c.set(RegisterWindowMessageW(w!("TaskbarCreated"))));
+        CreateWindowExW(
+            WINDOW_EX_STYLE(0),
+            class,
+            w!("MeowBox Agent"),
+            WS_OVERLAPPED,
+            0,
+            0,
+            0,
+            0,
+            None,
+            None,
+            Some(inst.into()),
+            None,
+        )
+    }
+}
+
 pub struct Tray {
     hwnd: HWND,
     icon: HICON,
@@ -161,33 +207,7 @@ pub struct Tray {
 impl Tray {
     /// Create the hidden window and add the icon. Main thread only (the window belongs to the calling thread).
     pub fn new(icon: HICON, tip: &str) -> windows::core::Result<Self> {
-        // SAFETY: standard window class registration and creation; the class name is a static string.
-        let hwnd = unsafe {
-            let inst = GetModuleHandleW(None)?;
-            let class = w!("MeowBoxAgentTray");
-            let wc = WNDCLASSW {
-                lpfnWndProc: Some(wndproc),
-                hInstance: inst.into(),
-                lpszClassName: class,
-                ..Default::default()
-            };
-            RegisterClassW(&wc);
-            TASKBAR_CREATED.with(|c| c.set(RegisterWindowMessageW(w!("TaskbarCreated"))));
-            CreateWindowExW(
-                WINDOW_EX_STYLE(0),
-                class,
-                w!("MeowBox Agent"),
-                WS_OVERLAPPED,
-                0,
-                0,
-                0,
-                0,
-                None,
-                None,
-                Some(inst.into()),
-                None,
-            )?
-        };
+        let hwnd = create_window()?;
         let tray = Self { hwnd, icon, tip: tip.to_owned() };
         tray.add();
         Ok(tray)
@@ -315,11 +335,48 @@ pub fn pump_one() -> bool {
     let mut msg = MSG::default();
     // SAFETY: standard message loop on the thread that owns the tray window.
     unsafe {
-        if GetMessageW(&mut msg, None, 0, 0).0 <= 0 {
+        let r = GetMessageW(&mut msg, None, 0, 0).0;
+        if r <= 0 {
+            tracing::debug!("message loop ends (GetMessage {r}, message 0x{:x})", msg.message);
             return false;
         }
         let _ = TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+    use windows::Win32::System::Threading::GetCurrentThreadId;
+
+    /// Explorer sends the icon's clicks with SendNotifyMessage: the main loop must see them at once, not only when
+    /// the next posted message comes (the 0.3.0 "tray icon stops answering once connected" bug).
+    #[test]
+    fn a_click_sent_like_explorer_reaches_the_loop() {
+        let hwnd = create_window().expect("window");
+        let h = hwnd.0 as isize;
+        // SAFETY: plain thread id query.
+        let me = unsafe { GetCurrentThreadId() };
+        std::thread::spawn(move || {
+            // SAFETY: sending to a window of another thread; posting WM_QUIT to a thread id.
+            unsafe {
+                let _ = SendNotifyMessageW(HWND(h as *mut _), WM_TRAY, WPARAM(1), LPARAM(WM_RBUTTONUP as isize));
+                std::thread::sleep(Duration::from_secs(3));
+                // watchdog: without the fix the loop would wait forever
+                let _ = PostThreadMessageW(me, WM_QUIT, WPARAM(0), LPARAM(0));
+            }
+        });
+        let t = Instant::now();
+        let mut got = None;
+        while got.is_none() && pump_one() {
+            got = pop();
+        }
+        assert!(matches!(got, Some(TrayEvent::Menu(_, _))), "no event: {got:?}");
+        assert!(t.elapsed() < Duration::from_secs(1), "event came only after {:?}", t.elapsed());
+        // SAFETY: our own window.
+        let _ = unsafe { DestroyWindow(hwnd) };
+    }
 }

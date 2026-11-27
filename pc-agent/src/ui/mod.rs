@@ -277,6 +277,7 @@ impl TrayApp {
     /// itself, it only records `open_request`.
     fn process(&mut self) {
         while let Some(ev) = tray::pop() {
+            tracing::debug!("tray event {ev:?}");
             match ev {
                 TrayEvent::Click => self.open_web(),
                 TrayEvent::Menu(x, y) => {
@@ -305,6 +306,7 @@ impl TrayApp {
                 self.process(); // events that arrived while the dialog was closing
             }
             if self.quit || !tray::pump_one() {
+                tracing::debug!("tray loop ends (quit {})", self.quit);
                 break;
             }
             self.process();
@@ -315,6 +317,7 @@ impl TrayApp {
     }
 
     fn run_dialog(&mut self, page: Page) {
+        tracing::debug!("window open ({page:?})");
         self.dialogs_opened += 1;
         let icon = egui::IconData { rgba: icon::cat_rgba(32, None), width: 32, height: 32 };
         let options = eframe::NativeOptions {
@@ -343,6 +346,7 @@ impl TrayApp {
             }),
         );
         tray::set_dialog_ctx(None);
+        tracing::debug!("window closed, back in the tray loop");
         crate::win::trim_memory();
         if let Err(e) = r {
             tracing::error!("dialog failed: {e}");

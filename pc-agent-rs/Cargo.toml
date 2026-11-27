@@ -1,0 +1,46 @@
+[package]
+name = "meowbox_agent"
+version = "0.3.0"
+edition = "2024"
+description = "MeowBox PC agent: PC stats and media to the speaker, YouTube relay, Meow Coding, tray icon"
+license = "MIT"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "meowbox"
+path = "src/bin/meowbox.rs"
+
+[[bin]]
+name = "MeowBoxAgent"
+path = "src/bin/tray.rs"
+
+[dependencies]
+anyhow = "1.0.105"
+eframe = { version = "0.37.0", default-features = false, features = ["default_fonts", "glow", "accesskit"] }
+serde_json = { version = "1.0.154", features = ["preserve_order"] }
+tiny-skia = { version = "0.12.0", default-features = false, features = ["std", "simd"] }
+tokio = { version = "1.54.1", features = ["sync"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "env-filter", "std"] }
+windows = { version = "0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_System_LibraryLoader",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[build-dependencies]
+winresource = "0.1.34"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

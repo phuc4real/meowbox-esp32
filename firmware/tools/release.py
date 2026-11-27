@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Prepare a MeowBox release (docs/firmware_v0.2.0.md, 3.2): manifest.json + meowbox-<ver>.bin [+ agent installer].
+"""Prepare a MeowBox release (docs/firmware_v0.2.0.md, 3.2): manifest.json + meowbox-<ver>.bin [+ agent installer]
++ SHA2-256SUMS of those files (the PC agent refuses to run an installer it cannot check).
 
 Run from firmware/ after `python web/build.py` and `idf.py build`:
 
@@ -81,6 +82,12 @@ def main():
         shutil.copy(a.agent, out)
         files.append(os.path.join(out, os.path.basename(a.agent)))
     json.dump(manifest, open(files[1], "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    # the PC agent checks its installer against this before running it (pc-agent/src/update.rs)
+    sums = os.path.join(out, "SHA2-256SUMS")
+    with open(sums, "w", encoding="utf-8", newline="\n") as f:
+        for p in files:
+            f.write(f"{hashlib.sha256(open(p, 'rb').read()).hexdigest()}  {os.path.basename(p)}\n")
+    files.append(sums)
     print(f"{tag}: {name} {len(data)} B sha256 {manifest['app']['sha256'][:16]}... -> {out}")
 
     if a.publish:

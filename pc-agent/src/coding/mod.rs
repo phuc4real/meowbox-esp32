@@ -227,8 +227,10 @@ pub fn git_branch(cwd: &str) -> String {
         if h.is_file() {
             let Ok(r) = std::fs::read_to_string(&h) else { return String::new() };
             let r = r.trim();
-            return if r.starts_with("ref:") {
-                r.rsplit('/').next().unwrap_or("").to_owned()
+            return if let Some(rf) = r.strip_prefix("ref:") {
+                // the whole branch name, slashes included (feature/cat-screen, fix/login)
+                let rf = rf.trim();
+                rf.strip_prefix("refs/heads/").or_else(|| rf.strip_prefix("refs/")).unwrap_or(rf).to_owned()
             } else {
                 r.chars().take(7).collect()
             };
@@ -268,7 +270,8 @@ fn iso_epoch(s: &str) -> Option<i64> {
         rest = r.trim_start_matches(|c: char| c.is_ascii_digit());
     }
     let offset = match rest {
-        "" => -local_offset_secs(),
+        // naive: local wall time, so UTC = local - offset (UTC+7 → 7 h earlier)
+        "" => local_offset_secs(),
         "Z" | "z" => 0,
         tz => {
             let sign = match tz.as_bytes().first()? {

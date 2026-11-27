@@ -20,7 +20,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::net::TcpStream;
-use tokio::sync::{Notify, mpsc, watch};
+use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
 
 const HEARTBEAT: Duration = Duration::from_secs(15);
@@ -51,7 +51,9 @@ struct Shared {
     cfg: SharedConfig,
     state: SharedState,
     /// "Search now" / "Take over" / saved a new speaker: close the link or cut the wait short.
-    kick: Arc<Notify>,
+    /// Bumped by every "Search now"; each attempt remembers the value it started with, so a press while the
+    /// core is busy (pinging, connecting) is never lost.
+    kick: Arc<watch::Sender<u64>>,
     /// The next hello carries "take": true.
     take: Arc<AtomicBool>,
     /// IPs the relay serves besides the connected speaker (the one the connect wizard is testing).
@@ -66,7 +68,7 @@ impl Shared {
         Self {
             cfg,
             state,
-            kick: Arc::new(Notify::new()),
+            kick: Arc::new(watch::Sender::new(0)),
             take: Arc::new(AtomicBool::new(false)),
             extra_allowed: Arc::default(),
             coding: Arc::default(),
@@ -138,7 +140,7 @@ impl CoreHandle {
         if take {
             self.shared.take.store(true, Ordering::SeqCst);
         }
-        self.shared.kick.notify_waiters();
+        self.shared.kick.send_modify(|g| *g += 1);
     }
 
     /// Where the core's short messages go (the tray's balloon).
@@ -268,12 +270,16 @@ async fn update_check(sh: Shared) {
     }
 }
 
-/// Wait `secs`, counting down in the state; "Search now" cuts it short.
-async fn sleep_with_countdown(sh: &Shared, secs: u64) {
+/// Wait `secs`, counting down in the state; "Search now" (also one pressed before the wait began) cuts it short.
+async fn sleep_with_countdown(sh: &Shared, secs: u64, kick: &mut watch::Receiver<u64>) {
     for left in (1..=secs).rev() {
+        if kick.has_changed().unwrap_or(false) {
+            kick.mark_unchanged();
+            break;
+        }
         sh.state.update(|s| s.retry_in = left as u32);
         tokio::select! {
-            _ = sh.kick.notified() => break,
+            _ = kick.changed() => break,
             _ = tokio::time::sleep(Duration::from_secs(1)) => {}
         }
     }
@@ -281,10 +287,11 @@ async fn sleep_with_countdown(sh: &Shared, secs: u64) {
 }
 
 async fn link_loop(sh: &Shared, relay_port: u16) {
-    let stats = Arc::new(tokio::sync::Mutex::new(Stats::new()));
-    let media = Arc::new(Media::default());
+    let feeds = Feeds { stats: Arc::new(tokio::sync::Mutex::new(Stats::new())), media: Arc::new(Media::default()) };
     let mut backoff: u64 = 1;
     loop {
+        // presses from here on count for this attempt
+        let mut kick = sh.kick.subscribe();
         sh.state.update(|s| {
             s.connected = false;
             s.searching = "start".into();
@@ -313,8 +320,14 @@ async fn link_loop(sh: &Shared, relay_port: u16) {
                     tracing::info!("speaker {} has an old firmware (proto {})", sp.name, sp.proto);
                 }
                 match connect(&sp.host).await {
+                    Ok(_) if kick.has_changed().unwrap_or(false) => {
+                        // "Search now" or a new speaker saved while this one was being reached: search again
+                        tracing::info!("reconnect asked while connecting to {}: searching again", sp.host);
+                        wait = 0;
+                        backoff = 1;
+                    }
                     Ok((ws, local_ip)) => {
-                        wait = session(sh, &sp, ws, &local_ip, relay_port, &stats, &media).await;
+                        wait = session(sh, &sp, ws, &local_ip, relay_port, &feeds, &mut kick).await;
                         if wait == 0 {
                             backoff = 1;
                         }
@@ -330,12 +343,18 @@ async fn link_loop(sh: &Shared, relay_port: u16) {
                 });
             }
         }
-        sleep_with_countdown(sh, if wait == 0 { backoff } else { wait }).await;
+        sleep_with_countdown(sh, if wait == 0 { backoff } else { wait }, &mut kick).await;
         backoff = (backoff * 2).min(30);
     }
 }
 
 type Ws = tokio_tungstenite::WebSocketStream<TcpStream>;
+
+/// What the link reads from this PC; kept across reconnects (the network counters need the previous sample).
+struct Feeds {
+    stats: Arc<tokio::sync::Mutex<Stats>>,
+    media: Arc<Media>,
+}
 
 /// TCP + WebSocket handshake to ws://host/ws/pc; also returns the local IP of this socket (the relay address the
 /// speaker can reach). No Origin header: the speaker refuses upgrades that carry one (web pages).
@@ -408,8 +427,8 @@ async fn session(
     ws: Ws,
     local_ip: &str,
     relay_port: u16,
-    stats: &Arc<tokio::sync::Mutex<Stats>>,
-    media: &Arc<Media>,
+    feeds: &Feeds,
+    kick: &mut watch::Receiver<u64>,
 ) -> u64 {
     let (mut sink, mut stream) = ws.split();
     let relay = (relay_port > 0).then(|| format!("http://{local_ip}:{relay_port}"));
@@ -437,14 +456,14 @@ async fn session(
             }
         }
     });
-    let sender = tokio::spawn(sender(sh.clone(), tx.clone(), stats.clone(), media.clone()));
+    let sender = tokio::spawn(sender(sh.clone(), tx.clone(), feeds.stats.clone(), feeds.media.clone()));
 
     let mut hb = tokio::time::interval(HEARTBEAT);
     hb.tick().await;
     let mut waiting_pong = false;
     let wait = loop {
         tokio::select! {
-            _ = sh.kick.notified() => {
+            _ = kick.changed() => {
                 let _ = tx.send(Message::Close(None)).await;
                 break 0;
             }
@@ -483,8 +502,8 @@ async fn session(
                         break 300;
                     }
                     Some(Incoming::MediaCmd(cmd)) => {
-                        media.command(&cmd).await;
-                        let m = media.read().await;
+                        feeds.media.command(&cmd).await;
+                        let m = feeds.media.read().await;
                         if tx.send(Message::text(compact(&m))).await.is_err() {
                             break 0;
                         }
@@ -573,6 +592,22 @@ mod tests {
         assert_eq!(parse_incoming(r#"["t","busy"]"#), None);
         assert_eq!(parse_incoming("not json"), None);
         assert_eq!(parse_incoming(r#"{"t":"stats"}"#), Some(Incoming::Other));
+    }
+
+    #[tokio::test]
+    async fn a_press_during_the_search_is_not_lost() {
+        let dir = std::env::temp_dir().join(format!("meowbox-kick-{}", std::process::id()));
+        let cfg = SharedConfig::new(crate::config::Config::default(), dir.join("agent.json"));
+        let sh = Shared::new(cfg, SharedState::default());
+        let mut kick = sh.kick.subscribe(); // the attempt starts
+        sh.kick.send_modify(|g| *g += 1); // pressed while it pings / connects, nobody waiting yet
+        let t = Instant::now();
+        sleep_with_countdown(&sh, 30, &mut kick).await;
+        assert!(t.elapsed() < Duration::from_secs(1), "the wait after the attempt is skipped");
+        // and the next wait is a normal one again
+        let t = Instant::now();
+        tokio::time::timeout(Duration::from_millis(1500), sleep_with_countdown(&sh, 30, &mut kick)).await.ok();
+        assert!(t.elapsed() >= Duration::from_millis(1400));
     }
 
     #[test]

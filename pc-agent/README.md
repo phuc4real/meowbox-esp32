@@ -48,8 +48,9 @@ does not connect to the wrong one. When the speaker's IP changes, type it again 
 
 Settings: `%APPDATA%\MeowBox\agent.json`. Log: `%APPDATA%\MeowBox\agent.log` (rotated at 1 MB × 3).
 
-**Cài đặt…** (tray menu, the second page of the same window): agent version and update (downloads the new installer
-and runs it), yt-dlp, ffmpeg; daily update check; run at Windows start; relay port; log folder.
+**Cài đặt…** (tray menu, the second page of the same window): agent version and update (downloads the new installer,
+checks it against the release's `SHA2-256SUMS` and runs it; a release without that file opens the release page
+instead), yt-dlp, ffmpeg; daily update check; run at Windows start; relay port; log folder.
 
 ### YouTube
 

@@ -68,6 +68,10 @@ fn small_helpers_like_python() {
     ] {
         assert_eq!(epoch(&v), want, "{v}");
     }
+    // no time zone: local time (Python's datetime.timestamp() of a naive datetime)
+    let utc = epoch(&json!("2026-11-27T13:00:00Z"));
+    assert_eq!(epoch(&json!("2026-11-27 13:00:00")), utc - local_offset_secs());
+    assert_eq!(epoch(&json!("2026-11-27T13:00:00")), utc - local_offset_secs());
 }
 
 #[test]
@@ -110,7 +114,7 @@ fn git_branch_from_head() {
     std::fs::create_dir_all(d.join(".git")).unwrap();
     std::fs::write(d.join(".git").join("HEAD"), "ref: refs/heads/feature/cat-screen\n").unwrap();
     std::fs::create_dir_all(d.join("src").join("deep")).unwrap();
-    assert_eq!(git_branch(&d.join("src").join("deep").to_string_lossy()), "cat-screen");
+    assert_eq!(git_branch(&d.join("src").join("deep").to_string_lossy()), "feature/cat-screen");
     std::fs::write(d.join(".git").join("HEAD"), "0123456789abcdef\n").unwrap();
     assert_eq!(git_branch(&d.to_string_lossy()), "0123456");
 }
@@ -343,4 +347,33 @@ async fn hook_server_only_takes_our_hook() {
         .unwrap();
     assert_eq!(r.text().await.unwrap(), "=^.^= MeowBox", "empty status body = {{}}");
     assert_eq!(tr.session_ids(), vec!["t1".to_string()], "only the real hook made a session");
+}
+
+#[test]
+fn only_meowbox_hooks_are_ours() {
+    let d = tmp("ours");
+    let path = d.join("settings.json");
+    let inst = Install { key: "0123456789abcdef0123456789abcdef".into(), port: 8767 };
+    let mine_old = json!({"type": "command", "command": "curl -s -m 3 -o /dev/null --data-binary @- http://127.0.0.1:8767/hook || exit 0"});
+    let mine_http = json!({"type": "http", "url": "http://127.0.0.1:8767/hook"});
+    let mine_now = json!({"type": "command", "command": inst.hook_command()});
+    let theirs = [
+        json!({"type": "command", "command": "curl -s --data-binary @- http://127.0.0.1:9000/hooks/x || exit 0"}),
+        json!({"type": "http", "url": "http://127.0.0.1:9000/hooks"}),
+        json!({"type": "http", "url": "http://127.0.0.1:9000/hook/extra"}),
+        json!({"type": "command", "command": "my-script http://127.0.0.1:8767/hook"}),
+    ];
+    let mut all = vec![mine_old, mine_http, mine_now];
+    all.extend(theirs.iter().cloned());
+    std::fs::write(&path, json!({"hooks": {"Stop": [{"hooks": all}]}}).to_string()).unwrap();
+    hooks::uninstall_at(&path).unwrap();
+    let cfg: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(cfg["hooks"]["Stop"][0]["hooks"], json!(theirs), "only MeowBox's three kinds go");
+
+    // someone's own status line that also posts to localhost is not ours
+    let sl = json!({"type": "command", "command": "curl -s --data-binary @- http://127.0.0.1:9000/status-page"});
+    std::fs::write(&path, json!({"statusLine": sl}).to_string()).unwrap();
+    hooks::install_at(&path, &inst).unwrap();
+    let cfg: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(cfg["statusLine"], sl);
 }

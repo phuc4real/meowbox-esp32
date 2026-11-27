@@ -76,6 +76,8 @@ python web/build.py; idf.py build
 python tools/release.py --notes notes.json --body body.md --agent ../pc-agent/packaging/build/MeowBoxAgent-Setup-<ver>.exe --publish
 ```
 
+The release also gets `SHA2-256SUMS` (the `.bin`, `manifest.json` and the agent installer): the PC agent only runs
+an installer that matches it.
 `notes.json` holds the short lines the web page shows (`{"vi":[...],"en":[...],"min_ver":"0.1.0"}`). Without
 `--publish` it only writes `dist/release/<ver>/`; `--base-url http://<pc>:8000/` makes a manifest for a local test
 server. API: [web/API.md](web/API.md) "Update".

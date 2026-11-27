@@ -260,6 +260,7 @@ pub fn main() {
         }
         _ => {}
     }
+    let host_given = cli.host.is_some();
     if let Some(h) = cli.host {
         cfg.host = h;
         cfg.last_host.clear();
@@ -270,7 +271,9 @@ pub fn main() {
         Cmd::Run { no_relay, no_update } => {
             tracing::info!("MeowBox Agent {} starting (headless)", crate::VERSION);
             let opts = crate::link::Options { relay: !no_relay, ytdlp_update: !no_update, ..Default::default() };
-            crate::link::run_forever(SharedConfig::new(cfg, path), SharedState::default(), opts);
+            // with --host, nothing the run learns (last_host, speaker name) is written over the saved config
+            let shared = if host_given { SharedConfig::in_memory(cfg) } else { SharedConfig::new(cfg, path) };
+            crate::link::run_forever(shared, SharedState::default(), opts);
         }
         Cmd::Notify { title, text, sound, priority, duration } => {
             let body = serde_json::json!({"title": title, "text": text, "sound": enum_name(sound),

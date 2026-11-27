@@ -37,13 +37,22 @@ fn state() -> std::sync::MutexGuard<'static, State> {
     STATE.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+/// `bin\ffmpeg`: one folder per downloaded build (`<build>\ffmpeg.exe` + DLLs) and `current` naming the one in use.
+/// A running stream locks its ffmpeg's files, so a new build never replaces a folder, it goes next to it. The Python
+/// agent kept ffmpeg.exe straight in `bin\ffmpeg`; that is still used until a build is downloaded.
 pub fn dir() -> PathBuf {
     crate::bin_dir().join("ffmpeg")
 }
 
+fn current() -> Option<PathBuf> {
+    let name = std::fs::read_to_string(dir().join("current")).ok()?.trim().to_owned();
+    let exe = dir().join(name).join("ffmpeg.exe");
+    (exe.is_file()).then_some(exe)
+}
+
 /// ffmpeg in PATH first (the user's own), else the one the agent downloaded.
 pub fn path() -> Option<PathBuf> {
-    crate::stats::which("ffmpeg").or_else(|| Some(dir().join("ffmpeg.exe")).filter(|p| p.is_file()))
+    crate::stats::which("ffmpeg").or_else(current).or_else(|| Some(dir().join("ffmpeg.exe")).filter(|p| p.is_file()))
 }
 
 pub fn version() -> Option<String> {
@@ -59,7 +68,7 @@ pub fn version() -> Option<String> {
 pub fn status() -> Status {
     let s = state();
     let path = path();
-    let own = path.as_ref().is_some_and(|p| p.parent() == Some(dir().as_path()));
+    let own = path.as_ref().is_some_and(|p| p.starts_with(dir()));
     Status { busy: s.busy, error: s.error.clone(), pct: s.pct, path, own }
 }
 
@@ -113,6 +122,23 @@ fn unpack(zip_path: &Path, new: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Delete builds other than `keep` and the Python agent's flat layout; files a running ffmpeg holds stay until next
+/// time.
+fn cleanup(keep: &str) {
+    let Ok(rd) = std::fs::read_dir(dir()) else { return };
+    for e in rd.flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        let p = e.path();
+        if p.is_dir() {
+            if name != keep {
+                let _ = std::fs::remove_dir_all(&p);
+            }
+        } else if name == "ffmpeg.exe" || name.ends_with(".dll") || name == "LICENSE.txt" {
+            let _ = std::fs::remove_file(&p);
+        }
+    }
+}
+
 async fn install_inner() -> anyhow::Result<String> {
     let (name, url, size) = asset().await?;
     let sums = String::from_utf8_lossy(
@@ -130,26 +156,50 @@ async fn install_inner() -> anyhow::Result<String> {
         state().pct = (done * 100 / total.max(size).max(1)) as u32;
     })
     .await?;
-    let (zp, new) = (tmp.clone(), dir().with_file_name("ffmpeg.new"));
+    let build = name.trim_end_matches(".zip").to_owned();
+    let (zp, b2) = (tmp.clone(), build.clone());
     let r = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-        unpack(&zp, &new)?;
-        let _ = std::fs::remove_dir_all(dir());
-        std::fs::rename(&new, dir())?;
+        let partial = dir().join(format!("{b2}.partial"));
+        let dest = dir().join(&b2);
+        unpack(&zp, &partial)?;
+        if dest.exists() {
+            // the same build again (Settings "download again"): replace it if nothing runs from it
+            std::fs::remove_dir_all(&dest)?;
+        }
+        std::fs::rename(&partial, &dest)?;
+        let cur = dir().join("current.tmp");
+        std::fs::write(&cur, &b2)?;
+        std::fs::rename(&cur, dir().join("current"))?;
+        cleanup(&b2);
         Ok(())
     })
     .await?;
     let _ = std::fs::remove_file(&tmp);
+    if r.is_err() {
+        let _ = std::fs::remove_dir_all(dir().join(format!("{build}.partial")));
+    }
     r?;
     state().fresh = true;
     let v = version().unwrap_or_else(|| "?".into());
-    tracing::info!("ffmpeg {v} installed in {}", dir().display());
+    tracing::info!("ffmpeg {v} installed in {}", dir().join(&build).display());
     Ok(v)
 }
 
-/// Download + verify + unpack ffmpeg into bin\ffmpeg. Returns the version; the error is a short reason.
+/// Clears `busy` however the install ends.
+struct Busy;
+
+impl Drop for Busy {
+    fn drop(&mut self) {
+        state().busy = false;
+    }
+}
+
+/// Download + verify + unpack ffmpeg into bin\ffmpeg\<build>. One at a time: a second caller waits for the first
+/// and then finds it installed. Returns the version; the error is a short reason.
 pub async fn install() -> anyhow::Result<String> {
     let _one = INSTALL.lock().await;
-    if dir().join("ffmpeg.exe").is_file() && state().fresh {
+    let _busy = Busy;
+    if current().is_some() && state().fresh {
         return Ok(version().unwrap_or_else(|| "?".into()));
     }
     {
@@ -159,23 +209,24 @@ pub async fn install() -> anyhow::Result<String> {
         s.pct = 0;
     }
     let r = install_inner().await;
-    let mut s = state();
-    s.busy = false;
     if let Err(e) = &r {
-        s.error = e.to_string().chars().take(120).collect();
+        state().error = e.to_string().chars().take(120).collect();
         tracing::warn!("ffmpeg install failed: {e}");
     }
     r
 }
 
-/// Start an install in the background unless one is running; `on_done` runs after it (success or not).
+/// Start an install in the background unless one is running; `on_done` runs after it (success or not). `busy` is set
+/// here, before the task starts, so a second call right after this one starts nothing; `install` clears it at the end.
 pub fn install_background(on_done: impl FnOnce() + Send + 'static) {
-    if state().busy {
-        return;
+    {
+        let mut s = state();
+        if s.busy {
+            return;
+        }
+        s.busy = true;
     }
-    state().busy = true; // so a second call right after this one does not start another download
     tokio::spawn(async move {
-        state().busy = false;
         let _ = install().await;
         on_done();
     });
@@ -200,7 +251,7 @@ mod tests {
         assert_eq!(asset_version("ffmpeg-n9.0.2-982-g836df4e858-win64-gpl-shared-9.0.zip"), None);
     }
 
-    /// Downloads ~75 MB into %LOCALAPPDATA%\MeowBoxinfmpeg: run by hand with LOCALAPPDATA pointing somewhere
+    /// Downloads ~75 MB into %LOCALAPPDATA%\MeowBox\bin\ffmpeg: run by hand with LOCALAPPDATA pointing somewhere
     /// disposable: `cargo test -- --ignored ffmpeg_download`.
     #[tokio::test]
     #[ignore]

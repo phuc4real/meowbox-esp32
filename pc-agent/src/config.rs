@@ -122,24 +122,26 @@ impl Config {
     }
 }
 
-/// The config shared by the core thread and the UI: changes are saved to `path` right away.
+/// The config shared by the core thread and the UI: changes are saved to `path` right away, unless it is an
+/// in-memory one (`meowbox --host … run`: a one-off address must not replace the saved speaker).
 #[derive(Clone)]
 pub struct SharedConfig {
     inner: std::sync::Arc<std::sync::Mutex<Config>>,
-    path: PathBuf,
+    path: Option<PathBuf>,
 }
 
 impl SharedConfig {
     pub fn new(cfg: Config, path: PathBuf) -> Self {
-        Self { inner: std::sync::Arc::new(std::sync::Mutex::new(cfg)), path }
+        Self { inner: std::sync::Arc::new(std::sync::Mutex::new(cfg)), path: Some(path) }
+    }
+
+    /// Changes stay in memory and are never written anywhere.
+    pub fn in_memory(cfg: Config) -> Self {
+        Self { inner: std::sync::Arc::new(std::sync::Mutex::new(cfg)), path: None }
     }
 
     pub fn load(path: PathBuf) -> Self {
         Self::new(Config::load(&path), path)
-    }
-
-    pub fn path(&self) -> &Path {
-        &self.path
     }
 
     pub fn get(&self) -> Config {
@@ -152,9 +154,10 @@ impl SharedConfig {
         let before = c.clone();
         f(&mut c);
         if *c != before
-            && let Err(e) = c.save(&self.path)
+            && let Some(path) = &self.path
+            && let Err(e) = c.save(path)
         {
-            tracing::warn!("could not save {}: {e}", self.path.display());
+            tracing::warn!("could not save {}: {e}", path.display());
         }
     }
 }
@@ -184,6 +187,16 @@ mod tests {
         assert_eq!(v["relay_port"], json!(9000));
         assert_eq!(v["speaker"], json!("MeowBox-TEST"));
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn in_memory_config_is_never_saved() {
+        let dir = std::env::temp_dir().join(format!("meowbox-mem-{}", std::process::id()));
+        let p = dir.join("agent.json");
+        let shared = SharedConfig::in_memory(Config::default());
+        shared.update(|c| c.last_host = "1.2.3.4".into());
+        assert_eq!(shared.get().last_host, "1.2.3.4");
+        assert!(!p.exists() && !dir.exists());
     }
 
     #[test]

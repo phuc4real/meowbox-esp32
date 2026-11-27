@@ -14,6 +14,9 @@ const REPO: &str = "yt-dlp/yt-dlp";
 
 /// yt-dlp processes running now (relay streams and lookups): old folders are only deleted when this is 0.
 static RUNNING: AtomicUsize = AtomicUsize::new(0);
+/// One install at a time: the agent's start-up maintenance, the tray's daily check and the Settings button can all
+/// ask at once, and they would write the same zip and folder.
+static UPDATING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// Held while a yt-dlp process runs.
 pub struct InUse(());
@@ -126,7 +129,9 @@ pub fn cleanup(keep: &str) {
 /// Download the latest onedir build, check it, unpack it next to the one in use and switch to it. Returns the
 /// installed tag; the error is a short reason for the user.
 pub async fn update(progress: impl Fn(&str)) -> anyhow::Result<String> {
+    let _one = UPDATING.lock().await;
     let tag = latest().await.ok_or_else(|| anyhow::anyhow!("cannot reach GitHub"))?;
+    // a call that waited for another one finds it installed
     if version().as_deref() == Some(tag.as_str()) {
         return Ok(tag);
     }

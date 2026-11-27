@@ -81,17 +81,35 @@ fn s(v: Option<&Value>) -> String {
     }
 }
 
-/// Ours: the command hook above, or the HTTP hook of the first Meow Coding builds (replaced on install).
+/// "http://127.0.0.1:<port><path>" exactly (a number for the port, nothing after the path).
+fn is_local_url(u: &str, path: &str) -> bool {
+    u.strip_prefix("http://127.0.0.1:")
+        .and_then(|r| r.strip_suffix(path))
+        .is_some_and(|port| !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// The URL a curl command posts to: the word after `--data-binary @-`.
+fn curl_target(cmd: &str) -> Option<&str> {
+    let cmd = cmd.trim();
+    let rest = cmd.strip_prefix("curl ")?.split_once("--data-binary @- ")?.1;
+    rest.split_whitespace().next()
+}
+
+/// Ours: what any MeowBox agent wrote, i.e. the curl hook above (with or without the key, so hooks of 0.2.4/0.2.5 are
+/// refreshed) or the HTTP hook of the first Meow Coding builds. Someone's own localhost hook (another path, another
+/// tool) is not ours.
 fn is_ours(h: &Value) -> bool {
-    let target =
-        if h.get("type").and_then(Value::as_str) == Some("http") { s(h.get("url")) } else { s(h.get("command")) };
-    target.contains("http://127.0.0.1:") && target.contains("/hook")
+    if h.get("type").and_then(Value::as_str) == Some("http") {
+        return is_local_url(&s(h.get("url")), "/hook");
+    }
+    let cmd = s(h.get("command"));
+    cmd.trim_end().ends_with("|| exit 0") && curl_target(&cmd).is_some_and(|u| is_local_url(u, "/hook"))
 }
 
 fn is_our_status(sl: Option<&Value>) -> bool {
     let Some(sl) = sl.filter(|v| v.is_object()) else { return false };
     let cmd = s(sl.get("command"));
-    cmd.contains("127.0.0.1:") && cmd.trim_end().ends_with("/status")
+    curl_target(&cmd).is_some_and(|u| is_local_url(u, "/status") && cmd.trim_end().ends_with(u))
 }
 
 /// The file as an object; a missing file is empty. A file that is not JSON (or not an object) is an error, so it is

@@ -109,7 +109,7 @@ python -m esptool --port COM10 -b 921600 write-flash 0 backup\speaker_full_16MB.
       tokens and 5-hour limit, and calls you when it waits), replacing the virtual pet; weather in °F when chosen;
       ~5 KB more internal RAM when idle; new defaults: weather in Ho Chi Minh City, three MP3 radio stations
 - [ ] Open items in [docs/backlog.md](docs/backlog.md): 24 h soak and hands-on checklist, update edge cases
-      (rollback, Wi-Fi lost while downloading), internal RAM back over 40 KB, battery calibration, swipe at ≥ 25 FPS,
+      (rollback, Wi-Fi lost while downloading), internal RAM back over 40 KB, battery calibration, swipe FPS in Brutalism,
       mini game, which "free" GPIOs reach pads
 
 ## Licences

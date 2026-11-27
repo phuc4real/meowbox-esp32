@@ -11,7 +11,7 @@ live in [roadmap.md](roadmap.md).
 ## Memory
 - **Internal RAM back to ≥ 40 KB free at the lowest.** The goal in CLAUDE.md is 40 KB; the heaviest soak measured
   39.5 KB in 0.2.2 and 39.9 KB in 0.2.3 (`docs/perf/results-0.2.3.md`), so there is no margin, and larger draw buffers
-  for the swipe FPS item below would need more. Look at what still sits in internal RAM (task stacks that could move
+  for the Brutalism swipe item below would need more. Look at what still sits in internal RAM (task stacks that could move
   to PSRAM, the decoder's 8 KB input buffer, LVGL draw buffers) with `tools/memwatch.py`.
   Also (measured 2026-11-26, same code and `sdkconfig`): the 0.2.3 release, built from IDF `release/v6.1` at
   `c43d665a`, has ~48 KB free when idle; built with the `v6.1.0` or `v6.1.1` tag it has ~12-14 KB (lowest 1.5-2.4 KB,
@@ -21,12 +21,10 @@ live in [roadmap.md](roadmap.md).
   streaming with notifications (0.2.3: 48.5 KB idle).
 
 ## Performance
-- **Swipe at ≥ 25 FPS while the radio plays.** Measured 2026-11-26 (0.2.3, animated tile change every 2 s, MP3
-  stream playing, no underrun): about 14-20 FPS in Swiss / Zen / Brutal, 12-17 in Cyberpunk; the slowest frames take
-  50-85 ms. The ceiling is about 35 FPS: a full frame is 142 KB over SPI at 40 MHz (~28 ms), and 40 MHz is the limit
-  because SCLK / MOSI (GPIO 9 / 10) are not the SPI IO MUX pins. Ideas: larger draw buffers (costs internal RAM,
-  which has no margin; PSRAM + DMA is slower), drawing less while the tileview scrolls (skip the Cyberpunk scanlines
-  and the cat during the animation), a shorter scroll animation.
+- **Swipe FPS in Brutalism.** Since 2026-11-27 ([perf/swipe-fps.md](perf/swipe-fps.md)) Swiss, Cyberpunk and Zen
+  swipe at ~26 FPS with the radio playing; Brutalism is at 23-24 (25 in eco). What is left is its grid (≈ 40 small
+  fills per 24-row chunk). Ideas: fewer, larger draw chunks (costs internal RAM, which has no margin), or the grid as
+  part of a cached background.
 - **Minify the web UI** (esbuild or similar) to get more room under the 30 KB first-load limit of `web/build.py`
   (29.6 KB in 0.2.3).
 

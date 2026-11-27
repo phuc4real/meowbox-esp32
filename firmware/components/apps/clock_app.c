@@ -535,9 +535,7 @@ static void build_enso(lv_obj_t *t) /* Zen */
 {
     lv_obj_t *e = lv_image_create(t);
     lv_image_set_src(e, &ui_img_enso);
-    lv_image_set_scale(e, 320); /* 150 px art drawn at ~188 px */
-    lv_obj_set_size(e, 188, 188);
-    lv_image_set_inner_align(e, LV_IMAGE_ALIGN_CENTER);
+    lv_obj_set_size(e, 188, 188); /* the art is made at this size (tools/ui_assets): no scaling while swiping */
     lv_obj_set_pos(e, 4, 22);
     lv_obj_set_style_image_recolor(e, ui_lc(UI_C_TEXT), 0);
     lv_obj_set_style_image_recolor_opa(e, LV_OPA_COVER, 0);

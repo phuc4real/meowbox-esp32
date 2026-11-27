@@ -6,7 +6,7 @@ Các ý tưởng để dành, chưa xếp vào bản nào. Khi quyết định l
 | Ý tưởng | Khi nào làm | Trạng thái |
 |---|---|---|
 | MeowBox Cloud (Cloudflare Worker) | khi số liệu ở mục 4 của v0.2.0 cho thấy vẫn thiếu băng thông (đo ở chỗ Wi-Fi yếu: [backlog.md](backlog.md), "Checks on the device"), hoặc cần thông báo khi loa ở ngoài | để dành |
-| Tối ưu lại các theme về UI/UX | sau v0.2.0 | mostly done in v0.2.2-v0.2.3; what is left: "Still to do" below |
+| Tối ưu lại các theme về UI/UX | sau v0.2.0 | done except Brutalism's swipe FPS ("Still to do" below) |
 | PC agent UI/UX | after v0.2.0 (v0.2.0 ships the agent functionally complete) | parked |
 
 ---
@@ -119,8 +119,13 @@ chủ chuyển mã luồng nhạc như trên.
   The web page now also drops Cyberpunk's HUD corners and segmented bars and Brutal's grid and shadows in eco. The
   hint and `API.md` no longer say eco switches on by itself on battery: nothing in the firmware does that.
 
+- Swipe FPS with the radio playing ([perf/swipe-fps.md](perf/swipe-fps.md)): Cyberpunk 15-17 → 26, Zen's clock tile
+  19 → 24, the others ~26 except Brutalism (23-24). Scanlines and grid are 1 px fills limited to the chunk being drawn,
+  the Zen ensō is made at its screen size, and the swipe animation is 250 ms instead of 400 ms. A swipe bench
+  (`UI_SWIPE_BENCH` in `components/ui/ui.c`) is kept for the next measurement.
+
 ### Still to do
-- Swipe at ≥ 25 FPS while the radio plays: in [backlog.md](backlog.md) (Performance).
+- Brutalism swipes at 23-24 FPS, just under the 25 goal: in [backlog.md](backlog.md) (Performance).
 
 ---
 

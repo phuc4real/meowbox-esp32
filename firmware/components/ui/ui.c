@@ -2,12 +2,14 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h> /* qsort (swipe bench) */
 #include <string.h>
 #include <time.h>
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "board.h"
 #include "settings.h"
+#include "misc/lv_area_private.h" /* lv_area_intersect */
 #include "misc/lv_text_private.h" /* lv_text_encoded_next */
 #include "widgets/tileview/lv_tileview_private.h" /* lv_tileview_tile_t: a tile's swipe directions */
 
@@ -348,35 +350,44 @@ lv_obj_t *ui_header(lv_obj_t *tile, const char *left, const char *right)
 }
 
 /* ---------------- tile background effects ---------------- */
+/* 1 px fills, and only the ones inside the area being drawn: LVGL renders the screen in 24-row chunks, and a line
+ * call per scanline queued ~80 draw tasks per tile in every chunk, which halved the swipe frame rate in Cyberpunk. */
 static void tile_bg_draw(lv_event_t *e)
 {
     const theme_def_t *t = ui_theme();
-    if (!ui_fx() || ui_is_night()) return;
+    if (!ui_fx() || ui_is_night() || !(t->fx_scanline || t->fx_grid)) return;
     lv_obj_t *tile = lv_event_get_target(e);
     lv_layer_t *layer = lv_event_get_layer(e);
-    lv_area_t a;
+    lv_area_t a, c;
     lv_obj_get_coords(tile, &a);
-    lv_draw_line_dsc_t d;
-    lv_draw_line_dsc_init(&d);
-    d.width = 1;
+    if (!lv_area_intersect(&c, &a, &layer->_clip_area)) return;
+    lv_draw_fill_dsc_t d;
+    lv_draw_fill_dsc_init(&d);
+    lv_area_t r;
     if (t->fx_scanline) {
         d.color = lv_color_white();
         d.opa = 10;
-        for (int y = a.y1; y <= a.y2; y += 3) {
-            d.p1.x = a.x1; d.p1.y = y; d.p2.x = a.x2; d.p2.y = y;
-            lv_draw_line(layer, &d);
+        r.x1 = c.x1;
+        r.x2 = c.x2;
+        for (int y = a.y1 + (c.y1 - a.y1 + 2) / 3 * 3; y <= c.y2; y += 3) {
+            r.y1 = r.y2 = y;
+            lv_draw_fill(layer, &d, &r);
         }
     }
     if (t->fx_grid) {
         d.color = lv_color_hex(0xD0D0D0);
         d.opa = LV_OPA_COVER;
-        for (int y = a.y1; y <= a.y2; y += 16) {
-            d.p1.x = a.x1; d.p1.y = y; d.p2.x = a.x2; d.p2.y = y;
-            lv_draw_line(layer, &d);
+        r.x1 = c.x1;
+        r.x2 = c.x2;
+        for (int y = a.y1 + (c.y1 - a.y1 + 15) / 16 * 16; y <= c.y2; y += 16) {
+            r.y1 = r.y2 = y;
+            lv_draw_fill(layer, &d, &r);
         }
-        for (int x = a.x1; x <= a.x2; x += 16) {
-            d.p1.x = x; d.p1.y = a.y1; d.p2.x = x; d.p2.y = a.y2;
-            lv_draw_line(layer, &d);
+        r.y1 = c.y1;
+        r.y2 = c.y2;
+        for (int x = a.x1 + (c.x1 - a.x1 + 15) / 16 * 16; x <= c.x2; x += 16) {
+            r.x1 = r.x2 = x;
+            lv_draw_fill(layer, &d, &r);
         }
     }
 }
@@ -792,6 +803,61 @@ static void inv_report(lv_timer_t *t)
     memset(&s_inv, 0, sizeof(s_inv));
 }
 
+/* ---------------- swipe FPS bench ---------------- */
+/* Build with UI_SWIPE_BENCH 1 to swipe to the next tile every 2 s and log "swipe: ... fps" (median frame interval
+ * of each animation) on the serial port; method and results in docs/perf/swipe-fps.md. Off in normal builds. */
+#ifndef UI_SWIPE_BENCH
+#define UI_SWIPE_BENCH 0
+#endif
+#if UI_SWIPE_BENCH
+static struct {
+    bool on;
+    int64_t t0, last;
+    uint32_t n;
+    uint16_t dt[64];
+    int from;
+} s_sw;
+static int u16cmp(const void *x, const void *y) { return *(const uint16_t *)x - *(const uint16_t *)y; }
+static void sw_scroll_cb(lv_event_t *e)
+{
+    int64_t now = esp_timer_get_time();
+    if (lv_event_get_code(e) == LV_EVENT_SCROLL_BEGIN) {
+        s_sw.on = true;
+        s_sw.t0 = s_sw.last = now;
+        s_sw.n = 0;
+        s_sw.from = ui_active_tile();
+    } else if (s_sw.on) {
+        s_sw.on = false;
+        int n = s_sw.n > 64 ? 64 : s_sw.n;
+        if (n < 3) return;
+        /* dt[0] runs from the scroll start to the first frame: left out */
+        qsort(s_sw.dt + 1, n - 1, sizeof(uint16_t), u16cmp);
+        uint16_t med = s_sw.dt[1 + (n - 1) / 2], worst = s_sw.dt[n - 1];
+        ESP_LOGI(TAG, "swipe: %d frames in %lu ms = %.1f fps, slowest %u ms, theme %s, tile %d-%d, median %u ms", n,
+                 (unsigned long)((now - s_sw.t0) / 1000), med ? 1000.0f / med : 0, worst, ui_theme()->id, s_sw.from,
+                 (int)ui_active_tile(), med);
+    }
+}
+static void sw_refr_cb(lv_event_t *e)
+{
+    if (!s_sw.on) return;
+    int64_t now = esp_timer_get_time();
+    if (s_sw.n < 64) s_sw.dt[s_sw.n] = (uint16_t)((now - s_sw.last) / 1000);
+    s_sw.last = now;
+    s_sw.n++;
+}
+static void sw_bench_tmr(lv_timer_t *t)
+{
+    static int dir = 1;
+    int cur = ui_active_tile(), nx = cur + dir;
+    if (nx < 0 || nx >= UI_TILE_COUNT) {
+        dir = -dir;
+        nx = cur + dir;
+    }
+    ui_show_tile((ui_tile_t)nx, true);
+}
+#endif
+
 /* ---------------- init ---------------- */
 void ui_init(void)
 {
@@ -811,5 +877,11 @@ void ui_init(void)
     s_ui_tmr = lv_timer_create(ui_timer, 500, NULL);
     lv_display_add_event_cb(lv_display_get_default(), inv_cb, LV_EVENT_INVALIDATE_AREA, NULL);
     lv_timer_create(inv_report, 10000, NULL);
+#if UI_SWIPE_BENCH
+    lv_obj_add_event_cb(s_tv, sw_scroll_cb, LV_EVENT_SCROLL_BEGIN, NULL);
+    lv_obj_add_event_cb(s_tv, sw_scroll_cb, LV_EVENT_SCROLL_END, NULL);
+    lv_display_add_event_cb(lv_display_get_default(), sw_refr_cb, LV_EVENT_REFR_READY, NULL);
+    lv_timer_create(sw_bench_tmr, 2000, NULL);
+#endif
     ESP_LOGI(TAG, "ui ready, theme %s", ui_theme()->id);
 }

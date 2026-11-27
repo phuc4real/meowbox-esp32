@@ -203,6 +203,15 @@ pub fn run_forever(cfg: SharedConfig, state: SharedState, opts: Options) {
 }
 
 async fn run(sh: Shared, opts: Options, mut stop: watch::Receiver<bool>) {
+    // Meow Coding: hooks written by an older agent are refreshed, then the local hook server
+    let cport = sh.cfg.get().coding_port;
+    if let Ok(Err(e)) = tokio::task::spawn_blocking(move || crate::coding::hooks::refresh(cport)).await {
+        tracing::warn!("Meow Coding: could not update the Claude Code hooks: {e}");
+    }
+    let key = tokio::task::spawn_blocking(crate::coding::hooks::hook_key).await.unwrap_or_default();
+    if let Err(e) = crate::coding::server::start(sh.coding.clone(), cport, key).await {
+        tracing::error!("Meow Coding port {cport} busy: {e}");
+    }
     let mut port = if opts.relay { sh.cfg.get().relay_port } else { 0 };
     if port > 0 {
         let s2 = sh.clone();

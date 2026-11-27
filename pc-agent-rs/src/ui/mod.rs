@@ -178,7 +178,7 @@ impl TrayApp {
             MenuItem::default(id::OPEN_WEB, s::M_OPEN_WEB),
             MenuItem::item(id::TEST_NOTIFY, s::M_TEST_NOTIFY),
             MenuItem::check(id::PAUSE, s::M_PAUSE, cfg.paused),
-            MenuItem::check(id::CODING, s::M_CODING, false), // phase 3
+            MenuItem::check(id::CODING, s::M_CODING, crate::coding::hooks::hooks_installed()),
             MenuItem::Separator,
             MenuItem::item(id::CONNECT, s::M_CONNECT),
             MenuItem::item(id::SETTINGS, s::M_SETTINGS),
@@ -215,6 +215,7 @@ impl TrayApp {
             id::RECONNECT => self.core.reconnect_now(false),
             id::TEST_NOTIFY => self.test_notify(),
             id::PAUSE => self.core.cfg().update(|c| c.paused = !c.paused),
+            id::CODING => self.toggle_coding(),
             id::AUTOSTART => {
                 if let Err(e) = crate::win::set_autostart(!crate::win::autostart_enabled()) {
                     tracing::warn!("autostart: {e}");
@@ -232,6 +233,22 @@ impl TrayApp {
                 self.core.stop();
             }
             other => tracing::debug!("menu item {other}: not in this build yet"),
+        }
+    }
+
+    /// Add / remove MeowBox's hooks and status line in ~/.claude/settings.json (new Claude Code sessions pick them up).
+    fn toggle_coding(&self) {
+        let r = if crate::coding::hooks::hooks_installed() {
+            crate::coding::hooks::uninstall().map(|_| s::T_CODING_OFF)
+        } else {
+            crate::coding::hooks::install(self.cfg().coding_port).map(|_| s::T_CODING_ON)
+        };
+        match r {
+            Ok(msg) => self.tray.notify(msg, s::TOAST_TITLE),
+            Err(e) => {
+                tracing::warn!("Claude Code settings: {e}");
+                self.tray.notify(&s::t_coding_failed(&e), s::TOAST_TITLE);
+            }
         }
     }
 

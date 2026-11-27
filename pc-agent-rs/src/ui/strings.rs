@@ -42,3 +42,10 @@ pub fn t_speaker_error(code: u16) -> String {
 pub fn t_send_failed(e: &dyn std::fmt::Display) -> String {
     format!("Không gửi được: {e}")
 }
+
+pub const T_CODING_OFF: &str = "Mèo thôi canh Claude Code rồi (đã gỡ hook)";
+pub const T_CODING_ON: &str = "Mèo vào vị trí! Mở phiên Claude Code mới để mèo code cùng sen";
+
+pub fn t_coding_failed(e: &dyn std::fmt::Display) -> String {
+    format!("Không sửa được ~/.claude/settings.json: {e}")
+}

@@ -1,6 +1,6 @@
 # Rewrite the PC agent in Rust
 
-Status: phases 0–2 done (2026-11-27), crate in `pc-agent-rs/`. Replaces the Python agent in `pc-agent/` (0.2.5, ~3,000 lines) with a
+Status: phases 0–3 done (2026-11-27), crate in `pc-agent-rs/`. Replaces the Python agent in `pc-agent/` (0.2.5, ~3,000 lines) with a
 Rust build that behaves the same for the speaker and the user. Estimate: **20–25 working days**, in 6 phases that
 each end in something that runs.
 
@@ -290,6 +290,24 @@ Original scope:
   mid-stream leaves no yt-dlp/ffmpeg process.
 
 ### Phase 3: Meow Coding (2 days)
+
+Result (2026-11-27):
+- `coding` (tracker, helpers), `coding::transcript` (incremental, lock not held while reading), `coding::hooks`
+  (install / refresh / uninstall, backup, broken JSON never overwritten), `coding::server` (127.0.0.1, key, no
+  Origin, JSON only, 4 MB); `meowbox coding install|uninstall|status`; tray item with checkmark and toasts.
+- 12 tests: the coding cases of test_agent.py, outputs of the Python functions for the same inputs (model label,
+  short, basename, action, epoch, status line, hook and status commands byte for byte), event order (late tool
+  events after Stop, permission prompt before PreToolUse), transcript (split message counted once, sidechain and
+  `<synthetic>` skipped, half-written line waits, status line context wins), settings.json round trip.
+- End to end in an isolated profile: the curl commands written to settings.json, run as Claude Code runs them, reach
+  the Rust server; the mock speaker gets `{"t":"coding","s":[{"name":"…","br":"rust-agent","st":"work","act":"edit",
+  "tok":42000,"model":"Opus 5.5","ctx":12}],"lim":{"h5":42,…}}`, then `done` after Stop.
+- Note: the real ~/.claude/settings.json on this PC still has the keyless commands of the installed 0.2.5 agent; any
+  agent built from current code (Python from source or Rust) rewrites them with the key at start, as designed
+  (0.2.5 ignores the key, so it keeps working).
+- Sizes (release): `MeowBoxAgent.exe` 9.0 MB, `meowbox.exe` 4.5 MB.
+
+Original scope:
 
 - tracker, transcript, server, hooks, `meowbox coding install/uninstall/status`.
 - Port every coding check of `test_agent.py`, plus tracker event-order cases (late PostToolUse after Stop, permission

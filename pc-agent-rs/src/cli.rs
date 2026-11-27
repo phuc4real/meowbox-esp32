@@ -215,8 +215,21 @@ pub fn main() {
             println!("{}\n{text}", path.display());
             return;
         }
-        Cmd::Coding { .. } => {
-            println!("Meow Coding: chưa có trong bản Rust này (giai đoạn 3)");
+        Cmd::Coding { action } => {
+            let port = cfg.coding_port;
+            let r = match action {
+                CodingAction::Install => crate::coding::hooks::install(port),
+                CodingAction::Uninstall => crate::coding::hooks::uninstall(),
+                CodingAction::Status => Ok(()),
+            };
+            if let Err(e) = r {
+                fail(format!("{}: {e}", crate::coding::claude_settings().display()), 1);
+            }
+            let on = if crate::coding::hooks::hooks_installed() { "đã bật" } else { "chưa bật" };
+            println!(
+                "{}: hook MeowBox {on} (http://127.0.0.1:{port}/hook)",
+                crate::coding::claude_settings().display()
+            );
             return;
         }
         Cmd::Tools { action } => {

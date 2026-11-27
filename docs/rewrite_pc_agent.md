@@ -1,6 +1,6 @@
 # Rewrite the PC agent in Rust
 
-Status: phases 0–3 done (2026-11-27), crate in `pc-agent-rs/`. Replaces the Python agent in `pc-agent/` (0.2.5, ~3,000 lines) with a
+Status: phases 0–4 done (2026-11-27), crate in `pc-agent-rs/`. Replaces the Python agent in `pc-agent/` (0.2.5, ~3,000 lines) with a
 Rust build that behaves the same for the speaker and the user. Estimate: **20–25 working days**, in 6 phases that
 each end in something that runs.
 
@@ -317,6 +317,24 @@ Original scope:
   Python agent, and the hook commands in settings.json are byte-identical.
 
 ### Phase 4: tray and dialogs (4–5 days)
+
+Result (2026-11-27):
+- One window, two pages: "Kết nối loa" (3-step wizard: IP with auto-check, reasons and Wi-Fi name on failure;
+  token checked against /api/notify/history, Next only after a pass; relay test with the Public-network firewall
+  button, or a new port when the relay port is taken) and "Cài đặt" (agent update check and download-and-run of the
+  installer, yt-dlp check/update, ffmpeg status/download with percentage, auto-update, autostart, relay port, log
+  folder, GitHub). Background work runs on the core's runtime (`ui::task`), never on the UI thread.
+- Tray: daily update check 5 s after start (newer agent → menu item + toast, yt-dlp maintenance), Meow Coding
+  checkmark.
+- Checked by driving the release build through UI Automation (accesskit exposes egui's buttons) against the mock
+  speaker, with screenshots of every step: IP ✓, token ✓ (auto-checked), relay ✓ (2 ms), settings page.
+- Window open: ~125 MB working set (OpenGL driver), trimmed when it closes (phase 0).
+- **Test isolation bug, found and fixed in this phase:** from phase 3 on, `tests/link.rs` started the core with the
+  real profile, so a `cargo test` refreshed the real ~/.claude/settings.json (keyless MeowBox commands → keyed ones,
+  other settings untouched). The core now has `Options::coding` (and the tests turn relay, yt-dlp, update check and
+  coding off); integration tests never use this PC's profile.
+
+Original scope:
 
 - tray (status line, icon dots, menu, toasts, update check), connect wizard, settings page, fonts, strings.
 - Done when: every tray item and both pages work on the device, including first-run flow, busy/take-over, wrong

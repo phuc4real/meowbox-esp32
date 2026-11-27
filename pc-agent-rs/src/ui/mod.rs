@@ -2,9 +2,12 @@
 //! when asked, an eframe window (Connect / Settings pages) that returns when closed. The core (phase 1) will run in
 //! its own tokio thread and wake the main thread through the tray's Waker.
 
+pub mod connect;
 pub mod fonts;
 pub mod icon;
+pub mod settings;
 pub mod strings;
+pub mod task;
 pub mod tray;
 
 use crate::config::Config;
@@ -317,7 +320,7 @@ impl TrayApp {
         let options = eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
                 .with_title(s::APP)
-                .with_inner_size([560.0, 420.0])
+                .with_inner_size([580.0, 560.0])
                 .with_resizable(false)
                 .with_maximize_button(false)
                 .with_icon(icon),
@@ -333,8 +336,10 @@ impl TrayApp {
             Box::new(move |cc| {
                 cc.egui_ctx.set_fonts(fonts::definitions());
                 cc.egui_ctx.set_theme(egui::Theme::Light);
+                style(&cc.egui_ctx);
                 tray::set_dialog_ctx(Some(cc.egui_ctx.clone()));
-                Ok(Box::new(Dialog { app, page, frames: 0, auto_close }))
+                let (connect, settings) = (connect::Connect::new(&app.core), settings::Settings::new(&app.core));
+                Ok(Box::new(Dialog { app, page, connect, settings, frames: 0, auto_close }))
             }),
         );
         tray::set_dialog_ctx(None);
@@ -354,12 +359,69 @@ impl TrayApp {
     }
 }
 
+/// Text colours of the Python dialogs: ok #080, error #b00, hints #666.
+#[derive(Clone, Copy)]
+pub enum Look {
+    Good,
+    Bad,
+    Hint,
+    Text,
+}
+
+impl Look {
+    pub fn color(self) -> egui::Color32 {
+        match self {
+            Self::Good => egui::Color32::from_rgb(0x00, 0x88, 0x00),
+            Self::Bad => egui::Color32::from_rgb(0xbb, 0x00, 0x00),
+            Self::Hint => egui::Color32::from_rgb(0x66, 0x66, 0x66),
+            Self::Text => egui::Color32::from_rgb(0x55, 0x55, 0x55),
+        }
+    }
+}
+
+pub fn msg(text: &str, look: Look) -> Option<(String, egui::Color32)> {
+    Some((text.to_owned(), look.color()))
+}
+
+pub fn hint(ui: &mut egui::Ui, text: &str) {
+    if !text.is_empty() {
+        ui.label(egui::RichText::new(text).color(Look::Hint.color()));
+    }
+}
+
+/// Windows-like sizes: 14 px Segoe UI, roomier buttons and fields.
+fn style(ctx: &egui::Context) {
+    ctx.all_styles_mut(|st| {
+        use egui::{FontFamily::Proportional, FontId, TextStyle};
+        st.text_styles = [
+            (TextStyle::Heading, FontId::new(18.0, Proportional)),
+            (TextStyle::Body, FontId::new(14.0, Proportional)),
+            (TextStyle::Button, FontId::new(14.0, Proportional)),
+            (TextStyle::Small, FontId::new(12.0, Proportional)),
+            (TextStyle::Monospace, FontId::new(13.0, egui::FontFamily::Monospace)),
+        ]
+        .into();
+        st.spacing.item_spacing = egui::vec2(8.0, 8.0);
+        st.spacing.button_padding = egui::vec2(12.0, 5.0);
+        st.spacing.interact_size.y = 28.0;
+    });
+}
+
 /// The one agent window. Borrows the tray app for as long as it is open (eframe's run_and_return).
 struct Dialog<'a> {
     app: &'a mut TrayApp,
     page: Page,
+    connect: connect::Connect,
+    settings: settings::Settings,
     frames: u32,
     auto_close: bool,
+}
+
+impl Dialog<'_> {
+    fn close(&self, ctx: &egui::Context) {
+        self.connect.close(&self.app.core);
+        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+    }
 }
 
 impl eframe::App for Dialog<'_> {
@@ -371,14 +433,18 @@ impl eframe::App for Dialog<'_> {
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::Focus);
         }
         if self.app.quit {
-            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+            self.close(ui.ctx());
         }
         self.frames += 1;
         if self.auto_close && self.frames > 3 {
-            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+            self.close(ui.ctx());
+        }
+        if ui.ctx().input(|i| i.viewport().close_requested()) {
+            self.connect.close(&self.app.core);
         }
 
-        egui::CentralPanel::default().show(ui, |ui| {
+        let frame = egui::Frame::central_panel(ui.style()).inner_margin(egui::Margin::symmetric(16, 12));
+        egui::CentralPanel::default().frame(frame).show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.page, Page::Connect, s::PAGE_CONNECT);
                 ui.selectable_value(&mut self.page, Page::Settings, s::PAGE_SETTINGS);
@@ -386,23 +452,40 @@ impl eframe::App for Dialog<'_> {
             ui.separator();
             match self.page {
                 Page::Connect => {
-                    ui.label("Nhập IP hiện trên màn hình loa (tile Hệ thống), vd 192.168.1.50:");
-                    ui.label("Tiếng Việt: ă â đ ê ô ơ ư · ạ ả ã ấ ầ ẩ ẫ ậ ắ ằ ẳ ẵ ặ ✓ ● ○ ✕ › ↗");
-                    ui.label(format!("Lần mở cửa sổ: {}", self.app.dialogs_opened));
+                    self.connect.ui(ui, &self.app.core);
+                    if self.connect.finished {
+                        self.close(ui.ctx());
+                    }
                 }
                 Page::Settings => {
-                    ui.label(format!("Phiên bản {}", crate::VERSION));
-                    let mut paused = self.app.cfg().paused;
-                    if ui.checkbox(&mut paused, s::M_PAUSE).changed() {
-                        self.app.command(id::PAUSE);
+                    egui::Panel::bottom("settings_nav").show_separator_line(false).show(ui, |ui| {
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            if ui.button(s::M_LOG_DIR).clicked() {
+                                crate::win::open(&crate::app_dir().to_string_lossy());
+                            }
+                            if ui.button(s::M_GITHUB).clicked() {
+                                crate::win::open(&format!("https://github.com/{}", crate::REPO));
+                            }
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.button(s::CLOSE).clicked() {
+                                    self.close(ui.ctx());
+                                }
+                            });
+                        });
+                    });
+                    let core = &self.app.core;
+                    let act = egui::CentralPanel::default()
+                        .frame(egui::Frame::NONE)
+                        .show(ui, |ui| egui::ScrollArea::vertical().show(ui, |ui| self.settings.ui(ui, core)).inner)
+                        .inner;
+                    if let Some(settings::Action::Quit) = act {
+                        self.app.quit = true;
+                        self.app.core.stop();
+                        self.close(ui.ctx());
                     }
                 }
             }
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::RIGHT), |ui| {
-                if ui.button(s::CLOSE).clicked() {
-                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
-                }
-            });
         });
     }
 }

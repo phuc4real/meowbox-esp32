@@ -110,7 +110,9 @@ fn core_for(host: &str, token: &str) -> (CoreHandle, std::path::PathBuf) {
     let mut cfg = Config::default();
     cfg.host = host.into();
     cfg.token = token.into();
-    let core = CoreHandle::start(SharedConfig::new(cfg, path.clone()), SharedState::default(), Options::default());
+    // nothing that touches this PC's real profile: no relay (yt-dlp download), no Claude Code settings
+    let opts = Options { relay: false, ytdlp_update: false, update_check: false, coding: false };
+    let core = CoreHandle::start(SharedConfig::new(cfg, path.clone()), SharedState::default(), opts);
     (core, path)
 }
 

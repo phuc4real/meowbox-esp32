@@ -30,13 +30,18 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 pub struct Options {
     /// Open the YouTube relay (phase 2).
     pub relay: bool,
-    /// Keep yt-dlp installed and up to date (phase 2).
+    /// Keep yt-dlp installed and up to date.
     pub ytdlp_update: bool,
+    /// Tray: 5 s after start, then daily (when auto_update), look for a newer agent and yt-dlp.
+    pub update_check: bool,
+    /// Meow Coding: refresh the hooks in ~/.claude/settings.json and serve them. Tests turn it off so they never
+    /// touch the real Claude Code settings.
+    pub coding: bool,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        Self { relay: true, ytdlp_update: true }
+        Self { relay: true, ytdlp_update: true, update_check: false, coding: true }
     }
 }
 
@@ -203,14 +208,16 @@ pub fn run_forever(cfg: SharedConfig, state: SharedState, opts: Options) {
 }
 
 async fn run(sh: Shared, opts: Options, mut stop: watch::Receiver<bool>) {
-    // Meow Coding: hooks written by an older agent are refreshed, then the local hook server
-    let cport = sh.cfg.get().coding_port;
-    if let Ok(Err(e)) = tokio::task::spawn_blocking(move || crate::coding::hooks::refresh(cport)).await {
-        tracing::warn!("Meow Coding: could not update the Claude Code hooks: {e}");
-    }
-    let key = tokio::task::spawn_blocking(crate::coding::hooks::hook_key).await.unwrap_or_default();
-    if let Err(e) = crate::coding::server::start(sh.coding.clone(), cport, key).await {
-        tracing::error!("Meow Coding port {cport} busy: {e}");
+    if opts.coding {
+        // Meow Coding: hooks written by an older agent are refreshed, then the local hook server
+        let cport = sh.cfg.get().coding_port;
+        if let Ok(Err(e)) = tokio::task::spawn_blocking(move || crate::coding::hooks::refresh(cport)).await {
+            tracing::warn!("Meow Coding: could not update the Claude Code hooks: {e}");
+        }
+        let key = tokio::task::spawn_blocking(crate::coding::hooks::hook_key).await.unwrap_or_default();
+        if let Err(e) = crate::coding::server::start(sh.coding.clone(), cport, key).await {
+            tracing::error!("Meow Coding port {cport} busy: {e}");
+        }
     }
     let mut port = if opts.relay { sh.cfg.get().relay_port } else { 0 };
     if port > 0 {
@@ -234,11 +241,31 @@ async fn run(sh: Shared, opts: Options, mut stop: watch::Receiver<bool>) {
             }
         }
     }
+    if opts.update_check {
+        tokio::spawn(update_check(sh.clone()));
+    }
     tokio::select! {
         _ = link_loop(&sh, port) => {}
         _ = stop.wait_for(|s| *s) => {}
     }
     tracing::info!("core stopped");
+}
+
+/// A newer agent (menu item + toast), a newer yt-dlp (installed), as the Python tray's check_update.
+async fn update_check(sh: Shared) {
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    loop {
+        if sh.cfg.get().auto_update {
+            if let Some(v) = crate::update::latest_version().await
+                && crate::update::newer_than_running(&v)
+            {
+                sh.state.update(|s| s.new_version = v.clone());
+                (sh.toast())(crate::ui::strings::t_new_agent(&v));
+            }
+            crate::tools::ytdlp::maintain(true).await;
+        }
+        tokio::time::sleep(Duration::from_secs(24 * 3600)).await;
+    }
 }
 
 /// Wait `secs`, counting down in the state; "Search now" cuts it short.

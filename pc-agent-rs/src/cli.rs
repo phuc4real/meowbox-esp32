@@ -269,7 +269,7 @@ pub fn main() {
     match cmd {
         Cmd::Run { no_relay, no_update } => {
             tracing::info!("MeowBox Agent {} starting (headless)", crate::VERSION);
-            let opts = crate::link::Options { relay: !no_relay, ytdlp_update: !no_update };
+            let opts = crate::link::Options { relay: !no_relay, ytdlp_update: !no_update, ..Default::default() };
             crate::link::run_forever(SharedConfig::new(cfg, path), SharedState::default(), opts);
         }
         Cmd::Notify { title, text, sound, priority, duration } => {

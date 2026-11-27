@@ -18,6 +18,7 @@ pub mod stats;
 pub mod tools;
 pub mod tts;
 pub mod ui;
+pub mod update;
 pub mod win;
 
 use std::path::PathBuf;

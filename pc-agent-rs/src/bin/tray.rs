@@ -32,7 +32,11 @@ fn main() {
         return;
     }
     tracing::info!("MeowBox Agent {} starting (tray)", meowbox_agent::VERSION);
-    let core = CoreHandle::start(SharedConfig::load(cfg_path), SharedState::default(), Options::default());
+    let core = CoreHandle::start(
+        SharedConfig::load(cfg_path),
+        SharedState::default(),
+        Options { update_check: selftest == 0, ..Options::default() },
+    );
     let mut app = match TrayApp::new(core) {
         Ok(a) => a,
         Err(e) => {

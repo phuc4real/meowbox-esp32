@@ -109,8 +109,10 @@ meowbox tray                                 # starts MeowBoxAgent.exe
 `say` picks a Vietnamese voice (Microsoft An) when Windows has one. If not: *Settings → Time & language → Speech →
 Add voices*, add Vietnamese.
 
-CPU/GPU temperatures: run [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) with
-*Options → Remote Web Server* on (port 8085). With an NVIDIA card the agent also reads `nvidia-smi`.
+GPU load and GPU temperature come from Windows itself, for any GPU (the "GPU Engine" counters and the display
+driver's report, as in Task Manager; some GPUs report no temperature). With an NVIDIA card the agent also reads
+`nvidia-smi`, which comes with the driver. Nothing else to install. There is no CPU temperature: Windows has no API
+for it without a kernel driver, so the speaker's temperature gauge shows the GPU's.
 
 ## Build from source
 
@@ -177,7 +179,7 @@ Claude Code hooks.
 ## Limits
 
 - Windows only (Media Session, Core Audio, WinRT text-to-speech, Network List Manager).
-- Without LibreHardwareMonitor or nvidia-smi there is no GPU % and no temperatures (sent as `null`).
+- No CPU temperature (`cpu_temp` is always `null`); GPU temperature only when the driver reports one.
 - A song's `pos`/`len` depend on the app. Chrome reports 0 for live videos.
 - The relay is for personal use. When YouTube changes, update yt-dlp in Cài đặt (or wait for the daily check).
 - Two agents on one PC (say `meowbox run` while the tray app runs) take the speaker from each other.

@@ -7,6 +7,7 @@ pub mod cli;
 pub mod coding;
 pub mod config;
 pub mod discovery;
+pub mod gpu;
 pub mod json;
 pub mod link;
 pub mod log;

@@ -1,5 +1,7 @@
-//! PC stats for the speaker's stats tile: CPU, RAM, disk, network from sysinfo; GPU load and temperatures from
-//! nvidia-smi and/or LibreHardwareMonitor's web server (LHM wins when both give a value).
+//! PC stats for the speaker's stats tile: CPU, RAM, disk, network from sysinfo; GPU load and GPU temperature from
+//! Windows itself (gpu.rs, any vendor), overridden by nvidia-smi on an NVIDIA card (it ships with the driver). No
+//! third-party app: `cpu_temp` is always null, as Windows has no API for it without a kernel driver; the speaker then
+//! shows the GPU temperature.
 
 use crate::json::round;
 use serde_json::{Map, Value, json};
@@ -16,9 +18,8 @@ pub struct Stats {
     sent: u64,
     recv: u64,
     t: Instant,
-    lhm_retry: Option<Instant>,
     nvsmi: Option<PathBuf>,
-    http: reqwest::Client,
+    gpu: Option<crate::gpu::GpuLoad>,
 }
 
 fn net_totals(nets: &Option<Networks>) -> (u64, u64) {
@@ -58,35 +59,8 @@ impl Stats {
             sent,
             recv,
             t: Instant::now(),
-            lhm_retry: None,
             nvsmi: which("nvidia-smi"),
-            http: crate::discovery::lan_client(),
-        }
-    }
-
-    /// LibreHardwareMonitor's web server (Options > Remote Web Server, port 8085); after a failure, wait 30 s.
-    async fn lhm(&mut self) -> Map<String, Value> {
-        if self.lhm_retry.is_some_and(|t| Instant::now() < t) {
-            return Map::new();
-        }
-        let r = async {
-            let r = self
-                .http
-                .get("http://localhost:8085/data.json")
-                .timeout(Duration::from_millis(500))
-                .send()
-                .await
-                .ok()?;
-            let v: Value = serde_json::from_slice(&r.bytes().await.ok()?).ok()?;
-            Some(parse_lhm(&v))
-        }
-        .await;
-        match r {
-            Some(m) => m,
-            None => {
-                self.lhm_retry = Some(Instant::now() + Duration::from_secs(30));
-                Map::new()
-            }
+            gpu: crate::gpu::GpuLoad::open(),
         }
     }
 
@@ -154,127 +128,30 @@ impl Stats {
         msg.insert("net_down".into(), json!(round(recv.saturating_sub(self.recv) as f64 / 1024.0 / dt)));
         msg.insert("disk".into(), json!(round(disk)));
         (self.sent, self.recv, self.t) = (sent, recv, now);
-        let nv = self.nvidia().await;
-        let lhm = self.lhm().await;
-        for extra in [nv, lhm] {
-            for (k, v) in extra {
-                if let Some(x) = v.as_f64() {
-                    msg.insert(k, json!(round(x)));
-                }
+        // Windows' own numbers first, nvidia-smi overrides them
+        if let Some(v) = self.gpu.as_mut().and_then(|g| g.sample()) {
+            msg.insert("gpu".into(), json!(round(v)));
+        }
+        if let Some(t) = crate::gpu::temperature() {
+            msg.insert("gpu_temp".into(), json!(round(t)));
+        }
+        for (k, v) in self.nvidia().await {
+            if let Some(x) = v.as_f64() {
+                msg.insert(k, json!(round(x)));
             }
         }
         Value::Object(msg)
     }
 }
 
-/// LibreHardwareMonitor data.json → cpu_temp, gpu_temp, gpu load (null where not found), like the Python agent.
-pub fn parse_lhm(root: &Value) -> Map<String, Value> {
-    // (hardware kind, group, sensor name, value)
-    let mut sensors: Vec<(Option<&str>, Option<&str>, String, f64)> = Vec::new();
-
-    fn number_prefix(s: &str) -> Option<f64> {
-        let end = s
-            .char_indices()
-            .take_while(|&(i, c)| c.is_ascii_digit() || c == '.' || c == ',' || (i == 0 && c == '-'))
-            .last()
-            .map(|(i, c)| i + c.len_utf8())?;
-        s[..end].replace(',', ".").parse().ok()
-    }
-
-    fn walk<'a>(
-        node: &'a Value,
-        mut hw: Option<&'a str>,
-        mut group: Option<&'a str>,
-        out: &mut Vec<(Option<&'a str>, Option<&'a str>, String, f64)>,
-    ) {
-        let img = node.get("ImageURL").and_then(Value::as_str).unwrap_or("");
-        let text = node.get("Text").and_then(Value::as_str).unwrap_or("");
-        let kids = node.get("Children").and_then(Value::as_array).map(Vec::as_slice).unwrap_or(&[]);
-        let value = node.get("Value").and_then(Value::as_str).unwrap_or("");
-        if kids.is_empty() && !value.is_empty() {
-            if let Some(v) = number_prefix(value) {
-                out.push((hw, group, text.to_owned(), v));
-            }
-            return;
-        }
-        if img.contains("temperature") {
-            group = Some("temp");
-        } else if img.contains("load") {
-            group = Some("load");
-        } else if img.contains("cpu") {
-            hw = Some("cpu");
-        } else if ["nvidia", "ati", "amd", "gpu", "intel"].iter().any(|k| img.contains(k)) {
-            hw = Some("gpu");
-        }
-        for k in kids {
-            walk(k, hw, group, out);
-        }
-    }
-
-    walk(root, None, None, &mut sensors);
-
-    let pick = |hw: &str, group: &str, names: &[&str]| -> Value {
-        let vals: Vec<_> = sensors.iter().filter(|s| s.0 == Some(hw) && s.1 == Some(group)).collect();
-        for n in names {
-            if let Some(s) = vals.iter().find(|s| s.2.starts_with(n)) {
-                return json!(s.3);
-            }
-        }
-        if group == "temp" {
-            vals.iter()
-                .map(|s| s.3)
-                .fold(None, |m: Option<f64>, v| Some(m.map_or(v, |m| m.max(v))))
-                .map_or(Value::Null, |v| json!(v))
-        } else {
-            Value::Null
-        }
-    };
-
-    let mut m = Map::new();
-    m.insert("cpu_temp".into(), pick("cpu", "temp", &["CPU Package", "Core (Tctl", "Package", "CPU Core"]));
-    m.insert("gpu_temp".into(), pick("gpu", "temp", &["GPU Core", "GPU Hot Spot"]));
-    m.insert("gpu".into(), pick("gpu", "load", &["GPU Core", "D3D 3D"]));
-    m
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn lhm_picks_named_sensors() {
-        let v = json!({"Text":"Sensor","Children":[{"Text":"DESKTOP","Children":[
-            {"Text":"AMD Ryzen 7","ImageURL":"images_icon/cpu.png","Children":[
-                {"Text":"Temperatures","ImageURL":"images_icon/temperature.png","Children":[
-                    {"Text":"Core (Tctl/Tdie)","Value":"61,5 °C","Children":[]},
-                    {"Text":"CCD1","Value":"70.0 °C","Children":[]}]},
-                {"Text":"Load","ImageURL":"images_icon/load.png","Children":[
-                    {"Text":"CPU Total","Value":"12.0 %","Children":[]}]}]},
-            {"Text":"NVIDIA GeForce","ImageURL":"images_icon/nvidia.png","Children":[
-                {"Text":"Temperatures","ImageURL":"images_icon/temperature.png","Children":[
-                    {"Text":"GPU Hot Spot","Value":"55.0 °C","Children":[]}]},
-                {"Text":"Load","ImageURL":"images_icon/load.png","Children":[
-                    {"Text":"GPU Core","Value":"33.0 %","Children":[]}]}]}]}]});
-        let m = parse_lhm(&v);
-        assert_eq!(m["cpu_temp"], json!(61.5));
-        assert_eq!(m["gpu_temp"], json!(55.0));
-        assert_eq!(m["gpu"], json!(33.0));
-    }
-
-    #[test]
-    fn lhm_temp_falls_back_to_max_and_load_to_null() {
-        let v = json!({"Children":[{"ImageURL":"cpu.png","Children":[{"ImageURL":"temperature.png","Children":[
-            {"Text":"A","Value":"40 °C"},{"Text":"B","Value":"48 °C"}]}]}]});
-        let m = parse_lhm(&v);
-        assert_eq!(m["cpu_temp"], json!(48.0));
-        assert_eq!(m["gpu"], Value::Null);
-    }
 
     #[tokio::test]
     async fn sample_has_every_field() {
         let mut s = Stats::new();
         s.nvsmi = None;
-        s.lhm_retry = Some(Instant::now() + Duration::from_secs(60));
         tokio::time::sleep(Duration::from_millis(250)).await;
         let m = s.sample().await;
         for k in ["t", "cpu", "ram", "gpu", "cpu_temp", "gpu_temp", "net_up", "net_down", "disk"] {
@@ -282,5 +159,6 @@ mod tests {
         }
         assert!((1..=100).contains(&m["ram"].as_i64().unwrap()));
         assert!((1..=100).contains(&m["disk"].as_i64().unwrap()));
+        assert_eq!(m["cpu_temp"], Value::Null, "no source for it");
     }
 }

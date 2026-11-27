@@ -26,8 +26,8 @@ const char *wifi_mgr_hostname(void);        /* meowbox-xxxx (mDNS: meowbox-xxxx.
 
 /* PC agent <-> speaker protocol (docs/firmware_v0.2.0.md, 2.6). Bump MB_PROTO when the WebSocket messages or the API
  * the agent uses change; raise MB_PROTO_MIN when older agents can no longer work. Agents before 0.2.0 send no proto (0). */
-#define MB_PROTO 1
-#define MB_PROTO_MIN 0
+#define MB_PROTO 2     /* 2 (0.2.7): the hello carries the notify token */
+#define MB_PROTO_MIN 2
 #define MB_DISCOVERY_PORT 8766              /* UDP: "MEOWBOX?" -> {"name","ip","ver","proto"}; the same JSON is broadcast to 8767 every 2 s */
 const char *wifi_mgr_ap_pass(void);         /* WPA2 password of that hotspot */
 cJSON *wifi_mgr_get_config(void);           /* API.md GET /api/config/wifi */
@@ -60,7 +60,9 @@ typedef enum {
 
 esp_err_t web_start(void);                  /* starts httpd + core endpoints */
 esp_err_t web_register(const char *uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t *), web_auth_t auth);
-esp_err_t web_register_ws(const char *uri, esp_err_t (*handler)(httpd_req_t *));
+/* pre_handshake (may be NULL) runs before the upgrade is answered; returning an error refuses it */
+esp_err_t web_register_ws(const char *uri, esp_err_t (*handler)(httpd_req_t *), esp_err_t (*pre_handshake)(httpd_req_t *));
+bool web_token_matches(const char *token); /* the notify token, compared in constant time */
 void web_ready(void);                       /* call after all web_register(): adds the static/captive catch-all */
 httpd_handle_t web_server(void);
 
@@ -70,7 +72,7 @@ esp_err_t web_send_ok(httpd_req_t *req);
 esp_err_t web_send_err(httpd_req_t *req, int status, const char *code);
 cJSON *web_read_json(httpd_req_t *req);     /* NULL + error already sent on failure */
 /* Receiving a request body: web_body_deadline() when the handler starts, then web_recv() instead of httpd_req_recv().
- * It retries receive timeouts until the deadline (15 s + 1 s per 16 KB), so a stalled or trickling client cannot hold
+ * It retries receive timeouts until the deadline (5 s + 1 s per 16 KB), so a stalled or trickling client cannot hold
  * the web server; returns the bytes read, or <= 0 on error (HTTPD_SOCK_ERR_TIMEOUT once the deadline passed). */
 int64_t web_body_deadline(httpd_req_t *req);
 int web_recv(httpd_req_t *req, char *buf, size_t len, int64_t deadline);

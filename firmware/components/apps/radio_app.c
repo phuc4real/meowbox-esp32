@@ -498,6 +498,18 @@ static void radio_cfg_hook(cJSON *doc)
     cJSON_ReplaceItemInObject(doc, "vol", cJSON_CreateNumber(audio_hw_get_volume()));
 }
 
+/* PUT /api/config/radio: every station needs an http(s) URL (the player could not open anything else) */
+static bool radio_put_hook(cJSON *body)
+{
+    cJSON *st = cJSON_GetObjectItem(body, "st"), *it;
+    if (!st) return true;
+    if (!cJSON_IsArray(st)) return false;
+    cJSON_ArrayForEach(it, st) {
+        if (!is_http_url(cJSON_GetStringValue(cJSON_GetObjectItem(it, "url")))) return false;
+    }
+    return true;
+}
+
 static void on_settings(const char *group, void *arg)
 {
     /* the web UI's radio "vol" field changes the live volume */
@@ -520,6 +532,7 @@ void radio_app_init(void)
     lv_timer_create(radio_tick, 500, NULL);
     settings_on_change(on_settings, NULL);
     web_set_config_hook("radio", radio_cfg_hook);
+    web_set_put_hook("radio", radio_put_hook);
     web_register("/api/radio/play", HTTP_POST, h_play, WEB_AUTH_SESSION);
     web_register("/api/sleep", HTTP_GET, h_sleep_get, WEB_AUTH_SESSION);
     web_register("/api/sleep", HTTP_POST, h_sleep_post, WEB_AUTH_SESSION);

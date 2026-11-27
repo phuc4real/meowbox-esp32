@@ -14,10 +14,12 @@ The answer is the status line text. API-key sessions have no plan limits.
 Only short labels leave the PC: the session title, the project folder, the git branch and the kind of action
 ("read", "bash", "image"...; the speaker words it). No prompt text, commands, file names or contents.
 """
+import hmac
 import json
 import logging
 import os
 import re
+import secrets
 import threading
 import time
 from dataclasses import dataclass, field
@@ -26,10 +28,15 @@ from pathlib import Path
 
 from aiohttp import web
 
+from . import APP_DIR
+
 log = logging.getLogger("meowbox")
 
+CLAUDE_DIR = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
 CLAUDE_SETTINGS = Path.home() / ".claude" / "settings.json"
 DEFAULT_PORT = 8767
+HOOK_KEY_PATH = APP_DIR / "hook.key"
+HOOK_HEADER = "X-MeowBox-Hook"
 MAX_SESSIONS = 4          # sent to the speaker, most important first
 WORK_STALE_S = 300        # "working" with no event for 5 min (interrupted with Esc: no Stop hook) -> idle
 DONE_STALE_S = 600        # finished turn shown as done for 10 min, then idle
@@ -81,7 +88,25 @@ def action(tool: str, inp: dict) -> str:
     return KIND.get(tool, "tool")
 
 
+def is_network_path(p: str) -> bool:
+    """A UNC path (\\\\server\\share, //server/share, \\\\?\\UNC\\...): opening it would reach another computer."""
+    return p.replace("/", "\\").startswith("\\\\")
+
+
+def transcript_ok(p: str) -> bool:
+    """Claude Code keeps transcripts as .jsonl files under its own folder; anything else is not read."""
+    if not p or is_network_path(p):
+        return False
+    try:
+        rp = Path(p).resolve()
+        return rp.suffix == ".jsonl" and rp.is_relative_to(CLAUDE_DIR.resolve())
+    except (OSError, ValueError):
+        return False
+
+
 def git_branch(cwd: str) -> str:
+    if not cwd or is_network_path(cwd):
+        return ""
     p = Path(cwd) if cwd else None
     for _ in range(8):
         if not p:
@@ -153,7 +178,7 @@ class Tracker:
             cwd = ev.get("cwd") or ""
             if cwd and (not s.cwd or name == "SessionStart"):  # the project: Bash `cd` moves the session's cwd later
                 s.cwd, s.branch = cwd, git_branch(cwd)
-            if ev.get("transcript_path"):
+            if ev.get("transcript_path") and transcript_ok(str(ev["transcript_path"])):
                 s.transcript = ev["transcript_path"]
             tool = ev.get("tool_name") or ""
             now = time.monotonic()
@@ -327,9 +352,32 @@ def read_transcript(s: Session) -> None:
 # ---------------------------------------------------------------- local HTTP endpoint for the hooks
 
 
+def hook_key() -> str:
+    """Per-install secret that the installed hook and status line commands send in X-MeowBox-Hook, so only they (not
+    a web page, nor another program or user on this PC) can feed the cat screen. Made on first use."""
+    try:
+        k = HOOK_KEY_PATH.read_text(encoding="utf-8").strip()
+    except OSError:
+        k = ""
+    if not re.fullmatch(r"[0-9a-f]{32}", k):
+        k = secrets.token_hex(16)
+        HOOK_KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        HOOK_KEY_PATH.write_text(k, encoding="utf-8")
+    return k
+
+
+def from_our_hook(req: web.Request, key: str) -> bool:
+    """Loopback, our key, JSON, and no Origin (browsers always send one on a cross-site POST)."""
+    return (req.remote in ("127.0.0.1", "::1") and "Origin" not in req.headers
+            and req.content_type == "application/json"
+            and hmac.compare_digest(req.headers.get(HOOK_HEADER, ""), key))
+
+
 async def start_server(tracker: Tracker, port: int) -> web.AppRunner:
+    key = hook_key()
+
     async def hook(req: web.Request) -> web.Response:
-        if req.remote not in ("127.0.0.1", "::1"):
+        if not from_our_hook(req, key):
             raise web.HTTPForbidden()
         try:
             ev = await req.json()
@@ -340,7 +388,7 @@ async def start_server(tracker: Tracker, port: int) -> web.AppRunner:
         return web.json_response({})  # empty answer: the hook changes nothing in Claude Code
 
     async def status(req: web.Request) -> web.Response:
-        if req.remote not in ("127.0.0.1", "::1"):
+        if not from_our_hook(req, key):
             raise web.HTTPForbidden()
         try:
             ev = json.loads(await req.read() or b"{}")
@@ -364,9 +412,13 @@ def hook_url(port: int) -> str:
     return f"http://127.0.0.1:{port}/hook"
 
 
+def _curl_headers() -> str:
+    return f'-H "{HOOK_HEADER}: {hook_key()}" -H "Content-Type: application/json"'
+
+
 def status_command(port: int) -> str:
     """Claude Code runs this with its status JSON on stdin and shows what it prints. Agent not running: an empty line."""
-    return f"curl -s -m 1 --data-binary @- http://127.0.0.1:{port}/status"
+    return f"curl -s -m 1 {_curl_headers()} --data-binary @- http://127.0.0.1:{port}/status"
 
 
 def _is_our_status(sl) -> bool:
@@ -376,7 +428,7 @@ def _is_our_status(sl) -> bool:
 
 def hook_command(port: int) -> str:
     """Run in the background by Claude Code with the event on stdin. `|| exit 0`: no error when the agent is off."""
-    return f"curl -s -m 3 -o /dev/null --data-binary @- {hook_url(port)} || exit 0"
+    return f"curl -s -m 3 -o /dev/null {_curl_headers()} --data-binary @- {hook_url(port)} || exit 0"
 
 
 def _is_ours(h: dict) -> bool:
@@ -446,6 +498,25 @@ def install_hooks(port: int = DEFAULT_PORT, path: Path = CLAUDE_SETTINGS) -> Non
     else:
         log.info("Claude Code already has a status line: the 5-hour limit will not reach the speaker")
     _write_settings(path, cfg)
+
+
+def refresh_hooks(port: int = DEFAULT_PORT, path: Path = CLAUDE_SETTINGS) -> bool:
+    """Hooks written by an older agent (no key in the command, or another port): write them again, or the server
+    refuses them. Nothing to do when Meow Coding is off. True if the file was rewritten."""
+    try:
+        cfg = _read_settings(path)
+    except (OSError, ValueError):
+        return False
+    ours = [h for groups in (cfg.get("hooks") or {}).values() if isinstance(groups, list)
+            for g in groups if isinstance(g, dict) for h in g.get("hooks", []) if isinstance(h, dict) and _is_ours(h)]
+    sl = cfg.get("statusLine")
+    stale = any(h.get("command") != hook_command(port) for h in ours) or \
+        (_is_our_status(sl) and sl.get("command") != status_command(port))
+    if ours and stale:
+        install_hooks(port, path)
+        log.info("Meow Coding: Claude Code hooks updated")
+        return True
+    return False
 
 
 def uninstall_hooks(path: Path = CLAUDE_SETTINGS) -> None:

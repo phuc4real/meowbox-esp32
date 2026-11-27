@@ -23,15 +23,17 @@ Mọi cài đặt làm trên trang web của loa.
    từng loa) và hiện một **mã QR** trên màn hình.
 2. Mở camera điện thoại (hoặc Zalo) và quét mã: điện thoại tự vào Wi-Fi đó, không cần gõ mật khẩu. Trang cài đặt
    thường tự mở. Không thấy thì quét mã thứ hai hiện trên loa (hoặc mở `http://192.168.4.1`).
-   Muốn vào bằng tay: mật khẩu **`meowbox2026`**, cũng ghi cạnh mã QR. Chạm vào màn hình để ẩn mã.
+   Muốn vào bằng tay: mật khẩu ghi cạnh mã QR (mỗi loa một mật khẩu riêng). Chạm vào màn hình để ẩn mã.
 3. Chọn Wi-Fi nhà, nhập mật khẩu. Loa nối mạng, rồi khoảng 10 giây sau Wi-Fi cài đặt tự tắt.
    Nếu không ai dùng, Wi-Fi cài đặt cũng tự tắt sau 10 phút.
-4. Mở trang web của loa (mục 3) và **đổi mật khẩu đăng nhập** ngay lần đầu.
+4. Mở trang web của loa (mục 3). Lần đầu đăng nhập, trang web bắt **đổi mật khẩu** rồi mới cho dùng.
 
 Mở lại Wi-Fi cài đặt khi đổi mạng hoặc mang loa đi chỗ khác:
 - giữ cùng lúc **VOL+** và **VOL−** trong 3 giây;
 - hoặc vào màn Hệ thống trên loa, chọn "Wi-Fi";
 - hoặc vào trang Wi-Fi trên web.
+
+Mất Wi-Fi quá 5 phút (ví dụ đổi router) thì loa tự mở Wi-Fi cài đặt trong lúc vẫn thử nối lại.
 
 Loa nhớ nhiều mạng Wi-Fi. Mỗi lần khởi động, nó thử trước các mạng đang có sóng, theo thứ tự bạn xếp trên web.
 
@@ -62,7 +64,8 @@ thì màn Máy tính được bỏ qua: vuốt từ Radio sang thẳng Mèo.
 Mở `http://meowbox-xxxx.local` (4 ký tự giống tên Wi-Fi cài đặt), hoặc IP hiện trên màn Hệ thống. Điện thoại hoặc
 máy tính phải cùng mạng Wi-Fi với loa.
 
-- Đăng nhập mặc định: **`meowbox`** / **`m3owb0x2026`**. Nên đổi mật khẩu ngay ở trang Hệ thống.
+- Đăng nhập mặc định: **`meowbox`** / **`m3owb0x2026`**. Còn dùng mật khẩu này thì trang web chỉ hiện ô đổi mật khẩu.
+  Đổi lại sau ở trang Hệ thống.
 - Nhập sai mật khẩu 5 lần thì máy đó phải chờ 30 giây mới thử lại được, sai tiếp thì chờ lâu hơn (tối đa 15 phút).
   Máy khác vẫn đăng nhập bình thường.
 - Một số Android và mạng công ty không mở được tên `.local`: dùng IP.
@@ -135,7 +138,8 @@ curl -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" \
    [Releases](https://github.com/phuc4real/meowbox-esp32/releases/latest) rồi chạy.
    Windows có thể báo "Unknown publisher": bấm *More info → Run anyway*.
 2. Cài xong, icon con mèo hiện ở khay hệ thống và cửa sổ **Kết nối loa** tự mở. Nhập IP của loa (xem ở tile Hệ thống
-   trên màn hình loa), dán token, rồi kiểm tra loa có gọi được máy tính không. Loa đổi IP thì mở lại
+   trên màn hình loa), dán token (bắt buộc, lấy ở trang Thông báo) và bấm Kiểm tra, rồi kiểm tra loa có gọi được
+   máy tính không. Loa đổi IP thì mở lại
    **Kết nối loa** trong menu và nhập IP mới.
 3. Ý nghĩa chấm trên icon:
    - xanh: đã nối loa;

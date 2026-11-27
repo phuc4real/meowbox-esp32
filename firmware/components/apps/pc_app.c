@@ -43,6 +43,8 @@ static int jint(cJSON *o, const char *k, int def)
     return cJSON_IsNumber(v) ? v->valueint : def;
 }
 
+static bool relay_ok(const char *hp);
+
 static void handle_msg(cJSON *j)
 {
     const char *t = cJSON_GetStringValue(cJSON_GetObjectItem(j, "t"));
@@ -79,8 +81,11 @@ static void handle_msg(cJSON *j)
         const char *relay = cJSON_GetStringValue(cJSON_GetObjectItem(j, "relay"));
         if (relay) {
             const char *hp = strstr(relay, "://");
-            radio_set_relay(hp ? hp + 3 : relay);
-            ESP_LOGI(TAG, "agent relay %s", relay);
+            hp = hp ? hp + 3 : relay;
+            if (relay_ok(hp)) {
+                radio_set_relay(hp);
+                ESP_LOGI(TAG, "agent relay %s", hp);
+            } else ESP_LOGW(TAG, "agent relay %s ignored: not the agent's own address %s", hp, s_peer);
         }
     } else if (!strcmp(t, "coding")) {
         cat_coding_update(j);
@@ -125,69 +130,112 @@ static void send_busy(int fd, const char *name)
     cJSON_free(txt);
 }
 
-/* One PC at a time (docs/firmware_v0.2.0.md, 2.4): while one is online, another one's hello gets
- * {"t":"busy","pc":"<name>"} and is closed, unless it says "take":true ("Take over" in the tray); then the old one
- * gets the busy message instead. An agent with a protocol older than MB_PROTO_MIN gets {"t":"proto","need":N}. */
-static bool admit(int fd, cJSON *j)
+/* The agent's own address and a port: where the speaker fetches YouTube from */
+static bool relay_ok(const char *hp)
 {
+    const char *colon = strrchr(hp, ':');
+    if (!colon || (size_t)(colon - hp) != strlen(s_peer) || strncmp(hp, s_peer, colon - hp) != 0) return false;
+    char *end;
+    long port = strtol(colon + 1, &end, 10);
+    return *end == 0 && port > 0 && port < 65536;
+}
+
+static void lost_agent(void)
+{
+    s_fd = -1;
+    radio_set_relay(""); /* only the connected agent's relay is used */
+    s_dirty = true;
+}
+
+/* Authentication lives on the httpd session (req->sess_ctx = fd + 1), never on the fd number alone: lwip reuses fd
+ * numbers, and a new connection starts with no sess_ctx. httpd calls this when the session closes. */
+#define PC_MARK(fd) ((void *)(intptr_t)((fd) + 1))
+static void pc_sess_closed(void *ctx)
+{
+    if (s_fd == (int)(intptr_t)ctx - 1) lost_agent();
+}
+
+static void refuse(int fd, const char *msg)
+{
+    send_to(fd, msg);
+    httpd_sess_trigger_close(web_server(), fd);
+}
+
+/* One PC at a time (docs/firmware_v0.2.0.md, 2.4). A connection's first message must be a hello with the notify token
+ * (API.md, /ws/pc): no token or a wrong one gets {"t":"auth"}, an agent with a protocol older than MB_PROTO_MIN gets
+ * {"t":"proto","need":N}, and both are closed. While one PC is online, another one's hello gets
+ * {"t":"busy","pc":"<name>"} and is closed, unless it says "take":true ("Take over" in the tray) or is the same PC
+ * reconnecting; then the old one gets the busy message instead. */
+static bool admit(httpd_req_t *req, int fd, cJSON *j)
+{
+    if (req->sess_ctx == PC_MARK(fd)) return fd == s_fd; /* authenticated: acted on while it holds the slot */
     const char *t = cJSON_GetStringValue(cJSON_GetObjectItem(j, "t"));
-    bool hello = t && !strcmp(t, "hello");
-    char msg[96];
-    if (hello && jint(j, "proto", 0) < MB_PROTO_MIN) {
-        snprintf(msg, sizeof(msg), "{\"t\":\"proto\",\"need\":%d,\"have\":%d}", MB_PROTO_MIN, MB_PROTO);
-        send_to(fd, msg);
+    if (!t || strcmp(t, "hello") != 0) {
         httpd_sess_trigger_close(web_server(), fd);
         return false;
     }
-    if (fd == s_fd) return true;
-    if (pc_online()) {
-        cJSON *take = cJSON_GetObjectItem(j, "take");
-        const char *who = cJSON_GetStringValue(cJSON_GetObjectItem(j, "name"));
-        bool same_pc = hello && who && who[0] && !strcmp(who, s_agent_name); /* reconnect before the old link timed out */
-        if (!hello || (!cJSON_IsTrue(take) && !same_pc)) {
-            if (hello) {
-                const char *nm = cJSON_GetStringValue(cJSON_GetObjectItem(j, "name"));
-                send_busy(fd, s_agent_name[0] ? s_agent_name : s_peer);
-                httpd_sess_trigger_close(web_server(), fd);
-                ESP_LOGI(TAG, "%s refused: busy with %s", nm ? nm : "agent", s_agent_name);
-            }
+    if (jint(j, "proto", 0) < MB_PROTO_MIN) {
+        xSemaphoreTake(s_lock, portMAX_DELAY); /* the web page's PC section then says "update the agent" */
+        s_agent_proto = jint(j, "proto", 0);
+        xSemaphoreGive(s_lock);
+        char msg[48];
+        snprintf(msg, sizeof(msg), "{\"t\":\"proto\",\"need\":%d,\"have\":%d}", MB_PROTO_MIN, MB_PROTO);
+        refuse(fd, msg);
+        return false;
+    }
+    if (!web_token_matches(cJSON_GetStringValue(cJSON_GetObjectItem(j, "token")))) {
+        ESP_LOGW(TAG, "agent refused: missing or wrong token");
+        refuse(fd, "{\"t\":\"auth\"}");
+        return false;
+    }
+    const char *nm = cJSON_GetStringValue(cJSON_GetObjectItem(j, "name"));
+    if (pc_online() && fd != s_fd) {
+        bool same_pc = nm && nm[0] && !strcmp(nm, s_agent_name); /* reconnect before the old link timed out */
+        if (!cJSON_IsTrue(cJSON_GetObjectItem(j, "take")) && !same_pc) {
+            send_busy(fd, s_agent_name[0] ? s_agent_name : s_peer);
+            httpd_sess_trigger_close(web_server(), fd);
+            ESP_LOGI(TAG, "%s refused: busy with %s", nm ? nm : "agent", s_agent_name);
             return false;
         }
-        const char *nm = cJSON_GetStringValue(cJSON_GetObjectItem(j, "name"));
         send_busy(s_fd, nm ? nm : "?");
         httpd_sess_trigger_close(web_server(), s_fd);
         ESP_LOGI(TAG, "%s takes over from %s", nm ? nm : "agent", s_agent_name);
     }
+    req->sess_ctx = PC_MARK(fd);
+    req->free_ctx = pc_sess_closed;
     s_fd = fd;
     learn_peer(fd);
     return true;
 }
 
+/* Before the upgrade is answered: browsers always send Origin on a WebSocket upgrade, the agent sends none */
+static esp_err_t ws_pre_handshake(httpd_req_t *req)
+{
+    if (httpd_req_get_hdr_value_len(req, "Origin")) {
+        ESP_LOGW(TAG, "refused a WebSocket from a web page");
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
 static esp_err_t ws_handler(httpd_req_t *req)
 {
     int fd = httpd_req_to_sockfd(req);
-    if (req->method == HTTP_GET) { /* handshake: the connection is admitted on its first message (hello) */
-        if (!pc_online()) {
-            s_fd = fd;
-            s_last_us = esp_timer_get_time();
-            learn_peer(fd);
-        }
-        s_dirty = true;
-        return ESP_OK;
-    }
+    if (req->method == HTTP_GET) return ESP_OK; /* the handshake; the connection is admitted on its hello */
     httpd_ws_frame_t f = {0};
     if (httpd_ws_recv_frame(req, &f, 0) != ESP_OK) return ESP_FAIL;
     if (f.type == HTTPD_WS_TYPE_CLOSE) {
-        if (s_fd == fd) s_fd = -1;
+        if (s_fd == fd) lost_agent();
         return ESP_OK;
     }
     if (f.len == 0 || f.len > 4096) return ESP_OK;
     char *buf = malloc(f.len + 1);
+    if (!buf) return ESP_OK;
     f.payload = (uint8_t *)buf;
     if (httpd_ws_recv_frame(req, &f, f.len) == ESP_OK) {
         buf[f.len] = 0;
         cJSON *j = cJSON_Parse(buf);
-        if (j && admit(fd, j)) {
+        if (j && admit(req, fd, j)) {
             s_last_us = esp_timer_get_time();
             handle_msg(j);
         }
@@ -219,7 +267,7 @@ static void fmt_rate(double kbps, char *out, size_t len)
 static void pc_tick(lv_timer_t *t)
 {
     bool on = pc_online();
-    if (s_fd >= 0 && !on && esp_timer_get_time() - s_last_us > 15000000) s_fd = -1;
+    if (s_fd >= 0 && !on && esp_timer_get_time() - s_last_us > 15000000) lost_agent();
     ui_tile_set_skip(UI_TILE_PC, !on); /* no computer: swiping goes from Radio straight to the cat */
     if (!s_body) return;
     /* compare with what the tile shows, not a remembered state: the tile is rebuilt on theme / night changes and
@@ -386,7 +434,7 @@ void pc_app_init(void)
     s_lock = xSemaphoreCreateMutex();
     ui_register_builder(UI_TILE_PC, pc_build);
     lv_timer_create(pc_tick, 500, NULL);
-    web_register_ws("/ws/pc", ws_handler);
+    web_register_ws("/ws/pc", ws_handler, ws_pre_handshake);
     web_register("/api/pc/relay_test", HTTP_POST, h_relay_test, WEB_AUTH_TOKEN);
     web_set_config_hook("pc", pc_cfg_hook);
 }

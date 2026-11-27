@@ -24,7 +24,8 @@ Không cần Python. Bộ cài:
 Cài xong agent chạy luôn, hiện icon con mèo ở khay hệ thống, và lần đầu tự mở cửa sổ **Kết nối loa**:
 
 1. **IP loa**: nhập IP hiện trên tile Hệ thống của loa, bấm Thử (agent gọi `/api/ping`).
-2. **Token**: dán token ở trang Thông báo của loa (cần cho `notify`, `say`, `wifi-setup`; có thể bỏ qua).
+2. **Token**: dán token ở trang Thông báo của loa rồi bấm Kiểm tra. Bắt buộc từ 0.2.7: loa chỉ nhận agent gửi đúng
+   token (số liệu máy, nhạc, YouTube, `notify`, `say`, `wifi-setup`).
 3. **Kiểm tra**: loa thử gọi relay trên máy này. Lỗi trên mạng Windows xếp là Public thì có nút
    "Cho phép trên mạng này" (hỏi quyền admin, chỉ thêm rule cho đúng loại mạng đó).
 
@@ -82,7 +83,7 @@ Sau khi cài (và chọn thêm vào PATH), hoặc `python agent.py ...` khi ch�
 meowbox notify "Build xong" "esp32-playground OK" --sound chime --priority high
 meowbox say "Build xong rồi nha"            # TTS Windows → WAV → /api/notify/audio
 meowbox say "test" --save test.wav           # chỉ lưu file, không gửi
-meowbox wifi-setup [on|off|status]           # Wi-Fi cài đặt MeowBox-XXXX (mật khẩu meowbox2026)
+meowbox wifi-setup [on|off|status]           # Wi-Fi cài đặt MeowBox-XXXX (mật khẩu hiện trên màn hình loa)
 meowbox coding install                       # Meow Coding: hook Claude Code (uninstall | status)
 meowbox config --set-host 192.168.1.50      # IP loa (tile Hệ thống)
 meowbox config --token <token> --speaker MeowBox-1A2B

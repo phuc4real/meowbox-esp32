@@ -18,7 +18,7 @@ import argparse, hashlib, json, os, re, shutil, struct, subprocess, sys, time
 
 FW = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 REPO = "phuc4real/meowbox-esp32"
-PROTO = 1  # PC agent <-> speaker protocol (docs/firmware_v0.2.0.md, 2.6); bump together with the agent
+PROTO = 2  # PC agent <-> speaker protocol (docs/firmware_v0.2.0.md, 2.6); bump together with the agent (MB_PROTO)
 
 
 def project_ver():

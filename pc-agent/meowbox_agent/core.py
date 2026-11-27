@@ -20,7 +20,7 @@ import psutil
 from pathlib import Path
 
 from . import CONFIG_PATH, PROTO, __version__
-from .coding import DEFAULT_PORT as CODING_PORT, Tracker, start_server as start_coding
+from .coding import DEFAULT_PORT as CODING_PORT, Tracker, refresh_hooks, start_server as start_coding
 from .config import AgentState, pc_name, save_config
 from .discovery import find_speaker
 from .relay import NOWIN, kill_all, start_relay
@@ -318,6 +318,10 @@ class Core:
         self._wake = asyncio.Event()
         cport = int(self.cfg.get("coding_port") or CODING_PORT)
         try:
+            refresh_hooks(cport)
+        except OSError as e:
+            log.warning("Meow Coding: could not update the Claude Code hooks: %s", e)
+        try:
             await start_coding(self.coding, cport)
         except OSError as e:
             log.error("Meow Coding port %d busy: %s", cport, e)
@@ -379,7 +383,7 @@ class Core:
 
     async def _session(self, ws, http, stats: Stats, media: Media, relay_port: int, sp) -> int:
         """One connection. Returns seconds to wait before the next attempt (0 = normal reconnect backoff)."""
-        hello = {"t": "hello", "name": pc_name(), "ver": __version__, "proto": PROTO}
+        hello = {"t": "hello", "name": pc_name(), "ver": __version__, "proto": PROTO, "token": self.cfg.get("token", "")}
         if relay_port:
             ip = ws.get_extra_info("sockname")[0]
             hello["relay"] = f"http://{ip}:{relay_port}"
@@ -428,6 +432,10 @@ class Core:
                 if t == "busy":   # another PC holds the speaker (or just took it over from us)
                     self.state.update(connected=False, error="busy", busy_with=data.get("pc", ""))
                     log.info("speaker busy with %s", data.get("pc"))
+                    return 60
+                if t == "auth":   # no token or a wrong one (the speaker's Notifications page has it)
+                    self.state.update(connected=False, error="token")
+                    log.warning("speaker refused the token: open 'Connect speaker' and enter it")
                     return 60
                 if t == "proto":  # this agent is too old for the speaker's firmware
                     self.state.update(connected=False, error="proto_agent")

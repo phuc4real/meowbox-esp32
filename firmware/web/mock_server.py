@@ -275,6 +275,12 @@ class H(BaseHTTPRequestHandler):
             return True
         return False
 
+    def need_new_pw(self, m, p):
+        """Like the firmware: while the default password is in use, a session may only change it."""
+        if S["def_pw"] and not NO_AUTH and (m, p) not in {("GET", "/api/session"), ("POST", "/api/password"),
+                                                           ("POST", "/api/logout")}:
+            raise Err(403, "def_pw")
+
     def has_token(self, q):
         a = self.headers.get("Authorization") or ""
         t = a[7:] if a.startswith("Bearer ") else (q.get("token") or [""])[0]
@@ -375,12 +381,16 @@ class H(BaseHTTPRequestHandler):
             return self.send_json({"theme": tid, "fonts": next((t["fonts"] for t in THEMES if t["id"] == tid), [])})
 
         if p.startswith("/api/notify"):
-            if not (self.has_token(q) or self.has_session()):
+            if self.has_token(q):
+                return self.notify(m, p, q)
+            if not self.has_session():
                 raise Err(401, "auth")
+            self.need_new_pw(m, p)
             return self.notify(m, p, q)
 
         if not self.has_session():
             raise Err(401, "auth")
+        self.need_new_pw(m, p)
 
         key = (m, p)
         if key == ("POST", "/api/logout"):
@@ -481,6 +491,7 @@ class H(BaseHTTPRequestHandler):
                     need(isinstance(s.get("id"), int) and 0 < s["id"] < 65536 and s["id"] not in ids)
                     need(s.get("type") in ("stream", "hls", "youtube"))
                     need(0 < len(str(s.get("name", ""))) <= 48 and 0 < len(str(s.get("url", ""))) <= 256)
+                    need(re.match(r"https?://", str(s["url"]), re.I))
                     ids.add(s["id"])
                     clean.append({k: s[k] for k in ("id", "name", "url", "type")})
                 r["st"] = clean

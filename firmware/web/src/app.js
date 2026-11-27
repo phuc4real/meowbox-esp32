@@ -70,6 +70,7 @@ if(o.tok)q.headers.Authorization='Bearer '+o.tok;
 let r;try{r=await fetch(p,q)}catch(e){if(!o.quiet)toast(t('netErr'),1);throw e}
 const j=await r.json().catch(()=>({}));
 if(r.status==401){showLogin();throw Error('auth')}
+if(r.status==403&&j.err=='def_pw'){mustPw();throw Error('def_pw')}
 if(!r.ok){if(!o.quiet)toast(t('err')+': '+(j.err||r.status),1);const e=Error(j.err||r.status);e.status=r.status;throw e}
 return j}
 const put=(p,b)=>api(p,{m:'PUT',b});
@@ -365,7 +366,7 @@ box.replaceChildren(...k);drawNav()};
 const au=sw(cfg,'auto',t('updAuto'));au.querySelector('input').addEventListener('change',async()=>{try{await put('/api/config/update',{auto:cfg.auto});toast(t('saved'))}catch(e){}});
 draw();if(['check','download','verify'].includes(u.state))poll();
 return[h('div',{class:'row'},stat,chk),pr,pt,box,fld('',au,t('updAutoHint'))]}
-async function pSys(){const s=await api('/api/status'),pw={old:'',new:'',n2:''},fi=h('input',{type:'file',accept:'.bin,application/octet-stream'}),pr=h('progress',{max:100,value:0,hidden:true}),pt=h('small',{class:'muted'});
+async function pSys(){const s=await api('/api/status'),fi=h('input',{type:'file',accept:'.bin,application/octet-stream'}),pr=h('progress',{max:100,value:0,hidden:true}),pt=h('small',{class:'muted'});
 const up=btn(t('upload'),async()=>{const f=fi.files[0];if(!f)return;
 if(f.size>MAXFW)return toast(t('otaBig'),1);if(new Uint8Array(await f.slice(0,1).arrayBuffer())[0]!=0xE9)return toast(t('otaBad'),1);
 up.disabled=true;pr.hidden=false;const x=new XMLHttpRequest();x.open('POST','/api/ota');x.setRequestHeader('Content-Type','application/octet-stream');
@@ -377,10 +378,7 @@ const lines=a=>a.length?h('pre',0,a.join('\n')):h('p',{class:'muted'},t('logNone
 const logSec=lg&&sec(t('logT'),kv([[t('logReason'),t('rs')[lg.reason]||lg.reason,'#'+lg.boot],lg.prev&&[t('logPrev'),fUp(lg.prev.up_s),t('minL')+' '+fB(lg.prev.int_min)]]),h('details',{class:'ota',open:lg.prev_log.length>0},h('summary',0,t('logPrevL')+' ('+lg.prev_log.length+')'),lines(lg.prev_log)),h('details',{class:'ota'},h('summary',0,t('logNowL')+' ('+lg.log.length+')'),lines(lg.log)),h('details',{class:'ota'},h('summary',0,t('logBoots')),h('pre',0,lg.boots.map(b=>'#'+b.n+'  '+(t('rs')[b.reason]||b.reason)+(b.up_s?'  ('+t('logRan')+' '+fUp(b.up_s)+')':'')).join('\n'))));
 return[sec(t('dev'),kv([[t('ver'),s.ver,s.build],[t('up'),fUp(s.up)],[t('ip'),s.ip,s.mode=='ap'?t('apMode'):s.ssid],[t('heap'),fB(s.heap),t('minL')+' '+fB(s.heap_min)],[t('psram'),fB(s.psram),t('tot')+' '+fB(s.psram_tot)],[t('time'),fT(s.time),'ICT (UTC+7)']])),logSec,
 sec(t('ota'),h('div',{class:'lim'},...await updSec(),h('details',{class:'ota'},h('summary',0,t('updFile')),h('p',0,t('otaHint')),fld(t('ota'),fi),pr,pt,h('p',{style:'margin-top:12px'},up)))),
-sec(t('chpw'),h('form',{class:'lim',onsubmit:async e=>{e.preventDefault();if(pw.new!=pw.n2)return toast(t('pwMis'),1);if(pw.new.length<6||pw.new.length>32)return toast(t('pwLen'),1);
-try{await api('/api/password',{b:{old:pw.old,new:pw.new},quiet:1});toast(t('pwOk'));banner(false);e.target.reset();pw.old=pw.new=pw.n2=''}catch(x){toast(x.status==403?t('badOld'):t('err')+': '+x.message,1)}}},
-fld(t('oldPw'),bind(pw,'old',{type:'password',autocomplete:'current-password',required:true})),fld(t('newPw'),bind(pw,'new',{type:'password',autocomplete:'new-password',required:true,minLength:6,maxLength:32})),
-fld(t('newPw2'),bind(pw,'n2',{type:'password',autocomplete:'new-password',required:true})),h('button',0,t('chpw')))),
+sec(t('chpw'),pwForm(()=>0)),
 sec(t('nSys'),row(btn(t('reboot'),async()=>{if(await ask(t('reboot'),t('rebootQ'),t('reboot'))){await api('/api/reboot',{b:{}});waitBack(t('reboot'))}},'ghost'),btn(t('logout'),logout,'ghost'))),
 sec(t('danger'),h('div',{class:'lim'},h('p',{class:'muted'},t('dataQ')),btn(t('dataReset'),async()=>{if(await ask(t('dataReset'),t('dataQ'),t('dataReset'),1)){await api('/api/factory_reset',{b:{confirm:true,scope:'data'}});waitBack(t('dataOk'))}},'danger'),
 h('p',{class:'muted'},t('factoryQ')),btn(t('factory'),async()=>{if(await ask(t('factory'),t('factoryQ'),t('factory'),1)){await api('/api/factory_reset',{b:{confirm:true,scope:'all'}});main.replaceChildren(h('p',0,t('factoryOk')))}},'danger')))]}
@@ -400,21 +398,27 @@ main.replaceChildren(h('p',{class:'muted'},t('loading')));
 const head=()=>[OWNH1[k]?null:h('h1',0,t(r[3]?'nSet':r[1])),r[3]?h('div',{class:'subnav'},Object.keys(R).filter(x=>R[x][3]).map(x=>h('a',{href:'#/'+x,class:x==k?'on':'','aria-current':x==k?'page':null},t(R[x][1])))):null].filter(Boolean);
 try{const n=await r[2]();if(my==seq)main.replaceChildren(...head(),...[n].flat().filter(Boolean))}
 catch(e){if(my==seq&&authed)main.replaceChildren(...head(),h('p',{class:'err'},t('loadErr')),btn(t('refresh'),route))}}
-function banner(on){const b=$('#banner');b.hidden=!on;if(on)b.replaceChildren(h('span',0,t('defPw')),h('a',{href:'#/sys'},t('defPwLink')))}
-function shell(on){nav.hidden=!on;$('#logout').hidden=!on;$('#menu').hidden=!on;if(!on){$('#banner').hidden=true;menu(0)}}
-function showLogin(){authed=false;timers.forEach(clearInterval);timers=[];onVis=null;shell(false);if(loginShown)return;loginShown=true;
+function pwForm(ok){const pw={old:'',new:'',n2:''};return h('form',{class:'lim',onsubmit:async e=>{e.preventDefault();if(pw.new!=pw.n2)return toast(t('pwMis'),1);if(pw.new.length<6||pw.new.length>32)return toast(t('pwLen'),1);
+try{await api('/api/password',{b:{old:pw.old,new:pw.new},quiet:1});toast(t('pwOk'));e.target.reset();pw.old=pw.new=pw.n2='';ok()}catch(x){toast(x.status==403?t('badOld'):t('err')+': '+x.message,1)}}},
+fld(t('oldPw'),bind(pw,'old',{type:'password',autocomplete:'current-password',required:true})),fld(t('newPw'),bind(pw,'new',{type:'password',autocomplete:'new-password',required:true,minLength:6,maxLength:32})),
+fld(t('newPw2'),bind(pw,'n2',{type:'password',autocomplete:'new-password',required:true})),h('button',0,t('chpw')))}
+// still on the published default password: nothing else until it is changed (the API answers 403 def_pw)
+let mustCh=0;
+function mustPw(){authed=false;mustCh=1;loginShown=false;shell(false);main.replaceChildren(h('div',{class:'login'},h('div',{class:'panel'},logo(56),h('h1',0,t('chpw')),h('p',0,t('defPw')),pwForm(()=>{mustCh=0;enter(false)}))))}
+function shell(on){nav.hidden=!on;$('#logout').hidden=!on;$('#menu').hidden=!on;if(!on)menu(0)}
+function showLogin(){authed=false;mustCh=0;timers.forEach(clearInterval);timers=[];onVis=null;shell(false);if(loginShown)return;loginShown=true;
 const o={user:'meowbox',pass:''},msg=h('p',{class:'err',role:'alert'});
 main.replaceChildren(h('div',{class:'login'},h('div',{class:'panel'},logo(56),h('h1',0,'MeowBox'),h('form',{onsubmit:async e=>{e.preventDefault();msg.textContent='';
 try{const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});const j=await r.json().catch(()=>({}));
 if(r.ok)enter(j.def_pw);else msg.textContent=t(r.status==429?'tooMany':'badLogin')}catch(x){msg.textContent=t('netErr')}}},
 fld(t('user'),bind(o,'user',{autocomplete:'username',required:true})),fld(t('pass'),bind(o,'pass',{type:'password',autocomplete:'current-password',required:true})),msg,h('button',{type:'submit'},t('login'))))));
 const p=main.querySelector('[type=password]');p&&p.focus()}
-function enter(defPw){authed=true;loginShown=false;shell(true);banner(defPw);syncTheme();route();
+function enter(defPw){loginShown=false;if(defPw)return mustPw();authed=true;shell(true);syncTheme();route();
 api('/api/status',{quiet:1}).then(s=>{if(s.upd){updAvail=s.upd;drawNav()}}).catch(()=>{})}
 async function logout(){try{await fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})}catch(e){}showLogin()}
 async function setLang(l){try{L=await loadLang(l)}catch(e){return toast(t('netErr'),1)}
 lang=l;ls('lang',l);html.lang=l;$('#lang').textContent=l=='vi'?'EN':'VI';$('#logout').title=t('logout');
-if(authed){banner(!$('#banner').hidden);route()}else{loginShown=false;showLogin()}}
+if(authed)route();else if(mustCh)mustPw();else{loginShown=false;showLogin()}}
 $('#lang').onclick=()=>setLang(lang=='vi'?'en':'vi');
 $('#menu').onclick=()=>menu(!nav.classList.contains('open'));
 $('#logout').onclick=logout;

@@ -73,6 +73,10 @@ try:
     c, j = req("POST", "/api/login", {"user": "meowbox", "pass": "m3owb0x2026"})
     check("login ok + def_pw", c == 200 and j.get("def_pw") is True and any(k.name == "sid" for k in jar))
     c, j = req("GET", "/api/session"); check("session", c == 200 and keys(j, "user", "def_pw"))
+    c, j = req("GET", "/api/status"); check("default password: other routes -> 403 def_pw", c == 403 and j.get("err") == "def_pw")
+    check("default password: notify with only the session -> 403", req("GET", "/api/notify/history")[0] == 403)
+    check("password short -> 400", req("POST", "/api/password", {"old": "m3owb0x2026", "new": "abc"})[0] == 400)
+    c, j = req("POST", "/api/password", {"old": "m3owb0x2026", "new": "m30w-first"}); check("password ok", j.get("ok"))
 
     print("status")
     c, j = req("GET", "/api/status")
@@ -94,6 +98,8 @@ try:
                     {"id": 10, "name": "YT", "url": "https://youtu.be/abc", "type": "youtube"}]
     c, j = req("PUT", "/api/config/radio", {"st": st}); check("radio put", c == 200 and len(j["st"]) == len(st))
     check("radio put dup id -> 400", req("PUT", "/api/config/radio", {"st": st + [st[0]]})[0] == 400)
+    bad = dict(st[0], id=999, url="ftp://ice.example/live.mp3")
+    check("radio put non-http url -> 400", req("PUT", "/api/config/radio", {"st": st + [bad]})[0] == 400)
     for b in ({"cmd": "play", "id": 9}, {"cmd": "play"}, {"cmd": "play", "url": "http://a/b", "name": "P"},
               {"cmd": "next"}, {"cmd": "prev"}, {"cmd": "vol", "vol": 55}, {"cmd": "stop"}):
         c, j = req("POST", "/api/radio/play", b)
@@ -174,8 +180,7 @@ try:
     c, j = req("POST", "/api/wifi/portal", {"on": True}); check("portal on", c == 200 and j["on"] and j["off_in"] > 0)
     check("portal bad -> 400", req("POST", "/api/wifi/portal", {"on": "yes"})[0] == 400)
     c, j = req("POST", "/api/wifi/portal", {"on": False}); check("portal off", c == 200 and not j["on"])
-    check("password short -> 400", req("POST", "/api/password", {"old": "m3owb0x2026", "new": "abc"})[0] == 400)
-    c, j = req("POST", "/api/password", {"old": "m3owb0x2026", "new": "m30w-secret"}); check("password ok", j.get("ok"))
+    c, j = req("POST", "/api/password", {"old": "m30w-first", "new": "m30w-secret"}); check("password changed again", j.get("ok"))
     c, j = req("GET", "/api/status"); check("def_pw cleared", j["def_pw"] is False)
     check("factory_reset w/o confirm -> 400", req("POST", "/api/factory_reset", {})[0] == 400)
     c, j = req("POST", "/api/logout", {}); check("logout", j.get("ok"))
@@ -188,6 +193,7 @@ try:
     c, j = req("POST", "/api/login", {"user": "meowbox", "pass": "m30w-secret"}); check("clear data keeps password", c == 200)
     c, j = req("POST", "/api/factory_reset", {"confirm": True, "scope": "all"}); check("factory reset", j.get("ok"))
     c, j = req("POST", "/api/login", {"user": "meowbox", "pass": "m3owb0x2026"}); check("default pw after reset", c == 200 and j["def_pw"])
+    c, j = req("POST", "/api/password", {"old": "m3owb0x2026", "new": "m30w-secret"}); check("change it after reset", j.get("ok"))
     c, j = req("GET", "/api/theme"); check("factory reset -> swiss", j.get("theme") == "swiss")
 
     print("update (GitHub Releases)")
@@ -245,7 +251,7 @@ try:
     check("password over 64 chars -> 401", req("POST", "/api/login", {"user": "meowbox", "pass": "x" * 5000})[0] == 401)
     for _ in range(4):
         req("POST", "/api/login", {"user": "meowbox", "pass": "wrong"})
-    c, j = req("POST", "/api/login", {"user": "meowbox", "pass": "m3owb0x2026"})
+    c, j = req("POST", "/api/login", {"user": "meowbox", "pass": "m30w-secret"})
     check("5 failures -> 429 even with the right password", c == 429 and j.get("err") == "too_many")
 finally:
     proc.terminate()

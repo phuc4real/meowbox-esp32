@@ -36,8 +36,9 @@ T = {
                "• Loa chưa có Wi-Fi: vào Wi-Fi cài đặt MeowBox-XXXX của loa bằng điện thoại.",
     "wifi_help": "Hướng dẫn cài Wi-Fi cho loa",
     "next": "Tiếp ›", "back": "‹ Quay lại", "finish": "Xong", "skip": "Bỏ qua",
-    "token_intro": "Token dùng để gửi thông báo, đọc chữ (say) và bật Wi-Fi cài đặt từ máy tính.\n"
-                   "Số liệu máy và điều khiển nhạc không cần token.",
+    "token_intro": "Loa chỉ nhận máy tính có token đúng: số liệu máy, điều khiển nhạc, YouTube, thông báo, đọc chữ\n"
+                   "(say) và Wi-Fi cài đặt đều cần nó. Token ở trang Thông báo trên loa.",
+    "token_need": "Nhập token rồi bấm Kiểm tra trước khi qua bước sau.",
     "open_notify": "Mở trang Thông báo trên loa",
     "token": "Token:", "check": "Kiểm tra",
     "token_ok": "✓ Token đúng", "token_bad": "Token sai", "token_err": "Không kiểm tra được ({e})",
@@ -84,6 +85,7 @@ class ConnectDialog:
         self.b_back.pack(side="left")
         self.b_next.pack(side="right")
         self.token = tk.StringVar(value=cfg.get("token", ""))
+        self.token_ok = False  # set by check_token(); step 2 needs it
         self._q: queue.Queue = queue.Queue()
         self._drain()
         self.show(0)
@@ -133,7 +135,10 @@ class ConnectDialog:
         if self.step == 0:
             self.save(reconnect=True)
         if self.step == 1:
-            self.save(reconnect=False)
+            if not self.token_ok:
+                self.tok_lbl.config(text=T["token_need"], foreground="#b00")
+                return
+            self.save(reconnect=True)  # the hello carries the token now
         if self.step == 2:
             self.save(reconnect=False)
             self.close()
@@ -220,7 +225,8 @@ class ConnectDialog:
         ttk.Button(r, text=T["check"], command=self.check_token).pack(side="left")
         self.tok_lbl = ttk.Label(self.body)
         self.tok_lbl.pack(anchor="w")
-        ttk.Button(self.body, text=T["skip"], command=lambda: self.show(2)).pack(anchor="w", pady=(16, 0))
+        if self.token.get().strip():  # saved earlier: check it right away
+            self.check_token()
 
     def check_token(self):
         host, tok = (self.sel.host if self.sel else ""), self.token.get().strip()
@@ -234,6 +240,7 @@ class ConnectDialog:
                 return e.code
 
         def done(r):
+            self.token_ok = r == 200
             if r == 200:
                 self.tok_lbl.config(text=T["token_ok"], foreground="#080")
             elif r == 401:

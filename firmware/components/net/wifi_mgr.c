@@ -19,13 +19,14 @@
 #include "esp_timer.h"
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
+#include "esp_random.h"
 #include "settings.h"
 
 static const char *TAG = "wifi";
 
 #define WIFI_FILE "/data/wifi.json"
 #define MAX_NETS 5
-#define AP_PASS "meowbox2026" /* WPA2 password of the MeowBox-XXXX setup hotspot */
+#define AP_FALLBACK_US (5LL * 60 * 1000000) /* offline this long with saved networks: open the setup hotspot */
 #define AP_OFF_AFTER_CONNECT_MS 10000          /* hotspot stays 10 s after joining Wi-Fi, so the setup page can show the new IP */
 #define AP_IDLE_OFF_US (10LL * 60 * 1000000)   /* a hotspot opened by hand while online closes after 10 min with no clients */
 #define BIT_GOT_IP BIT0
@@ -40,6 +41,7 @@ static net_mode_t s_mode = NET_MODE_CONNECTING;
 static bool s_ap_on;
 static volatile int64_t s_ap_idle_since; /* esp_timer us; last moment the hotspot had a client */
 static char s_ap_ssid[20];
+static char s_ap_pass[16]; /* WPA2 password of the setup hotspot: random per speaker, kept in NVS */
 static char s_hostname[20];
 
 /* ---- power save while streaming (4.1) ---- */
@@ -113,6 +115,28 @@ static void load_nets(void)
 
 static void save_nets(void);
 
+/* The setup hotspot's password: made at first boot (and after a factory reset, which erases NVS "wifi"), 10 letters
+ * and digits without look-alikes. The speaker shows it on screen and in its Wi-Fi QR code. */
+static void load_ap_pass(void)
+{
+    static const char al[] = "abcdefghjkmnpqrstuvwxyz23456789";
+    nvs_handle_t h;
+    bool nvs = nvs_open("wifi", NVS_READWRITE, &h) == ESP_OK;
+    size_t l = sizeof(s_ap_pass);
+    if (nvs && nvs_get_str(h, "ap_pass", s_ap_pass, &l) == ESP_OK && strlen(s_ap_pass) >= 8) {
+        nvs_close(h);
+        return;
+    }
+    for (int i = 0; i < 10; i++) s_ap_pass[i] = al[esp_random() % (sizeof(al) - 1)];
+    s_ap_pass[10] = 0;
+    if (nvs) {
+        nvs_set_str(h, "ap_pass", s_ap_pass);
+        nvs_commit(h);
+        nvs_close(h);
+    }
+    ESP_LOGI(TAG, "new setup hotspot password made");
+}
+
 /* First boot after xiaozhi: import its saved networks (NVS namespace "wifi", ssid/password, ssid1/password1...). */
 static void import_xiaozhi_nets(void)
 {
@@ -171,7 +195,7 @@ const char *wifi_mgr_mode_str(void)
 }
 bool wifi_mgr_connected(void) { return s_mode == NET_MODE_STA; }
 const char *wifi_mgr_ap_ssid(void) { return s_ap_ssid; }
-const char *wifi_mgr_ap_pass(void) { return AP_PASS; }
+const char *wifi_mgr_ap_pass(void) { return s_ap_pass; }
 bool net_time_valid(void) { return s_time_valid || time(NULL) > 1700000000; }
 
 void wifi_mgr_info(char *ssid, size_t ssid_len, char *ip, size_t ip_len, int *rssi)
@@ -246,7 +270,7 @@ static void ap_enable(bool on)
         ap.ap.ssid_len = strlen(s_ap_ssid);
         ap.ap.channel = 1;
         ap.ap.max_connection = 4;
-        strcpy((char *)ap.ap.password, AP_PASS);
+        strcpy((char *)ap.ap.password, s_ap_pass);
         ap.ap.authmode = WIFI_AUTH_WPA2_PSK;
         ap.ap.pairwise_cipher = WIFI_CIPHER_TYPE_CCMP;
         esp_wifi_set_config(WIFI_IF_AP, &ap);
@@ -345,6 +369,7 @@ static int order_by_scan(const net_t *nets, int n, int *order)
 static void conn_task(void *arg)
 {
     int fails = 0;
+    int64_t offline_since = 0; /* first failed pass of this outage */
     while (1) {
         if (s_mode == NET_MODE_STA) {
             EventBits_t b = xEventGroupWaitBits(s_ev, BIT_FAIL | BIT_RECHECK, pdFALSE, pdFALSE, pdMS_TO_TICKS(5000));
@@ -386,6 +411,7 @@ static void conn_task(void *arg)
         for (int k = 0; k < n && !ok; k++) ok = try_connect(&nets[order[k]]);
         if (ok) {
             fails = 0;
+            offline_since = 0;
             set_mode(NET_MODE_STA);
             if (s_ap_on) {
                 ESP_LOGI(TAG, "online, closing the setup hotspot in %d s", AP_OFF_AFTER_CONNECT_MS / 1000);
@@ -395,7 +421,9 @@ static void conn_task(void *arg)
             continue;
         }
         fails++;
-        if (fails >= 1 && !s_ap_on) ap_enable(true); /* nobody reachable: open the portal while retrying */
+        if (!offline_since) offline_since = esp_timer_get_time();
+        /* still offline after 5 min (not a short router restart): open the portal while retrying */
+        if (!s_ap_on && esp_timer_get_time() - offline_since >= AP_FALLBACK_US) ap_enable(true);
         set_mode(s_ap_on ? NET_MODE_AP : NET_MODE_CONNECTING);
         xEventGroupWaitBits(s_ev, BIT_RECHECK, pdFALSE, pdFALSE, pdMS_TO_TICKS(fails < 5 ? 15000 : 60000));
     }
@@ -611,6 +639,7 @@ esp_err_t wifi_mgr_start(void)
 
     esp_wifi_set_mode(WIFI_MODE_STA);
     ESP_ERROR_CHECK(esp_wifi_start());
+    load_ap_pass();
     esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
 
     /* time */

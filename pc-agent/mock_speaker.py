@@ -1,10 +1,11 @@
 """Mock MeowBox for testing the PC agent without hardware.
 
-  python mock_speaker.py [--port 8080] [--token test] [--name MeowBox-MOCK] [--proto 1]
+  python mock_speaker.py [--port 8080] [--token test] [--name MeowBox-MOCK] [--proto 2]
   curl "http://127.0.0.1:8080/mock/cmd?cmd=vol_up"   -> sends a media_cmd to the connected agent
 
-Like the firmware (docs/firmware_v0.2.0.md, 2.4-2.8): GET /api/ping, one agent at a time (another hello gets
-{"t":"busy"} unless it says "take":true), POST /api/pc/relay_test. The agent finds no speaker by itself: give it the
+Like the firmware (docs/firmware_v0.2.0.md, 2.4-2.8): GET /api/ping, the hello must carry the token (else
+{"t":"auth"}), one agent at a time (another hello gets {"t":"busy"} unless it says "take":true),
+POST /api/pc/relay_test. The agent finds no speaker by itself: give it the
 mock's address (`--host 127.0.0.1:8080`). Two mocks on different ports + --name test the speaker-name check.
 No mDNS / UDP discovery: the agent doesn't use them.
 """
@@ -36,8 +37,14 @@ async def ws_pc(req: web.Request) -> web.WebSocketResponse:
                 continue
             data = json.loads(msg.data)
             if not admitted:
-                if data.get("t") == "hello" and int(data.get("proto", 0)) < req.app["proto_min"]:
+                if data.get("t") != "hello":
+                    break
+                if int(data.get("proto", 0)) < req.app["proto_min"]:
                     await ws.send_json({"t": "proto", "need": req.app["proto_min"], "have": req.app["proto"]})
+                    break
+                if data.get("token") != req.app["token"]:  # like the firmware: the hello carries the notify token
+                    print(f"[ws] auth: refusing {data.get('name')} (no or wrong token)", flush=True)
+                    await ws.send_json({"t": "auth"})
                     break
                 old = current["ws"]
                 same = data.get("name") and data.get("name") == current["name"]
@@ -123,8 +130,8 @@ def main() -> None:
     ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--token", default="test")
     ap.add_argument("--name", default="MeowBox-MOCK")
-    ap.add_argument("--proto", type=int, default=1, help="protocol the mock speaks")
-    ap.add_argument("--proto-min", type=int, default=0, help="oldest agent protocol accepted")
+    ap.add_argument("--proto", type=int, default=2, help="protocol the mock speaks")
+    ap.add_argument("--proto-min", type=int, default=2, help="oldest agent protocol accepted")
     ap.add_argument("--quiet", action="store_true", help="don't print stats messages")
     ap.add_argument("--audio-dir", default=".")
     a = ap.parse_args()

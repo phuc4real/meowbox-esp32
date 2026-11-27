@@ -7,14 +7,18 @@ The mock in `web/mock_server.py` implements exactly this document.
 
 - Transport: plain HTTP on port 80 (`http://meowbox-xxxx.local` or the device IP). JSON bodies are UTF-8,
   `Content-Type: application/json`. Request bodies are at most **8 KB**, except `/api/ota` and
-  `/api/notify/audio`. A body must arrive within 15 s plus 1 s per 16 KB, else `408 {"err":"timeout"}` (or the
+  `/api/notify/audio`. A body must arrive within 5 s plus 1 s per 16 KB, else `408 {"err":"timeout"}` (or the
   connection is closed).
 - Shapes are kept flat and short so the firmware can parse them with cJSON. Booleans are JSON `true`/`false`.
   Unknown fields are ignored, and a missing field in a `PUT` keeps its current value.
 - Success: HTTP 200 with a JSON object (`{"ok":true}` when there is nothing else to return).
 - Error: HTTP 4xx/5xx with `{"err":"<code>"}`. Codes: `auth` (401), `forbidden` (403), `bad_json` (400),
   `bad_value` (400), `not_found` (404), `too_large` (413), `too_many` (429), `busy` (503), `bad_image` (400),
-  `bad_old` (403), `queue_full` (429), `timeout` (408).
+  `bad_old` (403), `queue_full` (429), `timeout` (408), `def_pw` (403).
+- `/api/*` answers only requests addressed to the speaker: a `Host` header (if sent) must be the speaker's IP,
+  `192.168.4.1`, `meowbox-xxxx` or `meowbox`, optionally with `.local`, `.lan`, `.home`, `.home.arpa`,
+  `.localdomain` or `.internal` and a port; an `Origin` header (if sent) must be `http://` + one of those.
+  Anything else → `403 forbidden`. The web page itself is sent with `X-Frame-Options: DENY`.
 - Times are Unix seconds (UTC). The device always uses the `ICT-7` time zone; the UI shows local times in ICT.
 
 ### Static files
@@ -49,6 +53,7 @@ In SoftAP mode any unknown host redirects to `/` (captive portal).
 | `POST /api/login`, `GET /api/theme` | none |
 | `/api/notify`, `/api/notify/audio`, `/api/notify/history` | **Bearer token** (`Authorization: Bearer <token>`), or `?token=<token>` on GET. The session cookie is also accepted so the web UI can use them. |
 | every other `/api/*` | **session cookie** `sid` |
+| `/ws/pc` | the notify token in the first message (`hello`), see below |
 
 - Default credentials `meowbox` / `m3owb0x2026`. The password is stored as SHA-256(salt + password) in `/data/auth.json`.
   A device still on the pre-2026-11-23 default (`meowbox`) is moved to the new default on boot.
@@ -58,6 +63,9 @@ In SoftAP mode any unknown host redirects to `/` (captive portal).
   further failure doubles the wait (up to 15 min). A correct login, or 15 min without a failure, resets it. Other
   devices are not affected. Passwords longer than 64 characters never match.
 - Missing or invalid session → `401 {"err":"auth"}`; the UI then shows the login screen.
+- While the default password is in use (`def_pw`), a session may only call `GET /api/session` and
+  `POST /api/password` (and log out): everything else answers `403 {"err":"def_pw"}`, and the UI shows only the
+  change-password form. Token routes still work with the token. A factory reset brings the default back.
 
 ---
 
@@ -101,7 +109,7 @@ All other sessions are invalidated.
   "play":{"st":"play","id":2,"name":"Lofi Girl","title":"Snowman - Kudasai"}
 }
 ```
-- `mode`: `sta` (connected), `ap` (SoftAP portal `MeowBox-XXXX`, WPA2, password `meowbox2026`), `conn` (connecting).
+- `mode`: `sta` (connected), `ap` (SoftAP portal `MeowBox-XXXX`, WPA2), `conn` (connecting).
 - `bat`: 0–100 or `-1` if unknown. `chg`: charging; `usb`: USB power present.
 - `heap`/`heap_min`: free internal heap now/minimum since boot (bytes). `psram`/`psram_tot`: free/total PSRAM.
 - `sleep`: seconds left on the sleep timer, 0 = off. `pc`: PC agent connected.
@@ -146,7 +154,8 @@ Saves the network at the top of the list and switches to it. → `{"ok":true}` i
 the device may get a new IP (shown on its screen). Omit `pass` to reuse a saved password.
 
 ### `GET /api/wifi/portal` · `POST /api/wifi/portal`
-State of the setup hotspot `MeowBox-XXXX` (WPA2, password `meowbox2026`). **Token auth** (`Authorization:
+State of the setup hotspot `MeowBox-XXXX` (WPA2; its password is made per speaker at first boot and after a
+factory reset, and shown only on the speaker's screen and in its Wi-Fi QR code). **Token auth** (`Authorization:
 Bearer <notify token>`), a web session also works, so the PC agent can reopen it.
 ```json
 {"on":true}
@@ -154,6 +163,7 @@ Bearer <notify token>`), a web session also works, so the PC agent can reopen it
 → `{"on":true,"ssid":"MeowBox-A1B2","off_in":587}`
 - `off_in`: seconds until a hotspot opened while online closes by itself (10 min without clients),
   `"client"` while a device is connected (timer paused), `null` when off or while offline.
+- With no saved network it opens by itself (first boot); with saved networks only after 5 min without Wi-Fi.
 - The hotspot also closes 10 s after the speaker joins Wi-Fi. While offline it stays on: `{"on":false}`
   then returns `409 offline`. `on` must be a bool, otherwise `400 bad_value`.
 - On the speaker: hold VOL+ and VOL− together for 3 s, or System tile → "Wi-Fi".
@@ -180,7 +190,8 @@ Bearer <notify token>`), a web session also works, so the PC agent can reopen it
 
 ### `PUT /api/config/radio`
 `{"st":[...]}` (full list, same item shape) and/or `{"vol":40}`. → same shape as GET.
-Alarms that reference a deleted station fall back to `chime`.
+Alarms that reference a deleted station fall back to `chime`. A station whose `url` does not start with `http://` or
+`https://` → `400 bad_value` (nothing saved).
 
 ### `POST /api/radio/play`
 One command per call:
@@ -419,17 +430,20 @@ Session auth. Why the speaker last started, and its error/warning log lines (Sys
   `int_min` of an entry are filled in at the next start (0 for the current one).
 
 ### `/ws/pc` protocol (agent ↔ speaker)
-- Agent → speaker first message: `{"t":"hello","name":"DESKTOP-MEO","ver":"0.2.0","proto":1,"relay":"http://ip:8765"}`,
-  optional `"take":true`. Then `stats` / `media` every second, `notify`, `coding`.
+- Agent → speaker first message: `{"t":"hello","name":"DESKTOP-MEO","ver":"0.2.7","proto":2,"token":"<notify token>",
+  "relay":"http://ip:8765"}`, optional `"take":true`. Then `stats` / `media` every second, `notify`, `coding`.
+  Protocol 2 (0.2.7): the hello must carry the notify token, else `{"t":"auth"}` and close; any other first message
+  closes the connection. `relay` is used only if its IP is the agent's own address, and only while that agent stays
+  connected. A WebSocket upgrade with an `Origin` header (a web page) is refused.
 - `coding` (Meow Coding, agent 0.2.4+): `{"t":"coding","s":[{"id":"085ba2bd","ag":"claude","name":"…","dir":"meowbox",
   "br":"main","st":"work","act":"edit","for":42,"tok":4975388,"ctx":36,"model":"Opus 5.5"}]}`, sent
   when the list changes (at most once a second) and every 30 s. Fields as in `GET /api/config/cat`; `ctx` is left out
   until known; `lim` as in `GET /api/config/cat`, sent once Claude Code's status line has reported it. Firmware before
   0.2.4 ignores it. The agent learns the sessions from Claude Code's hooks
-  (background `curl` to `http://127.0.0.1:8767/hook`, installed by `meowbox coding install` or the tray menu) and reads each
+  (background `curl` to `http://127.0.0.1:8767/hook` with a per-install key header, installed by `meowbox coding install` or the tray menu) and reads each
   session's transcript for tokens, context and title. The plan's usage limits and the exact context use come from
   Claude Code's status line (`curl ... http://127.0.0.1:8767/status`, also installed when no status line is set).
-- Speaker → agent: `media_cmd`; `{"t":"busy","pc":"OTHER-PC"}` then close (one PC at a time: another PC is connected,
+- Speaker → agent: `media_cmd`; `{"t":"auth"}` then close (missing or wrong token); `{"t":"busy","pc":"OTHER-PC"}` then close (one PC at a time: another PC is connected,
   or this one was taken over; a hello with `take:true` takes over, the same PC name reconnecting is let in);
   `{"t":"proto","need":N,"have":M}` then close when the agent's `proto` is below the firmware's minimum.
 

@@ -16,6 +16,7 @@
 #include "esp_app_desc.h"
 #include "esp_mac.h"
 #include "esp_ota_ops.h"
+#include "esp_netif.h"
 #include "psa/crypto.h"
 #include "lwip/sockets.h"
 #include "nvs.h"
@@ -75,7 +76,7 @@ esp_err_t web_send_err(httpd_req_t *req, int status, const char *code)
 
 int64_t web_body_deadline(httpd_req_t *req)
 {
-    return esp_timer_get_time() + (15LL + (int64_t)(req->content_len / 16384)) * 1000000;
+    return esp_timer_get_time() + (5LL + (int64_t)(req->content_len / 16384)) * 1000000;
 }
 
 int web_recv(httpd_req_t *req, char *buf, size_t len, int64_t deadline)
@@ -341,45 +342,113 @@ static sess_t *find_session(httpd_req_t *req)
     return NULL;
 }
 
+bool web_token_matches(const char *got)
+{
+    char tok[24];
+    settings_get_str("notify", "token", tok, sizeof(tok), "");
+    size_t n = strlen(tok);
+    if (!n || !got || strlen(got) != n) return false;
+    uint8_t d = 0; /* same time whatever matches */
+    for (size_t i = 0; i < n; i++) d |= (uint8_t)(tok[i] ^ got[i]);
+    return d == 0;
+}
+
 static bool token_ok(httpd_req_t *req)
 {
-    char tok[24], got[80];
-    settings_get_str("notify", "token", tok, sizeof(tok), "");
-    if (!tok[0]) return false;
+    char got[80];
     size_t l = httpd_req_get_hdr_value_len(req, "Authorization");
     if (l && l < sizeof(got) && httpd_req_get_hdr_value_str(req, "Authorization", got, sizeof(got)) == ESP_OK) {
-        if (strncmp(got, "Bearer ", 7) == 0 && strcmp(got + 7, tok) == 0) return true;
+        if (strncmp(got, "Bearer ", 7) == 0 && web_token_matches(got + 7)) return true;
     }
     char q[24];
-    return web_query(req, "token", q, sizeof(q)) && strcmp(q, tok) == 0;
+    return web_query(req, "token", q, sizeof(q)) && web_token_matches(q);
+}
+
+/* A host name a browser may use for this speaker: its IP, the setup hotspot's 192.168.4.1, or its name (meowbox-xxxx
+ * or meowbox, as mDNS / the router's DNS give it) with an optional local suffix; any port. */
+static bool name_is_us(const char *h, size_t n)
+{
+    char name[64];
+    if (n >= sizeof(name)) return false;
+    memcpy(name, h, n);
+    name[n] = 0;
+    char *colon = strchr(name, ':');
+    if (colon) *colon = 0;
+    for (char *p = name; *p; p++) *p = (char)tolower((unsigned char)*p);
+    if (strcmp(name, "192.168.4.1") == 0) return true;
+    esp_netif_ip_info_t ip;
+    char ips[16];
+    esp_netif_t *sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (sta && esp_netif_get_ip_info(sta, &ip) == ESP_OK && ip.ip.addr) {
+        snprintf(ips, sizeof(ips), IPSTR, IP2STR(&ip.ip));
+        if (strcmp(name, ips) == 0) return true;
+    }
+    static const char *const sfx[] = {"", ".local", ".lan", ".home", ".home.arpa", ".localdomain", ".internal"};
+    const char *const names[] = {wifi_mgr_hostname(), "meowbox"};
+    for (int k = 0; k < 2; k++) {
+        size_t l = strlen(names[k]);
+        if (strncmp(name, names[k], l) != 0) continue;
+        for (size_t i = 0; i < sizeof(sfx) / sizeof(sfx[0]); i++)
+            if (strcmp(name + l, sfx[i]) == 0) return true;
+    }
+    return false;
+}
+
+/* The API answers only requests addressed to this speaker: a web page on another site whose name was made to point at
+ * the speaker still sends its own name as Host / Origin. Clients without these headers (curl, the PC agent) pass. */
+static bool request_is_for_us(httpd_req_t *req)
+{
+    char v[80];
+    size_t l = httpd_req_get_hdr_value_len(req, "Host");
+    if (l && (l >= sizeof(v) || httpd_req_get_hdr_value_str(req, "Host", v, sizeof(v)) != ESP_OK || !name_is_us(v, l)))
+        return false;
+    l = httpd_req_get_hdr_value_len(req, "Origin");
+    if (l) {
+        if (l >= sizeof(v) || httpd_req_get_hdr_value_str(req, "Origin", v, sizeof(v)) != ESP_OK) return false;
+        if (strncmp(v, "http://", 7) != 0 || !name_is_us(v + 7, strlen(v + 7))) return false;
+    }
+    return true;
 }
 
 /* Handler wrapper storing the auth mode in user_ctx */
-typedef struct { esp_err_t (*fn)(httpd_req_t *); web_auth_t auth; } route_t;
+typedef struct { esp_err_t (*fn)(httpd_req_t *); web_auth_t auth; bool def_pw_ok; } route_t;
+
+static esp_err_t h_session(httpd_req_t *req);
+static esp_err_t h_password(httpd_req_t *req);
 
 static esp_err_t route_dispatch(httpd_req_t *req)
 {
     route_t *rt = req->user_ctx;
-    if (rt->auth == WEB_AUTH_SESSION && !find_session(req)) return web_send_err(req, 401, "auth");
-    if (rt->auth == WEB_AUTH_TOKEN && !token_ok(req) && !find_session(req)) return web_send_err(req, 401, "auth");
+    if (!request_is_for_us(req)) return web_send_err(req, 403, "forbidden");
+    bool token = rt->auth == WEB_AUTH_TOKEN && token_ok(req);
+    if (rt->auth == WEB_AUTH_SESSION || (rt->auth == WEB_AUTH_TOKEN && !token)) {
+        if (!find_session(req)) return web_send_err(req, 401, "auth");
+        /* still on the published default password: only changing it (and the session check) until it is changed */
+        if (s_def_pw && !rt->def_pw_ok) return web_send_err(req, 403, "def_pw");
+    }
     return rt->fn(req);
 }
 
 esp_err_t web_register(const char *uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t *), web_auth_t auth)
 {
     route_t *rt = malloc(sizeof(route_t));
+    if (!rt) return ESP_ERR_NO_MEM;
     rt->fn = handler;
     rt->auth = auth;
+    rt->def_pw_ok = handler == h_session || handler == h_password;
     httpd_uri_t u = {.uri = uri, .method = method, .handler = route_dispatch, .user_ctx = rt};
     esp_err_t r = httpd_register_uri_handler(s_srv, &u);
     if (r != ESP_OK) ESP_LOGE(TAG, "register %s failed: %s", uri, esp_err_to_name(r));
     return r;
 }
 
-esp_err_t web_register_ws(const char *uri, esp_err_t (*handler)(httpd_req_t *))
+#if !CONFIG_HTTPD_WS_PRE_HANDSHAKE_CB_SUPPORT
+#error "CONFIG_HTTPD_WS_PRE_HANDSHAKE_CB_SUPPORT must be on (sdkconfig.defaults; delete sdkconfig or run idf.py reconfigure)"
+#endif
+esp_err_t web_register_ws(const char *uri, esp_err_t (*handler)(httpd_req_t *), esp_err_t (*pre_handshake)(httpd_req_t *))
 {
     httpd_uri_t u = {.uri = uri, .method = HTTP_GET, .handler = handler, .is_websocket = true,
-                     .handle_ws_control_frames = false};
+                     .handle_ws_control_frames = false, .ws_pre_handshake_cb = pre_handshake};
     return httpd_register_uri_handler(s_srv, &u);
 }
 
@@ -794,6 +863,10 @@ static esp_err_t h_static(httpd_req_t *req)
         return httpd_resp_send(req, NULL, 0);
     }
     httpd_resp_set_type(req, mime(mpath));
+    if (strcmp(mime(mpath), "text/html; charset=utf-8") == 0) { /* the page is never shown inside another site */
+        httpd_resp_set_hdr(req, "X-Frame-Options", "DENY");
+        httpd_resp_set_hdr(req, "Content-Security-Policy", "frame-ancestors 'none'");
+    }
     if (f.gzip) httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
     return httpd_resp_send(req, (const char *)f.data, f.len);
 }
@@ -814,7 +887,7 @@ esp_err_t web_start(void)
     cfg.stack_size = 8192;
     cfg.lru_purge_enable = true;
     cfg.max_open_sockets = 7;
-    cfg.recv_wait_timeout = 10;
+    cfg.recv_wait_timeout = 5; /* one server task runs every handler: a silent client holds it at most this long */
     cfg.send_wait_timeout = 10;
     esp_err_t r = httpd_start(&s_srv, &cfg);
     if (r != ESP_OK) return r;

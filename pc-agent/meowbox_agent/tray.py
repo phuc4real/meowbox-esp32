@@ -45,6 +45,8 @@ def status_line(st: AgentState, cfg: dict) -> tuple[str, tuple]:
         return f"● Đã kết nối {st.name} · {st.ip()} ({how})", GREEN
     if st.error == "busy":
         return f"✕ {want} đang nối với {st.busy_with}", RED
+    if st.error == "token":
+        return "✕ Loa cần token đúng: mở 'Kết nối loa…', bước 2", RED
     if st.error == "proto_agent":
         return "✕ Loa cần MeowBox Agent mới hơn: bấm 'Có bản mới' hoặc vào GitHub", RED
     if st.error == "port":

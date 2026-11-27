@@ -57,6 +57,11 @@ async fn conn(f: Fake, mut sock: WebSocket) {
                     };
                     if let Some(r) = reply {
                         let _ = sock.send(Message::Text(r.to_string().into())).await;
+                        // close as the speaker does, reading what the agent still sends: dropping the socket with
+                        // unread data makes Windows reset it, and the reset can discard the answer before the agent
+                        // reads it
+                        let _ = sock.send(Message::Close(None)).await;
+                        while let Some(Ok(_)) = sock.recv().await {}
                         return;
                     }
                 }

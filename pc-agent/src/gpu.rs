@@ -95,37 +95,81 @@ pub fn busiest_engine(items: impl Iterator<Item = (String, f64)>) -> Option<f64>
     per_engine.into_values().reduce(f64::max).map(|v| v.min(100.0))
 }
 
-/// Highest temperature (°C) any display adapter reports, None when none does (integrated GPUs, old drivers).
-pub fn temperature() -> Option<f64> {
-    // SAFETY: the first call gets the count, the second fills a buffer of that size; every opened adapter is closed.
-    unsafe {
-        let mut e = D3DKMT_ENUMADAPTERS2::default();
-        if D3DKMTEnumAdapters2(&mut e).is_err() || e.NumAdapters == 0 {
-            return None;
+/// The display adapters opened once for temperature reads. They are enumerated again when a query fails (driver
+/// update, eGPU unplugged) and every REENUMERATE reads, so an adapter added later is seen too.
+#[derive(Default)]
+pub struct GpuTemp {
+    adapters: Vec<u32>,
+    reads: u32,
+}
+
+const REENUMERATE: u32 = 60;
+
+impl GpuTemp {
+    fn close(&mut self) {
+        for &h in &self.adapters {
+            let close = D3DKMT_CLOSEADAPTER { hAdapter: h };
+            // SAFETY: a handle we opened through D3DKMTEnumAdapters2 and have not closed yet.
+            let _ = unsafe { D3DKMTCloseAdapter(&close) };
         }
-        let mut infos = vec![D3DKMT_ADAPTERINFO::default(); e.NumAdapters as usize];
-        e.pAdapters = infos.as_mut_ptr();
-        if D3DKMTEnumAdapters2(&mut e).is_err() {
-            return None;
+        self.adapters.clear();
+    }
+
+    fn open(&mut self) {
+        self.close();
+        // SAFETY: the first call gets the count, the second fills a buffer of that size.
+        unsafe {
+            let mut e = D3DKMT_ENUMADAPTERS2::default();
+            if D3DKMTEnumAdapters2(&mut e).is_err() || e.NumAdapters == 0 {
+                return;
+            }
+            let mut infos = vec![D3DKMT_ADAPTERINFO::default(); e.NumAdapters as usize];
+            e.pAdapters = infos.as_mut_ptr();
+            if D3DKMTEnumAdapters2(&mut e).is_err() {
+                return;
+            }
+            self.adapters = infos[..e.NumAdapters as usize].iter().map(|i| i.hAdapter).collect();
         }
+    }
+
+    /// Highest temperature (°C) any display adapter reports, None when none does (integrated GPUs, old drivers).
+    pub fn read(&mut self) -> Option<f64> {
+        if self.adapters.is_empty() || self.reads >= REENUMERATE {
+            self.open();
+            self.reads = 0;
+        }
+        self.reads += 1;
         let mut best: Option<f64> = None;
-        for info in &infos[..e.NumAdapters as usize] {
+        let mut failed = false;
+        for &h in &self.adapters {
             let mut perf = D3DKMT_ADAPTER_PERFDATA::default();
             let mut q = D3DKMT_QUERYADAPTERINFO {
-                hAdapter: info.hAdapter,
+                hAdapter: h,
                 Type: KMTQAITYPE_ADAPTERPERFDATA,
                 pPrivateDriverData: &mut perf as *mut _ as *mut _,
                 PrivateDriverDataSize: size_of::<D3DKMT_ADAPTER_PERFDATA>() as u32,
             };
+            // SAFETY: q points at a live perf struct of the size given.
+            if unsafe { D3DKMTQueryAdapterInfo(&mut q) }.is_err() {
+                failed = true;
+                continue;
+            }
             // tenths of a degree; 0 = not reported
-            if D3DKMTQueryAdapterInfo(&mut q).is_ok() && perf.Temperature > 0 && perf.Temperature < 1500 {
+            if perf.Temperature > 0 && perf.Temperature < 1500 {
                 let t = perf.Temperature as f64 / 10.0;
                 best = Some(best.map_or(t, |b: f64| b.max(t)));
             }
-            let close = D3DKMT_CLOSEADAPTER { hAdapter: info.hAdapter };
-            let _ = D3DKMTCloseAdapter(&close);
+        }
+        if failed {
+            self.reads = REENUMERATE; // enumerate again next time
         }
         best
+    }
+}
+
+impl Drop for GpuTemp {
+    fn drop(&mut self) {
+        self.close();
     }
 }
 
@@ -160,8 +204,11 @@ mod tests {
         if let Some(v) = g.sample() {
             assert!((0.0..=100.0).contains(&v), "{v}");
         }
-        if let Some(t) = temperature() {
-            assert!((1.0..150.0).contains(&t), "{t}");
+        let mut temp = GpuTemp::default();
+        for _ in 0..3 {
+            if let Some(t) = temp.read() {
+                assert!((1.0..150.0).contains(&t), "{t}");
+            }
         }
     }
 }

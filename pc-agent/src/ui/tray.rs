@@ -250,6 +250,17 @@ impl Tray {
         }
     }
 
+    /// Change the tooltip only, keeping the icon.
+    pub fn set_tip(&mut self, tip: &str) {
+        self.tip = tip.chars().take(127).collect();
+        let mut d = self.data();
+        d.uFlags = NIF_TIP;
+        // SAFETY: as in add().
+        unsafe {
+            let _ = Shell_NotifyIconW(NIM_MODIFY, &d);
+        }
+    }
+
     /// Balloon / toast next to the tray ("MeowBox" title), like pystray's Icon.notify.
     pub fn notify(&self, text: &str, title: &str) {
         let mut d = self.data();

@@ -11,9 +11,13 @@ use tokio::io::AsyncWriteExt;
 
 pub const UA: &str = "MeowBoxAgent";
 
-/// HTTP client for GitHub (system proxy from the environment, unlike the LAN client).
+/// HTTP client for GitHub (system proxy from the environment, unlike the LAN client). Built once, no idle
+/// connections kept, for the same reason as `discovery::lan_client`.
 pub fn web_client() -> reqwest::Client {
-    reqwest::Client::builder().user_agent(UA).build().expect("http client")
+    static C: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|| {
+        reqwest::Client::builder().user_agent(UA).pool_max_idle_per_host(0).build().expect("http client")
+    });
+    C.clone()
 }
 
 /// GET a GitHub API URL as JSON.

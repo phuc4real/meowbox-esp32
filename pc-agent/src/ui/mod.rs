@@ -56,6 +56,15 @@ pub fn status_line(st: &AgentState, cfg: &Config) -> (String, (u8, u8, u8)) {
     ("○ Đang nối loa…".into(), icon::GREY)
 }
 
+/// Tray icon size (px) and dot colour.
+type IconKey = (u32, (u8, u8, u8));
+
+/// The key to draw when the icon must change, None when the one in the tray still fits.
+fn new_icon_key(current: Option<IconKey>, size: u32, color: (u8, u8, u8)) -> Option<IconKey> {
+    let key = (size, color);
+    (current != Some(key)).then_some(key)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Page {
     Connect,
@@ -85,6 +94,8 @@ pub struct TrayApp {
     /// Toasts queued by other threads (shown on the next wake).
     toasts: Arc<Mutex<VecDeque<String>>>,
     last_line: String,
+    /// Size and dot colour of the icon now in the tray: the icon is drawn again only when one of them changes.
+    icon_key: Option<IconKey>,
     /// A page the user asked for; opened by the outer loop, or switched to if a dialog is already open.
     open_request: Option<Page>,
     quit: bool,
@@ -110,6 +121,7 @@ impl TrayApp {
             tray,
             toasts,
             last_line: String::new(),
+            icon_key: Some((size, icon::GREY)),
             open_request: None,
             quit: false,
             selftest_reopen: 0,
@@ -165,7 +177,13 @@ impl TrayApp {
             line.trim_start_matches(['●', '○', '✕', ' ']).to_owned()
         };
         let tip = format!("{} · {ip} · {tail}", if st.name.is_empty() { "MeowBox" } else { &st.name });
-        self.tray.set(tray::make_icon(&icon::cat_rgba(size, Some(color)), size), &tip);
+        // the line changes every second while a retry counts down; the dot does not
+        if let Some(key) = new_icon_key(self.icon_key, size, color) {
+            self.tray.set(tray::make_icon(&icon::cat_rgba(size, Some(color)), size), &tip);
+            self.icon_key = Some(key);
+        } else {
+            self.tray.set_tip(&tip);
+        }
         self.last_line = line;
     }
 
@@ -523,5 +541,20 @@ mod tests {
             status_line(&st, &cfg2),
             ("● Đã kết nối MeowBox-1A2B · 192.168.1.50 (IP lần trước)".into(), icon::GREEN)
         );
+    }
+
+    /// The retry countdown changes the line every second; the icon is drawn only when its dot or size changes.
+    #[test]
+    fn countdown_does_not_redraw_the_icon() {
+        let mut cfg = Config::default();
+        cfg.last_host = "192.168.1.50".into();
+        let st = |n| AgentState { error: LinkError::NotFound, retry_in: n, ..Default::default() };
+        let (l8, c8) = status_line(&st(8), &cfg);
+        let (l7, c7) = status_line(&st(7), &cfg);
+        assert_ne!(l8, l7);
+        let key = new_icon_key(Some((16, icon::GREY)), 16, c8).expect("grey to red draws once");
+        assert_eq!(new_icon_key(Some(key), 16, c7), None, "same dot: tooltip only");
+        assert!(new_icon_key(Some(key), 24, c7).is_some(), "DPI change draws again");
+        assert!(new_icon_key(None, 16, c7).is_some());
     }
 }

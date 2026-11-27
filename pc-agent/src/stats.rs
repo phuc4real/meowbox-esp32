@@ -20,6 +20,25 @@ pub struct Stats {
     t: Instant,
     nvsmi: Option<PathBuf>,
     gpu: Option<crate::gpu::GpuLoad>,
+    gpu_temp: crate::gpu::GpuTemp,
+    /// Slow values, read again only every DISK_EVERY / GPU_TEMP_EVERY: (when, value).
+    disk_last: Option<(Instant, Option<f64>)>,
+    gpu_temp_last: Option<(Instant, Option<f64>)>,
+}
+
+const DISK_EVERY: Duration = Duration::from_secs(30);
+const GPU_TEMP_EVERY: Duration = Duration::from_secs(5);
+
+/// The cached value while it is younger than `every`, else a new one from `read`.
+fn cached<T: Copy>(last: &mut Option<(Instant, T)>, now: Instant, every: Duration, read: impl FnOnce() -> T) -> T {
+    match *last {
+        Some((t, v)) if now.duration_since(t) < every => v,
+        _ => {
+            let v = read();
+            *last = Some((now, v));
+            v
+        }
+    }
 }
 
 fn net_totals(nets: &Option<Networks>) -> (u64, u64) {
@@ -61,6 +80,9 @@ impl Stats {
             t: Instant::now(),
             nvsmi: which("nvidia-smi"),
             gpu: crate::gpu::GpuLoad::open(),
+            gpu_temp: crate::gpu::GpuTemp::default(),
+            disk_last: None,
+            gpu_temp_last: None,
         }
     }
 
@@ -101,22 +123,19 @@ impl Stats {
         if let Some(n) = self.nets.as_mut() {
             n.refresh(true);
         }
-        if let Some(d) = self.disks.as_mut() {
-            d.refresh(true);
-        }
         let now = Instant::now();
         let dt = now.duration_since(self.t).as_secs_f64().max(1e-3);
         let (sent, recv) = net_totals(&self.nets);
-        let disk = self
-            .disks
-            .iter()
-            .flat_map(|d| d.iter())
-            .find(|d| d.mount_point().to_string_lossy().eq_ignore_ascii_case(&self.disk_mount))
-            .map(|d| {
+        let (disks, mount) = (&mut self.disks, &self.disk_mount);
+        let disk = cached(&mut self.disk_last, now, DISK_EVERY, || {
+            let d = disks.as_mut()?;
+            d.refresh(true);
+            d.iter().find(|d| d.mount_point().to_string_lossy().eq_ignore_ascii_case(mount)).map(|d| {
                 let t = d.total_space().max(1) as f64;
                 (t - d.available_space() as f64) * 100.0 / t
             })
-            .unwrap_or(0.0);
+        })
+        .unwrap_or(0.0);
         let mut msg = Map::new();
         msg.insert("t".into(), json!("stats"));
         msg.insert("cpu".into(), json!(round(cpu)));
@@ -132,7 +151,8 @@ impl Stats {
         if let Some(v) = self.gpu.as_mut().and_then(|g| g.sample()) {
             msg.insert("gpu".into(), json!(round(v)));
         }
-        if let Some(t) = crate::gpu::temperature() {
+        let temp = &mut self.gpu_temp;
+        if let Some(t) = cached(&mut self.gpu_temp_last, now, GPU_TEMP_EVERY, || temp.read()) {
             msg.insert("gpu_temp".into(), json!(round(t)));
         }
         for (k, v) in self.nvidia().await {
@@ -147,6 +167,15 @@ impl Stats {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn slow_values_are_read_again_only_when_old() {
+        let (mut last, t0) = (None, Instant::now());
+        let every = Duration::from_secs(30);
+        assert_eq!(cached(&mut last, t0, every, || 1), 1);
+        assert_eq!(cached(&mut last, t0 + Duration::from_secs(29), every, || 2), 1);
+        assert_eq!(cached(&mut last, t0 + every, every, || 3), 3);
+    }
 
     #[tokio::test]
     async fn sample_has_every_field() {

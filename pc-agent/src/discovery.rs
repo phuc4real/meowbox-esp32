@@ -44,9 +44,14 @@ impl PingError {
     }
 }
 
-/// HTTP client for the speaker: LAN only, so never through a proxy.
+/// HTTP client for the speaker: LAN only, so never through a proxy. Built once (a clone shares it). No idle
+/// connections are kept: a pooled connection belongs to the tokio runtime that opened it, and the CLI and tests run
+/// more than one runtime in a process; requests to the speaker are rare anyway (the stream is the WebSocket).
 pub fn lan_client() -> reqwest::Client {
-    reqwest::Client::builder().no_proxy().build().expect("http client")
+    static C: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|| {
+        reqwest::Client::builder().no_proxy().pool_max_idle_per_host(0).build().expect("http client")
+    });
+    C.clone()
 }
 
 /// GET http://host/api/ping: is it a MeowBox, and which one?
@@ -93,25 +98,54 @@ pub async fn ping(host: &str) -> Option<Speaker> {
     ping_detail_with(host, Duration::from_secs(2)).await.ok()
 }
 
+/// How long the typed IP still gets once the last working IP has answered: both are on the LAN, so a live typed IP
+/// answers about as fast, and a dead one no longer costs its whole ping timeout.
+const TYPED_GRACE: Duration = Duration::from_millis(500);
+
 /// The speaker at the typed IP, else at the last working one, if it answers (and has the name in `speaker`, if
-/// set). The typed IP goes first so a new one wins over a stale last_host. `report(step)` says which IP is tried.
+/// set). Both are pinged at once; the typed IP wins when both answer, so a new one wins over a stale last_host.
+/// `report(step)` says which IPs are tried.
 pub async fn find_speaker(cfg: &Config, report: impl Fn(&str)) -> Option<Speaker> {
+    find_speaker_with(cfg, report, Duration::from_secs(2)).await
+}
+
+async fn find_speaker_with(cfg: &Config, report: impl Fn(&str), timeout: Duration) -> Option<Speaker> {
     let want = cfg.speaker.as_str();
-    let mut tried: Vec<&str> = Vec::new();
-    for (h, how) in [(cfg.host.as_str(), "manual"), (cfg.last_host.as_str(), "last")] {
-        if h.is_empty() || tried.contains(&h) {
-            continue;
-        }
-        tried.push(h);
-        report(&format!("ip {h}"));
-        if let Some(mut sp) = ping(h).await
-            && (want.is_empty() || sp.name == want)
-        {
+    let (typed, last) = (cfg.host.as_str(), cfg.last_host.as_str());
+    let last = if last == typed { "" } else { last };
+    let check = |h: &str, how: &'static str| {
+        let h = h.to_owned();
+        async move {
+            if h.is_empty() {
+                return None;
+            }
+            let mut sp = ping_detail_with(&h, timeout).await.ok()?;
+            if !want.is_empty() && sp.name != want {
+                return None;
+            }
             sp.how = how.into();
-            return Some(sp);
+            Some(sp)
         }
+    };
+    match (typed.is_empty(), last.is_empty()) {
+        (true, true) => return None,
+        (false, true) => report(&format!("ip {typed}")),
+        (true, false) => report(&format!("ip {last}")),
+        (false, false) => report(&format!("ip {typed}, {last}")),
     }
-    None
+    let typed_fut = check(typed, "manual");
+    let last_fut = check(last, "last");
+    tokio::pin!(typed_fut, last_fut);
+    tokio::select! {
+        sp = &mut typed_fut => match sp {
+            Some(sp) => Some(sp),
+            None => last_fut.await,
+        },
+        sp = &mut last_fut => match sp {
+            Some(sp) => tokio::time::timeout(TYPED_GRACE, typed_fut).await.ok().flatten().or(Some(sp)),
+            None => typed_fut.await,
+        },
+    }
 }
 
 /// IPv4 networks of this PC's interfaces (no loopback / link-local), as (address, prefix length).
@@ -158,6 +192,53 @@ mod tests {
         assert!(in_network(a("192.168.1.50"), a("192.168.1.7"), 24));
         assert!(!in_network(a("192.168.2.50"), a("192.168.1.7"), 24));
         assert!(in_network(a("10.1.2.3"), a("10.9.9.9"), 8));
+    }
+
+    /// A speaker on 127.0.0.1 answering /api/ping as `name`; a "dead" one accepts and never answers.
+    async fn fake(name: Option<&'static str>) -> String {
+        let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let host = l.local_addr().unwrap().to_string();
+        match name {
+            Some(n) => {
+                let app = axum::Router::new().route(
+                    "/api/ping",
+                    axum::routing::get(move || async move { axum::Json(serde_json::json!({"name": n, "proto": 2})) }),
+                );
+                tokio::spawn(async move { axum::serve(l, app).await.unwrap() });
+            }
+            None => {
+                tokio::spawn(async move {
+                    let mut held = Vec::new();
+                    while let Ok((sock, _)) = l.accept().await {
+                        held.push(sock);
+                    }
+                });
+            }
+        }
+        host
+    }
+
+    #[tokio::test]
+    async fn typed_ip_wins_and_a_dead_one_costs_little() {
+        let (a, b, dead) = (fake(Some("MeowBox-A")).await, fake(Some("MeowBox-B")).await, fake(None).await);
+        let cfg = |host: &str, last: &str| {
+            let mut c = Config::default();
+            (c.host, c.last_host) = (host.into(), last.into());
+            c
+        };
+        let t = Duration::from_secs(3);
+        let sp = find_speaker_with(&cfg(&a, &b), |_| {}, t).await.unwrap();
+        assert_eq!((sp.name.as_str(), sp.how.as_str()), ("MeowBox-A", "manual"));
+        let started = std::time::Instant::now();
+        let sp = find_speaker_with(&cfg(&dead, &b), |_| {}, t).await.unwrap();
+        assert_eq!((sp.name.as_str(), sp.how.as_str()), ("MeowBox-B", "last"));
+        assert!(started.elapsed() < Duration::from_secs(2), "{:?}", started.elapsed());
+        let sp = find_speaker_with(&cfg(&a, &dead), |_| {}, t).await.unwrap();
+        assert_eq!(sp.how, "manual");
+        let mut wrong = cfg(&a, &b);
+        wrong.speaker = "MeowBox-B".into();
+        assert_eq!(find_speaker_with(&wrong, |_| {}, t).await.unwrap().name, "MeowBox-B", "name must match");
+        assert!(find_speaker_with(&cfg("", ""), |_| {}, t).await.is_none());
     }
 
     #[tokio::test]

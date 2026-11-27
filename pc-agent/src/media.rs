@@ -2,6 +2,7 @@
 //! media buttons back: through GSMTC, falling back to media keys; volume on the default output device.
 
 use serde_json::{Value, json};
+use std::time::{Duration, Instant};
 use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSession as Session, GlobalSystemMediaTransportControlsSessionManager as Manager,
 };
@@ -18,7 +19,32 @@ const VK_VOL_DOWN: u8 = 0xAE;
 
 #[derive(Default)]
 pub struct Media {
-    mgr: tokio::sync::OnceCell<Option<Manager>>,
+    mgr: tokio::sync::Mutex<Retrying<Manager>>,
+}
+
+/// How long a failed GSMTC start is remembered before the next try (at logon the service may not be up yet).
+const RETRY_AFTER: Duration = Duration::from_secs(30);
+
+/// A value that is made once, but tried again at most every RETRY_AFTER while making it fails.
+pub struct Retrying<T> {
+    val: Option<T>,
+    failed_at: Option<Instant>,
+}
+
+impl<T> Default for Retrying<T> {
+    fn default() -> Self {
+        Self { val: None, failed_at: None }
+    }
+}
+
+impl<T> Retrying<T> {
+    pub async fn get<F: Future<Output = Option<T>>>(&mut self, now: Instant, make: impl FnOnce() -> F) -> Option<&T> {
+        if self.val.is_none() && self.failed_at.is_none_or(|t| now.duration_since(t) >= RETRY_AFTER) {
+            self.val = make().await;
+            self.failed_at = if self.val.is_none() { Some(now) } else { None };
+        }
+        self.val.as_ref()
+    }
 }
 
 fn empty() -> Value {
@@ -41,16 +67,18 @@ pub fn app_name(aumid: &str) -> &str {
 
 impl Media {
     async fn session(&self) -> Option<Session> {
-        let mgr = self
-            .mgr
-            .get_or_init(|| async {
+        let mut mgr = self.mgr.lock().await;
+        let mgr = mgr
+            .get(Instant::now(), || async {
                 match Manager::RequestAsync() {
-                    Ok(op) => op.await.ok(),
-                    Err(_) => None,
+                    Ok(op) => op.await.inspect_err(|e| tracing::debug!("media session manager: {e}")).ok(),
+                    Err(e) => {
+                        tracing::debug!("media session manager: {e}");
+                        None
+                    }
                 }
             })
-            .await
-            .as_ref()?;
+            .await?;
         mgr.GetCurrentSession().ok()
     }
 
@@ -164,6 +192,24 @@ mod tests {
         assert_eq!(app_name("Spotify.exe"), "Spotify");
         assert_eq!(app_name("Microsoft.ZuneMusic_8wekyb3d8bbwe!Microsoft.ZuneMusic"), "Microsoft.ZuneMusic");
         assert_eq!(app_name("chrome"), "chrome");
+    }
+
+    /// A failed start is tried again after RETRY_AFTER, not before; a success is kept.
+    #[tokio::test]
+    async fn failed_start_is_retried_later() {
+        let mut r = Retrying::<u32>::default();
+        let t0 = Instant::now();
+        let calls = std::cell::Cell::new(0);
+        let make = |v: Option<u32>| {
+            calls.set(calls.get() + 1);
+            async move { v }
+        };
+        assert_eq!(r.get(t0, || make(None)).await, None);
+        assert_eq!(r.get(t0 + Duration::from_secs(5), || make(Some(7))).await, None, "too soon");
+        assert_eq!(calls.get(), 1);
+        assert_eq!(r.get(t0 + RETRY_AFTER, || make(Some(7))).await, Some(&7));
+        assert_eq!(r.get(t0 + RETRY_AFTER * 5, || make(Some(9))).await, Some(&7), "kept");
+        assert_eq!(calls.get(), 2);
     }
 
     #[tokio::test]

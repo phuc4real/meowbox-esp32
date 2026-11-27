@@ -12,7 +12,7 @@ Baseline (installed 0.3.0, connected, idle, measured 2026-11-28 over 30 s): **0.
 
 ## Part A: engine
 
-### A1. Tray icon re-rendered every second while not connected — do
+### A1. Tray icon re-rendered every second while not connected — done (step 1)
 `ui/mod.rs` `refresh()`: the status line carries the countdown "(thử lại sau N s)", so it changes every second and each
 change draws the cat again (tiny-skia), makes a new `HICON` and calls `Shell_NotifyIconW`. Fix: keep the icon per dot
 colour (three cached icons, rebuilt only when the DPI-dependent size changes) and update the tooltip alone with
@@ -25,12 +25,12 @@ entirely (decided 2026-11-28): remove `nvidia()`, the `nvsmi` field and `which()
 nvidia-smi mentions in `gpu.rs`, `stats.rs` and `pc-agent/README.md`. If an NVIDIA card turns out to report no
 temperature through D3DKMT (only checked on AMD so far), the speaker shows none for it, as for integrated GPUs.
 
-### A3. A new HTTP client for every request — do
+### A3. A new HTTP client for every request — done (step 1)
 `discovery::lan_client()` and `tools::web_client()` build a `reqwest::Client` (connection pool, SChannel TLS setup) on
 each call: every ping, notify, token check, GitHub call. Fix: two `LazyLock<reqwest::Client>` (LAN: no proxy; web:
 user agent, system proxy). No behaviour change.
 
-### A4. Media dead until restart if GSMTC fails once — do
+### A4. Media dead until restart if GSMTC fails once — done (step 1)
 `media.rs`: the `OnceCell` caches a failed `GlobalSystemMediaTransportControlsSessionManager::RequestAsync()` as
 `None` for good (e.g. at logon, before the service is up): the media tile stays empty. Fix: on failure, retry at most
 every 30 s. Test: inject a failing factory, then a working one.
@@ -42,15 +42,15 @@ on the session; send `media` when they fire, plus every 5 s while playing (the s
 less CPU and Windows wake-ups, a track change on the PC shows on the speaker at once instead of up to 1 s later.
 Keep the polling path as a fallback when subscribing fails. Test: the change-detection logic on a fake session.
 
-### A6. Disk list rescanned every second — do
+### A6. Disk list rescanned every second — done (step 1)
 `stats.rs` `d.refresh(true)` enumerates the disks each second; the disk % moves slowly. Refresh every 30 s, send the
 last value in between.
 
-### A7. GPU temperature opens and closes every adapter every second — do
+### A7. GPU temperature opens and closes every adapter every second — done (step 1)
 `gpu::temperature()`: `D3DKMTEnumAdapters2` + query + close per sample. Read it every 5 s (temperatures move slowly)
 and keep the adapter list; reopen only if a query fails (driver update, eGPU unplugged).
 
-### A8. Speaker search pings one address after the other — do
+### A8. Speaker search pings one address after the other — done (step 1)
 `discovery::find_speaker`: a dead typed IP costs its 2 s timeout before the last working IP is tried. Ping both at
 once and take the typed one if both answer (same preference as now). Shortens reconnects after the speaker's IP
 changed.
@@ -74,6 +74,16 @@ Now that the Python agent is gone: `json::round` (half-to-even like Python's `ro
 "no command means `run`" argv rewrite (`cli::with_default_command`) and `meowbox tray` can go (the installer starts
 `MeowBoxAgent.exe`, nobody types `agent.py --no-relay` any more). Keep the repeated-key refusal on `/ws/pc`: it is a
 safety check, not parity.
+
+### A13. A refusal can be lost before the agent reads it — do
+The agent sends `coding`, `stats` and `media` right after `hello`, before the speaker has answered. When the speaker
+refuses (`busy`, `auth`, `proto`) it sends the answer and closes (`pc_app.c` `refuse()`); closing with the agent's
+messages still unread makes lwIP reset the connection, and the reset can drop the answer before the agent reads it.
+The agent then sees a plain disconnect and retries every second instead of showing "busy" or "wrong token". The fake
+speaker in `tests/link.rs` had the same race (`wrong_token_and_busy` failed about 1 run in 3, also on 0.3.0); it now
+closes like a well-behaved peer, which hides the problem in tests. Fix on the agent side: after `hello`, wait up to
+~300 ms for a refusal before sending anything else (the speaker answers at once), so nothing is unread when it closes.
+Optionally on the speaker: read what is pending before closing.
 
 ## Part B: UI/UX redesign (from the roadmap)
 
@@ -224,6 +234,11 @@ API in use (`NIF_INFO`); keep that API.
 | 7 | B2 mirror, one-page connect, settings list, states, keyboard, screenshots | 1–1½ days |
 | 8 | B5 icon artwork, B7 installer and its images | ½ day |
 | 9 | A9 relay copies | 1 h |
+| 10 | A13 wait for a refusal after hello | 1 h |
+
+Measured after step 1 (2026-11-28, `meowbox.exe run --no-relay` against `mock_speaker.py`, scratch profile, idle,
+30 s after a 10 s warm-up, two runs each): 0.3.0 0.42 / 0.47 % of one core, 7.7–8.2 MB private; step 1 0.62 / 0.42 %,
+8.5–8.6 MB private. The difference is within the noise; the tray icon (A1) is not in `run`.
 
 After each step: `cargo test`, `cargo clippy --all-targets -- -D warnings`, the CPU/memory measurement above (connected,
 idle, 30 s) written into this file, and for B steps screenshots through UI Automation in a scratch profile.

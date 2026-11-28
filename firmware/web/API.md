@@ -191,7 +191,7 @@ Bearer <notify token>`), a web session also works, so the PC agent can reopen it
 ### `PUT /api/config/radio`
 `{"st":[...]}` (full list, same item shape) and/or `{"vol":40}`. → same shape as GET.
 Alarms that reference a deleted station fall back to `chime`. A station whose `url` does not start with `http://` or
-`https://` → `400 bad_value` (nothing saved).
+`https://`, or without a numeric `id`, → `400 bad_value` (nothing saved).
 
 ### `POST /api/radio/play`
 One command per call:

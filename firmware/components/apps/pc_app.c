@@ -168,7 +168,13 @@ static void refuse(int fd, const char *msg)
  * reconnecting; then the old one gets the busy message instead. */
 static bool admit(httpd_req_t *req, int fd, cJSON *j)
 {
-    if (req->sess_ctx == PC_MARK(fd)) return fd == s_fd; /* authenticated: acted on while it holds the slot */
+    if (req->sess_ctx == PC_MARK(fd)) { /* authenticated: acted on while it holds the slot */
+        if (fd == s_fd) return true;
+        /* it lost the slot (15 s silent, e.g. a Wi-Fi drop the TCP link survived): close it, or the agent, still
+         * getting pongs, would keep sending into the void and never reconnect */
+        httpd_sess_trigger_close(web_server(), fd);
+        return false;
+    }
     const char *t = cJSON_GetStringValue(cJSON_GetObjectItem(j, "t"));
     if (!t || strcmp(t, "hello") != 0) {
         httpd_sess_trigger_close(web_server(), fd);
@@ -228,7 +234,8 @@ static esp_err_t ws_handler(httpd_req_t *req)
         if (s_fd == fd) lost_agent();
         return ESP_OK;
     }
-    if (f.len == 0 || f.len > 4096) return ESP_OK;
+    if (f.len == 0) return ESP_OK;
+    if (f.len > 4096) return ESP_FAIL; /* its payload would stay unread and break the next frame: close the link */
     char *buf = malloc(f.len + 1);
     if (!buf) return ESP_OK;
     f.payload = (uint8_t *)buf;

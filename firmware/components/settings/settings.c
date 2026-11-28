@@ -81,8 +81,7 @@ esp_err_t settings_write_file(const char *path, const void *data, size_t len)
         unlink(tmp);
         return ESP_FAIL;
     }
-    unlink(path);
-    return rename(tmp, path) == 0 ? ESP_OK : ESP_FAIL;
+    return rename(tmp, path) == 0 ? ESP_OK : ESP_FAIL; /* LittleFS replaces `path` in one step */
 }
 
 /* Copy keys of `src` into `dst` if the key exists in `dst` with a compatible type. */

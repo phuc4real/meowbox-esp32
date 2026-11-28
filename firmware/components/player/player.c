@@ -296,8 +296,9 @@ static void stream_loop(uint32_t gen, esp_http_client_handle_t c, int metaint)
         if (metaint && until_meta < want) want = until_meta;
         int r = esp_http_client_read(c, (char *)buf, want);
         if (r <= 0) {
-            if (esp_http_client_is_complete_data_received(c)) s_eof = true;
-            else set_err(gen, "read", 0);
+            if (esp_http_client_is_complete_data_received(c)) {
+                if (alive(gen)) s_eof = true; /* an old session's end must not end the new one */
+            } else set_err(gen, "read", 0);
             break;
         }
         rb_put(gen, buf, r);
@@ -404,7 +405,10 @@ static void hls_loop(uint32_t gen, const char *playlist_url)
             last_seq = sn;
         }
         free(txt);
-        if (endlist) { s_eof = true; break; }
+        if (endlist) {
+            if (alive(gen)) s_eof = true;
+            break;
+        }
         for (int i = 0; i < target * 5 && alive(gen); i++) vTaskDelay(pdMS_TO_TICKS(100)); /* ~half target */
     }
     free(buf);
@@ -446,6 +450,7 @@ static void fetch_task(void *arg)
         int status = 0;
         int64_t clen = 0;
         bool hls = strstr(url, ".m3u8") != NULL;
+        uint32_t rx0 = s_rx;
         if (hls) {
             hls_loop(gen, url);
         } else {
@@ -491,6 +496,7 @@ static void fetch_task(void *arg)
             }
         }
         if (s_eof || !alive(gen)) break;
+        if (s_rx - rx0 > 512 * 1024) retries = 0; /* that connection played well: count drops afresh */
         retries++;
         if (alive(gen)) s_reconn++;
         int wait = retries < 3 ? 1000 : retries < 5 ? 3000 : 8000;

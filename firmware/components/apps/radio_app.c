@@ -498,7 +498,8 @@ static void radio_cfg_hook(cJSON *doc)
     cJSON_ReplaceItemInObject(doc, "vol", cJSON_CreateNumber(audio_hw_get_volume()));
 }
 
-/* PUT /api/config/radio: every station needs an http(s) URL (the player could not open anything else) */
+/* PUT /api/config/radio: every station needs an http(s) URL (the player could not open anything else) and a
+ * numeric id (radio_play_id / radio_step read it) */
 static bool radio_put_hook(cJSON *body)
 {
     cJSON *st = cJSON_GetObjectItem(body, "st"), *it;
@@ -506,6 +507,7 @@ static bool radio_put_hook(cJSON *body)
     if (!cJSON_IsArray(st)) return false;
     cJSON_ArrayForEach(it, st) {
         if (!is_http_url(cJSON_GetStringValue(cJSON_GetObjectItem(it, "url")))) return false;
+        if (!cJSON_IsNumber(cJSON_GetObjectItem(it, "id"))) return false;
     }
     return true;
 }

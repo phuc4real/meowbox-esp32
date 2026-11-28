@@ -100,6 +100,8 @@ try:
     check("radio put dup id -> 400", req("PUT", "/api/config/radio", {"st": st + [st[0]]})[0] == 400)
     bad = dict(st[0], id=999, url="ftp://ice.example/live.mp3")
     check("radio put non-http url -> 400", req("PUT", "/api/config/radio", {"st": st + [bad]})[0] == 400)
+    no_id = {k: v for k, v in st[0].items() if k != "id"}
+    check("radio put station without id -> 400", req("PUT", "/api/config/radio", {"st": st + [no_id]})[0] == 400)
     for b in ({"cmd": "play", "id": 9}, {"cmd": "play"}, {"cmd": "play", "url": "http://a/b", "name": "P"},
               {"cmd": "next"}, {"cmd": "prev"}, {"cmd": "vol", "vol": 55}, {"cmd": "stop"}):
         c, j = req("POST", "/api/radio/play", b)

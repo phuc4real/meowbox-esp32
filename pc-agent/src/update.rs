@@ -17,21 +17,36 @@ fn num(v: &str) -> (u64, u64, u64) {
     (out[0], out[1], out[2])
 }
 
-/// Tag of the latest (non-draft, non-prerelease) release without the "v", e.g. "0.3.1"; None on any error.
+/// The newest agent on GitHub: the tag without the "v" (e.g. "0.3.1") of the latest release, not a draft or a
+/// prerelease, that carries the agent's installer (a firmware-only release is no new agent); None on any error.
 pub async fn latest_version() -> Option<String> {
-    let url = format!("https://api.github.com/repos/{}/releases/latest", crate::REPO);
+    let url = format!("https://api.github.com/repos/{}/releases?per_page=20", crate::REPO);
     match crate::tools::github_json(&url, Duration::from_secs(8)).await {
-        Ok(j) => j
-            .get("tag_name")
-            .and_then(|t| t.as_str())
-            .map(|t| t.trim_start_matches('v').to_owned())
-            .filter(|t| valid_version(t)),
+        Ok(j) => newest_agent(&j),
         Err(e) => {
             // offline, rate limit, no release yet: stay quiet
             tracing::debug!("update check failed: {e}");
             None
         }
     }
+}
+
+/// The first published release in a GitHub release list (newest first) that has the agent's installer.
+fn newest_agent(list: &serde_json::Value) -> Option<String> {
+    let published = |r: &&serde_json::Value| {
+        !r.get("draft").and_then(|v| v.as_bool()).unwrap_or(false)
+            && !r.get("prerelease").and_then(|v| v.as_bool()).unwrap_or(false)
+    };
+    list.as_array()?.iter().filter(published).find_map(agent_release)
+}
+
+/// The version of a GitHub release JSON when it has `MeowBoxAgent-Setup-<version>.exe` among its assets.
+fn agent_release(j: &serde_json::Value) -> Option<String> {
+    let v = j.get("tag_name")?.as_str()?.trim_start_matches('v').to_owned();
+    let want = format!("MeowBoxAgent-Setup-{v}.exe");
+    let assets = j.get("assets")?.as_array()?;
+    let has = assets.iter().any(|a| a.get("name").and_then(|n| n.as_str()) == Some(want.as_str()));
+    (valid_version(&v) && has).then_some(v)
 }
 
 pub fn newer_than(v: &str, running: &str) -> bool {
@@ -82,6 +97,25 @@ pub async fn download_installer(v: &str) -> anyhow::Result<std::path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_a_release_with_the_installer_is_a_new_agent() {
+        let rel = |tag: &str, files: &[&str]| {
+            let assets: Vec<_> = files.iter().map(|f| serde_json::json!({ "name": f })).collect();
+            serde_json::json!({ "tag_name": tag, "assets": assets })
+        };
+        let with = rel("v0.3.2", &["meowbox-0.3.2.bin", "MeowBoxAgent-Setup-0.3.2.exe", "SHA2-256SUMS"]);
+        assert_eq!(agent_release(&with), Some("0.3.2".into()));
+        assert_eq!(agent_release(&rel("v0.3.2", &["meowbox-0.3.2.bin", "SHA2-256SUMS"])), None, "firmware only");
+        assert_eq!(agent_release(&rel("v0.3.2", &["MeowBoxAgent-Setup-0.3.1.exe"])), None, "another version's");
+        assert_eq!(agent_release(&serde_json::json!({ "tag_name": "v0.3.2" })), None);
+        // newest first: a firmware-only 0.3.3 and a draft 0.3.4 are skipped, 0.3.2 is the newest agent
+        let mut draft = rel("v0.3.4", &["MeowBoxAgent-Setup-0.3.4.exe"]);
+        draft["draft"] = serde_json::json!(true);
+        let list = serde_json::json!([draft, rel("v0.3.3", &["meowbox-0.3.3.bin"]), with]);
+        assert_eq!(newest_agent(&list), Some("0.3.2".into()));
+        assert_eq!(newest_agent(&serde_json::json!({ "message": "rate limited" })), None);
+    }
 
     #[test]
     fn versions() {

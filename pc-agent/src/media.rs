@@ -115,6 +115,14 @@ impl<T> Retrying<T> {
     }
 }
 
+/// Titles are cut to what the speaker can show (it keeps 96 / 64 bytes) with room to spare: the speaker drops a
+/// `/ws/pc` frame over 4 KB, and a page title can be any length.
+const MEDIA_TEXT_MAX: usize = 200;
+
+fn clip(s: &str) -> String {
+    s.chars().take(MEDIA_TEXT_MAX).collect()
+}
+
 fn empty() -> Value {
     json!({"t": "media", "app": "", "title": "", "artist": "", "state": "stopped", "pos": 0, "len": 0})
 }
@@ -242,8 +250,8 @@ impl Media {
         let pos = if len > 0.0 { pos.min(len) } else { pos };
         let aumid = s.SourceAppUserModelId()?.to_string();
         Ok(Some(json!({
-            "t": "media", "app": app_name(&aumid), "title": props.Title()?.to_string(),
-            "artist": props.Artist()?.to_string(), "state": state,
+            "t": "media", "app": app_name(&aumid), "title": clip(&props.Title()?.to_string()),
+            "artist": clip(&props.Artist()?.to_string()), "state": state,
             "pos": crate::json::round(pos), "len": crate::json::round(len),
         })))
     }
@@ -374,6 +382,13 @@ mod tests {
         let t = Instant::now();
         m.changed(Duration::from_millis(200)).await;
         assert!(t.elapsed() < Duration::from_secs(2));
+    }
+
+    #[test]
+    fn long_titles_are_cut() {
+        let long = "Bài hát ".repeat(100);
+        assert_eq!(clip(&long).chars().count(), MEDIA_TEXT_MAX);
+        assert_eq!(clip("short"), "short");
     }
 
     #[tokio::test]

@@ -1,5 +1,5 @@
 ﻿; Inno Setup 6 script for MeowBox Agent (docs/firmware_v0.2.0.md, 2.11). Built by build.ps1:
-;   iscc /DAppVersion=0.3.0 MeowBoxAgent.iss   ->  build\MeowBoxAgent-Setup-0.3.0.exe
+;   iscc /DAppVersion=0.3.1 MeowBoxAgent.iss   ->  build\MeowBoxAgent-Setup-0.3.1.exe
 ; Two exes from `cargo build --release`: MeowBoxAgent.exe (tray) and meowbox.exe (command line).
 ; Installs for the whole machine (Program Files, admin) so it can add the firewall rules itself.
 

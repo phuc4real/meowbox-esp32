@@ -1,6 +1,6 @@
 # PC agent: enhancements after 0.3.0
 
-Status (2026-11-28): parts A and B done, not released yet. Everything here ships as **0.3.1**, together with the tray fix and the
+Status (2026-11-28): parts A and B done, shipped in 0.3.1. Everything here ships as **0.3.1**, together with the tray fix and the
 GPU stats already on `main`. Two parts: **A**, the engine (what the agent does every second, found by
 a review of the Rust code after 0.3.0) and **B**, the UI/UX redesign parked in `docs/roadmap.md` ("PC agent UI/UX",
 written for the Python/tkinter agent, updated here for Rust/egui). The agent no longer has to mirror the Python one:

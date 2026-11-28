@@ -129,10 +129,11 @@ chủ chuyển mã luồng nhạc như trên.
 
 ---
 
-## PC agent UI/UX
+## PC agent UI/UX — done in 0.3.1
 
-Planned in [enhance_agent.md](enhance_agent.md) (part B), updated for the Rust/egui agent of 0.3.0; the list below is
-the original note.
+Done in 0.3.1 as planned in [enhance_agent.md](enhance_agent.md) (part B): the window in the speaker's theme with a
+mirror of its Computer screen, the one-page connect check, English, the tray icon's eyes, toasts, the installer. The
+list below is the original note.
 
 ### Why
 v0.2.0 focuses on what the agent does (discovery, relay, installer, updates). Its windows and menus are plain

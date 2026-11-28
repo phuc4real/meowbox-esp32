@@ -114,6 +114,10 @@ python -m esptool --port COM10 -b 921600 write-flash 0 backup\speaker_full_16MB.
       asked before first use and each speaker has its own setup-hotspot password; every sound is a cat; the screen stays
       on while charging; the effects saver turns off the same decorations on the speaker and the web page; swiping
       at ~26 FPS with the radio playing
+- [x] 0.3.1: the PC agent's window wears the speaker's theme (light or dark as Windows is) with a mirror of its
+      Computer screen, checks the connection in three rows that say what to fix, speaks English too, and its tray cat
+      shows the state with its eyes; GPU load and temperature for any GPU with no extra app; fewer, more useful toasts;
+      a Vietnamese installer; the radio keeps reconnecting through a long day of dropped connections
 - [ ] Open items in [docs/backlog.md](docs/backlog.md): 24 h soak and hands-on checklist, update edge cases
       (rollback, Wi-Fi lost while downloading), internal RAM back over 40 KB, battery calibration, swipe FPS in Brutalism,
       mini game, which "free" GPIOs reach pads

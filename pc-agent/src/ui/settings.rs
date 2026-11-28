@@ -84,12 +84,18 @@ impl Settings {
         }
         poll(&mut self.ff_task, |r| self.ff = Some(r));
         if self.ff.as_ref().is_some_and(|(_, s)| s.busy) && self.ff_task.is_none() {
-            // download running: refresh the percentage every second
+            // download running: refresh the percentage every second; the version (it runs ffmpeg) only once done
             let ctx = ui.ctx().clone();
+            let before = self.ff.as_ref().and_then(|(v, _)| v.clone());
             self.ff_task = Some(Task::spawn(core, ui.ctx(), async move {
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 ctx.request_repaint();
-                blocking(|| (ffmpeg::version(), ffmpeg::status())).await.unwrap_or_default()
+                blocking(move || {
+                    let st = ffmpeg::status();
+                    (if st.busy { before } else { ffmpeg::version() }, st)
+                })
+                .await
+                .unwrap_or_default()
             }));
         }
         if self.ff_installing && self.ff.as_ref().is_some_and(|(_, s)| !s.busy) && self.ff_task.is_none() {

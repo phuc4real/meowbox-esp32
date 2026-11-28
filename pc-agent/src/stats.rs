@@ -1,11 +1,9 @@
 //! PC stats for the speaker's stats tile: CPU, RAM, disk, network from sysinfo; GPU load and GPU temperature from
-//! Windows itself (gpu.rs, any vendor), overridden by nvidia-smi on an NVIDIA card (it ships with the driver). No
-//! third-party app: `cpu_temp` is always null, as Windows has no API for it without a kernel driver; the speaker then
+//! Windows itself (gpu.rs, any vendor). No third-party app: `cpu_temp` is always null, as Windows has no API for it without a kernel driver; the speaker then
 //! shows the GPU temperature.
 
 use crate::json::round;
 use serde_json::{Map, Value, json};
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use sysinfo::{CpuRefreshKind, Disks, MemoryRefreshKind, Networks, RefreshKind, System};
 
@@ -18,7 +16,6 @@ pub struct Stats {
     sent: u64,
     recv: u64,
     t: Instant,
-    nvsmi: Option<PathBuf>,
     gpu: Option<crate::gpu::GpuLoad>,
     gpu_temp: crate::gpu::GpuTemp,
     /// Slow values, read again only every DISK_EVERY / GPU_TEMP_EVERY: (when, value).
@@ -47,12 +44,6 @@ fn net_totals(nets: &Option<Networks>) -> (u64, u64) {
         .fold((0, 0), |(s, r), (_, d)| (s + d.total_transmitted(), r + d.total_received()))
 }
 
-/// First `name.exe` on PATH (like shutil.which).
-pub fn which(name: &str) -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
-    std::env::split_paths(&path).map(|d| d.join(format!("{name}.exe"))).find(|p| p.is_file())
-}
-
 impl Default for Stats {
     fn default() -> Self {
         Self::new()
@@ -78,7 +69,6 @@ impl Stats {
             sent,
             recv,
             t: Instant::now(),
-            nvsmi: which("nvidia-smi"),
             gpu: crate::gpu::GpuLoad::open(),
             gpu_temp: crate::gpu::GpuTemp::default(),
             disk_last: None,
@@ -86,32 +76,8 @@ impl Stats {
         }
     }
 
-    async fn nvidia(&self) -> Map<String, Value> {
-        let Some(exe) = &self.nvsmi else { return Map::new() };
-        let mut cmd = tokio::process::Command::new(exe);
-        cmd.args(["--query-gpu=utilization.gpu,temperature.gpu", "--format=csv,noheader,nounits"])
-            .stdin(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .kill_on_drop(true)
-            .creation_flags(crate::win::CREATE_NO_WINDOW);
-        let Ok(Ok(out)) = tokio::time::timeout(Duration::from_secs(3), cmd.output()).await else {
-            return Map::new();
-        };
-        let text = String::from_utf8_lossy(&out.stdout);
-        let mut vals = text.lines().next().unwrap_or("").split(',').map(|x| x.trim().parse::<f64>());
-        match (vals.next(), vals.next()) {
-            (Some(Ok(load)), Some(Ok(temp))) => {
-                let mut m = Map::new();
-                m.insert("gpu".into(), json!(load));
-                m.insert("gpu_temp".into(), json!(temp));
-                m
-            }
-            _ => Map::new(),
-        }
-    }
-
     /// One `stats` message; rates are per second since the previous call.
-    pub async fn sample(&mut self) -> Value {
+    pub fn sample(&mut self) -> Value {
         let (mut cpu, mut ram) = (0.0, 0.0);
         if let Some(sys) = self.sys.as_mut() {
             sys.refresh_cpu_usage();
@@ -147,18 +113,12 @@ impl Stats {
         msg.insert("net_down".into(), json!(round(recv.saturating_sub(self.recv) as f64 / 1024.0 / dt)));
         msg.insert("disk".into(), json!(round(disk)));
         (self.sent, self.recv, self.t) = (sent, recv, now);
-        // Windows' own numbers first, nvidia-smi overrides them
         if let Some(v) = self.gpu.as_mut().and_then(|g| g.sample()) {
             msg.insert("gpu".into(), json!(round(v)));
         }
         let temp = &mut self.gpu_temp;
         if let Some(t) = cached(&mut self.gpu_temp_last, now, GPU_TEMP_EVERY, || temp.read()) {
             msg.insert("gpu_temp".into(), json!(round(t)));
-        }
-        for (k, v) in self.nvidia().await {
-            if let Some(x) = v.as_f64() {
-                msg.insert(k, json!(round(x)));
-            }
         }
         Value::Object(msg)
     }
@@ -180,9 +140,8 @@ mod tests {
     #[tokio::test]
     async fn sample_has_every_field() {
         let mut s = Stats::new();
-        s.nvsmi = None;
         tokio::time::sleep(Duration::from_millis(250)).await;
-        let m = s.sample().await;
+        let m = s.sample();
         for k in ["t", "cpu", "ram", "gpu", "cpu_temp", "gpu_temp", "net_up", "net_down", "disk"] {
             assert!(m.get(k).is_some(), "{k}");
         }

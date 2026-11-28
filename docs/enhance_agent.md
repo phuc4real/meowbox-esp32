@@ -18,7 +18,7 @@ change draws the cat again (tiny-skia), makes a new `HICON` and calls `Shell_Not
 colour (three cached icons, rebuilt only when the DPI-dependent size changes) and update the tooltip alone with
 `NIF_TIP`. Test: a unit test that `refresh()` with only `retry_in` changing does not call `make_icon` (count calls).
 
-### A2. nvidia-smi started every second on NVIDIA PCs — do
+### A2. nvidia-smi started every second on NVIDIA PCs — done
 `stats.rs` `nvidia()`: a new process per sample (tens of ms of CPU, up to 3 s timeout) that also delays the media
 message sent after it. Windows now gives GPU load and temperature for any vendor (`gpu.rs`). Drop nvidia-smi
 entirely (decided 2026-11-28): remove `nvidia()`, the `nvsmi` field and `which()` if nothing else uses it, and the
@@ -35,7 +35,7 @@ user agent, system proxy). No behaviour change.
 `None` for good (e.g. at logon, before the service is up): the media tile stays empty. Fix: on failure, retry at most
 every 30 s. Test: inject a failing factory, then a working one.
 
-### A5. Media by events instead of polling every second — do (largest item, ~½ day)
+### A5. Media by events instead of polling every second — done
 The sender asks GSMTC for properties, timeline and playback info every second. Subscribe instead:
 `CurrentSessionChanged` on the manager, `MediaPropertiesChanged` / `PlaybackInfoChanged` / `TimelinePropertiesChanged`
 on the session; send `media` when they fire, plus every 5 s while playing (the speaker extrapolates `pos`). Gains:
@@ -55,35 +55,39 @@ and keep the adapter list; reopen only if a query fails (driver update, eGPU unp
 once and take the typed one if both answer (same preference as now). Shortens reconnects after the speaker's IP
 changed.
 
-### A9. Relay copies — small
+### A9. Relay copies — done
 `relay/mod.rs` allocates a new 16 KB buffer per read; `mp4adts.rs` copies each AAC frame once more (`take().to_vec()`
 then into the output). Reuse one read buffer, write frames straight from the input buffer. Covered by the existing
 byte-for-byte fixture tests.
 
-### A10. Settings page starts `ffmpeg -version` every second while downloading — small
+### A10. Settings page starts `ffmpeg -version` every second while downloading — done
 `ui/settings.rs`: the 1 s refresh during a download reads the version too. Read only the status (percentage) then, and
-the version once when the download ends.
+the version once when the download ends. Done: while busy the 1 s refresh reads only the status and keeps the version it had.
 
-### A11. Binary size — small
+### A11. Binary size — done
 `reqwest` features `http2` and `charset` are not needed (the speaker and GitHub work over HTTP/1.1, all bodies are
 UTF-8 JSON or bytes). Drop them; measure both exes before and after. Also try `opt-level = "z"` for `meowbox.exe` only
 if it saves more than 0.5 MB (profile per binary is not possible in one package: measure first, decide then).
+Result: without `http2` and `charset`, `MeowBoxAgent.exe` 9 929 728 → 9 317 376 bytes, `meowbox.exe` 4 706 816 →
+4 097 536 (−0.6 MB each). `opt-level = "z"` would save `meowbox.exe` only 0.42 MB more (and `MeowBoxAgent.exe`
+0.13 MB): below the bar, `"s"` stays.
 
-### A12. Python-parity leftovers — tidy
+### A12. Python-parity leftovers — done
 Now that the Python agent is gone: `json::round` (half-to-even like Python's `round`) can be a plain round; the
 "no command means `run`" argv rewrite (`cli::with_default_command`) and `meowbox tray` can go (the installer starts
 `MeowBoxAgent.exe`, nobody types `agent.py --no-relay` any more). Keep the repeated-key refusal on `/ws/pc`: it is a
 safety check, not parity.
 
-### A13. A refusal can be lost before the agent reads it — do
+### A13. A refusal can be lost before the agent reads it — done
 The agent sends `coding`, `stats` and `media` right after `hello`, before the speaker has answered. When the speaker
 refuses (`busy`, `auth`, `proto`) it sends the answer and closes (`pc_app.c` `refuse()`); closing with the agent's
 messages still unread makes lwIP reset the connection, and the reset can drop the answer before the agent reads it.
 The agent then sees a plain disconnect and retries every second instead of showing "busy" or "wrong token". The fake
-speaker in `tests/link.rs` had the same race (`wrong_token_and_busy` failed about 1 run in 3, also on 0.3.0); it now
-closes like a well-behaved peer, which hides the problem in tests. Fix on the agent side: after `hello`, wait up to
-~300 ms for a refusal before sending anything else (the speaker answers at once), so nothing is unread when it closes.
-Optionally on the speaker: read what is pending before closing.
+speaker in `tests/link.rs` had the same race (`wrong_token_and_busy` failed about 1 run in 3, also on 0.3.0). Fix on
+the agent side: after `hello`, wait up to 300 ms (`REFUSAL_WAIT`) for a refusal before sending anything else (the
+speaker answers at once), so nothing is unread when it closes. The fake still drops the socket at once like the
+speaker, so the test now guards the fix (10 runs out of 10 pass). Optionally on the speaker: read what is pending
+before closing.
 
 ## Part B: UI/UX redesign (from the roadmap)
 
@@ -239,6 +243,11 @@ API in use (`NIF_INFO`); keep that API.
 Measured after step 1 (2026-11-28, `meowbox.exe run --no-relay` against `mock_speaker.py`, scratch profile, idle,
 30 s after a 10 s warm-up, two runs each): 0.3.0 0.42 / 0.47 % of one core, 7.7–8.2 MB private; step 1 0.62 / 0.42 %,
 8.5–8.6 MB private. The difference is within the noise; the tray icon (A1) is not in `run`.
+
+Measured after all of part A (same setup, three runs each, against a build of `176b042`, the first with Windows' GPU
+counters; the installed 0.3.0 reads no GPU at all, so it is not a fair base): `176b042` 0.68 / 0.36 / 0.47 % of one
+core, 8.0–8.1 MB private; part A 0.31 / 0.47 / 0.31 %, 7.8–7.9 MB private. About a quarter less CPU, within a noisy
+measurement. `media` messages with nothing playing: one every 5 s, as before.
 
 After each step: `cargo test`, `cargo clippy --all-targets -- -D warnings`, the CPU/memory measurement above (connected,
 idle, 30 s) written into this file, and for B steps screenshots through UI Automation in a scratch profile.

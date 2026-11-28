@@ -230,6 +230,8 @@ struct Stream {
     _children: Vec<tokio::process::Child>,
     src: ChildStdout,
     convert: Convert,
+    /// One read buffer for the whole stream.
+    buf: Vec<u8>,
     title: String,
     how: String,
     sent: u64,
@@ -238,13 +240,12 @@ struct Stream {
 impl Stream {
     /// Next converted bytes; Ok(None) at the end.
     async fn next(&mut self) -> Result<Option<Vec<u8>>, mp4adts::Unsupported> {
-        let mut buf = vec![0u8; 16384];
         loop {
-            let n = self.src.read(&mut buf).await.unwrap_or(0);
+            let n = self.src.read(&mut self.buf).await.unwrap_or(0);
             if n == 0 {
                 return Ok(None);
             }
-            let out = self.convert.feed(&buf[..n])?;
+            let out = self.convert.feed(&self.buf[..n])?;
             if !out.is_empty() {
                 return Ok(Some(out));
             }
@@ -364,6 +365,7 @@ async fn yt_stream(State(ctx): State<Ctx>, ConnectInfo(addr): ConnectInfo<Socket
         _children: std::mem::take(&mut children),
         src,
         convert,
+        buf: vec![0u8; 16384],
         title,
         how,
         sent: 0,

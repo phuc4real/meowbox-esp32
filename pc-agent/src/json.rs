@@ -68,9 +68,9 @@ pub fn compact(v: &Value) -> String {
     v.to_string()
 }
 
-/// Python's round(): halves to even, so stats round the same way as the Python agent did.
+/// Nearest whole number (halves away from zero), for the numbers the speaker shows.
 pub fn round(x: f64) -> i64 {
-    x.round_ties_even() as i64
+    x.round() as i64
 }
 
 #[cfg(test)]
@@ -92,7 +92,7 @@ mod tests {
     }
 
     #[test]
-    fn rounds_like_python() {
-        assert_eq!((round(2.5), round(3.5), round(-0.5), round(2.6)), (2, 4, 0, 3));
+    fn rounds_to_nearest() {
+        assert_eq!((round(2.5), round(3.4), round(-0.4), round(2.6)), (3, 3, 0, 3));
     }
 }

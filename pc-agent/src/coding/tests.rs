@@ -80,8 +80,8 @@ fn status_line_like_python() {
     assert_eq!(tr.status(&json!({})), "=^.^= MeowBox");
     let ev = json!({"rate_limits": {"five_hour": {"used_percentage": 72.5, "resets_at": 1764000000},
                                     "seven_day": {"utilization": 12}}});
-    assert_eq!(tr.status(&ev), "=o.o= MeowBox · 5h 72% · 7d 12%");
-    assert_eq!(Value::Object(tr.limits_msg()), json!({"h5": 72, "h5r": 1764000000, "d7": 12}));
+    assert_eq!(tr.status(&ev), "=o.o= MeowBox · 5h 73% · 7d 12%");
+    assert_eq!(Value::Object(tr.limits_msg()), json!({"h5": 73, "h5r": 1764000000, "d7": 12}));
     assert_eq!(tr.status(&json!({"rate_limits": {"five_hour": {"used_percentage": 95}}})), "=x.x= MeowBox · 5h 95%");
     assert_eq!(Value::Object(tr.limits_msg()), json!({"h5": 95}));
 }

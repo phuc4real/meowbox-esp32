@@ -1,6 +1,5 @@
-//! Command line (meowbox.exe), as cli.py: run / tray / notify / say / wifi-setup / tools / coding / config.
-//! With no command it runs the headless agent; options without a command also mean `run` (the old
-//! `agent.py --no-relay` habit).
+//! Command line (meowbox.exe): run / notify / say / wifi-setup / tools / coding / config. With no command it runs
+//! the headless agent.
 
 use crate::config::{Config, SharedConfig};
 use crate::state::SharedState;
@@ -24,8 +23,6 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Cmd {
-    /// icon ở khay hệ thống (mặc định của MeowBoxAgent.exe)
-    Tray,
     /// chạy agent không có giao diện
     Run {
         /// không mở YouTube relay
@@ -126,31 +123,6 @@ fn enum_name<T: ValueEnum>(v: T) -> String {
     v.to_possible_value().map(|p| p.get_name().to_owned()).unwrap_or_default()
 }
 
-const SUBCOMMANDS: &[&str] = &["tray", "run", "notify", "say", "wifi-setup", "tools", "coding", "config", "help"];
-
-/// Insert `run` where the command would be when none is given (global options may come first).
-pub fn with_default_command(argv: Vec<String>) -> Vec<String> {
-    let mut i = 1;
-    while i < argv.len() {
-        let a = argv[i].as_str();
-        if SUBCOMMANDS.contains(&a) || a == "-h" || a == "--help" || a == "-V" || a == "--version" {
-            return argv;
-        }
-        if (a == "--config" || a == "--host") && i + 1 < argv.len() {
-            i += 2;
-            continue;
-        }
-        if a == "-v" || a == "--verbose" || a.starts_with("--config=") || a.starts_with("--host=") {
-            i += 1;
-            continue;
-        }
-        break; // first token that is neither a global option nor a command: `run` goes here
-    }
-    let mut out = argv;
-    out.insert(i.min(out.len()), "run".into());
-    out
-}
-
 fn fail(msg: impl std::fmt::Display, code: i32) -> ! {
     eprintln!("{msg}");
     std::process::exit(code)
@@ -181,20 +153,13 @@ fn rt() -> tokio::runtime::Runtime {
 }
 
 pub fn main() {
-    let cli = Cli::parse_from(with_default_command(std::env::args().collect()));
+    let cli = Cli::parse();
     crate::log::setup(cli.verbose, false, &crate::app_dir());
     let path = cli.config.clone().unwrap_or_else(crate::config_path);
     let mut cfg = Config::load(&path);
     let cmd = cli.cmd.unwrap_or(Cmd::Run { no_relay: false, no_update: false });
 
     match cmd {
-        Cmd::Tray => {
-            let exe = crate::win::tray_exe();
-            if let Err(e) = std::process::Command::new(&exe).spawn() {
-                fail(format!("{}: {e}", exe.display()), 1);
-            }
-            return;
-        }
         Cmd::Config { set_host, speaker, token, relay_port } => {
             if let Some(v) = set_host {
                 cfg.host = v;
@@ -332,18 +297,6 @@ mod tests {
 
     fn v(a: &[&str]) -> Vec<String> {
         a.iter().map(|s| s.to_string()).collect()
-    }
-
-    #[test]
-    fn default_command_is_run() {
-        assert_eq!(with_default_command(v(&["meowbox"])), v(&["meowbox", "run"]));
-        assert_eq!(with_default_command(v(&["meowbox", "--no-relay"])), v(&["meowbox", "run", "--no-relay"]));
-        assert_eq!(
-            with_default_command(v(&["meowbox", "--host", "1.2.3.4", "--no-relay"])),
-            v(&["meowbox", "--host", "1.2.3.4", "run", "--no-relay"])
-        );
-        assert_eq!(with_default_command(v(&["meowbox", "-v", "notify", "hi"])), v(&["meowbox", "-v", "notify", "hi"]));
-        assert_eq!(with_default_command(v(&["meowbox", "--version"])), v(&["meowbox", "--version"]));
     }
 
     #[test]

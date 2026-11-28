@@ -52,7 +52,7 @@ fn current() -> Option<PathBuf> {
 
 /// ffmpeg in PATH first (the user's own), else the one the agent downloaded.
 pub fn path() -> Option<PathBuf> {
-    crate::stats::which("ffmpeg").or_else(current).or_else(|| Some(dir().join("ffmpeg.exe")).filter(|p| p.is_file()))
+    super::which("ffmpeg").or_else(current).or_else(|| Some(dir().join("ffmpeg.exe")).filter(|p| p.is_file()))
 }
 
 pub fn version() -> Option<String> {

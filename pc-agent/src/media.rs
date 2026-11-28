@@ -1,8 +1,14 @@
 //! Now playing (Windows Global System Media Transport Controls) for the speaker's media tile, and the speaker's
 //! media buttons back: through GSMTC, falling back to media keys; volume on the default output device.
+//!
+//! The link reads the media state when Windows says it changed (`watch` subscribes to the current session's events),
+//! plus every few seconds as a resend; when subscribing fails it polls every second instead.
 
 use serde_json::{Value, json};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
+use windows::Foundation::TypedEventHandler;
 use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSession as Session, GlobalSystemMediaTransportControlsSessionManager as Manager,
 };
@@ -20,6 +26,68 @@ const VK_VOL_DOWN: u8 = 0xAE;
 #[derive(Default)]
 pub struct Media {
     mgr: tokio::sync::Mutex<Retrying<Manager>>,
+    subs: tokio::sync::Mutex<Subs>,
+    /// Woken by every event (and kept as a permit if nobody waits yet).
+    changed: Arc<tokio::sync::Notify>,
+    /// Set by CurrentSessionChanged: subscribe to the new session.
+    session_moved: Arc<AtomicBool>,
+}
+
+/// Event registrations; removed when replaced or dropped.
+#[derive(Default)]
+struct Subs {
+    mgr: Option<(Manager, i64)>,
+    session: Option<(Session, [i64; 3])>,
+}
+
+impl Subs {
+    fn drop_session(&mut self) {
+        if let Some((s, [a, b, c])) = self.session.take() {
+            let _ = s.RemoveMediaPropertiesChanged(a);
+            let _ = s.RemovePlaybackInfoChanged(b);
+            let _ = s.RemoveTimelinePropertiesChanged(c);
+        }
+    }
+}
+
+impl Drop for Subs {
+    fn drop(&mut self) {
+        self.drop_session();
+        if let Some((m, t)) = self.mgr.take() {
+            let _ = m.RemoveCurrentSessionChanged(t);
+        }
+    }
+}
+
+/// When to send a `media` message: when it changed (the position aside, the speaker moves it on by itself), else
+/// every RESEND.
+#[derive(Default)]
+pub struct MediaGate {
+    last: Option<(Value, Instant)>,
+}
+
+pub const RESEND: Duration = Duration::from_secs(5);
+
+impl MediaGate {
+    pub fn should_send(&mut self, msg: &Value, now: Instant) -> bool {
+        let mut key = msg.clone();
+        if let Some(o) = key.as_object_mut() {
+            o.remove("pos");
+        }
+        let send = match &self.last {
+            Some((k, t)) => *k != key || now.duration_since(*t) >= RESEND,
+            None => true,
+        };
+        if send {
+            self.last = Some((key, now));
+        }
+        send
+    }
+
+    /// Time left before the next resend.
+    pub fn until_resend(&self, now: Instant) -> Duration {
+        self.last.as_ref().map_or(Duration::ZERO, |(_, t)| RESEND.saturating_sub(now.duration_since(*t)))
+    }
 }
 
 /// How long a failed GSMTC start is remembered before the next try (at logon the service may not be up yet).
@@ -66,20 +134,93 @@ pub fn app_name(aumid: &str) -> &str {
 }
 
 impl Media {
-    async fn session(&self) -> Option<Session> {
+    async fn manager(&self) -> Option<Manager> {
         let mut mgr = self.mgr.lock().await;
-        let mgr = mgr
-            .get(Instant::now(), || async {
-                match Manager::RequestAsync() {
-                    Ok(op) => op.await.inspect_err(|e| tracing::debug!("media session manager: {e}")).ok(),
+        mgr.get(Instant::now(), || async {
+            match Manager::RequestAsync() {
+                Ok(op) => op.await.inspect_err(|e| tracing::debug!("media session manager: {e}")).ok(),
+                Err(e) => {
+                    tracing::debug!("media session manager: {e}");
+                    None
+                }
+            }
+        })
+        .await
+        .cloned()
+    }
+
+    async fn session(&self) -> Option<Session> {
+        self.manager().await?.GetCurrentSession().ok()
+    }
+
+    /// Make sure we hear about changes of the current session. False when that is not possible (GSMTC not up):
+    /// the caller then polls.
+    pub async fn watch(&self) -> bool {
+        let mut subs = self.subs.lock().await;
+        if subs.mgr.is_none() {
+            let Some(mgr) = self.manager().await else { return false };
+            let (n, moved) = (self.changed.clone(), self.session_moved.clone());
+            let h = TypedEventHandler::new(move |_, _| {
+                moved.store(true, Ordering::SeqCst);
+                n.notify_one();
+                Ok(())
+            });
+            match mgr.CurrentSessionChanged(&h) {
+                Ok(t) => subs.mgr = Some((mgr, t)),
+                Err(e) => {
+                    tracing::debug!("media: no session events ({e})");
+                    return false;
+                }
+            }
+            self.session_moved.store(true, Ordering::SeqCst);
+        }
+        if self.session_moved.swap(false, Ordering::SeqCst) {
+            subs.drop_session();
+            let cur = subs.mgr.as_ref().and_then(|(m, _)| m.GetCurrentSession().ok());
+            if let Some(s) = cur {
+                match self.subscribe(&s) {
+                    Ok(tokens) => subs.session = Some((s, tokens)),
                     Err(e) => {
-                        tracing::debug!("media session manager: {e}");
-                        None
+                        tracing::debug!("media: no events from this session ({e})");
+                        self.session_moved.store(true, Ordering::SeqCst); // try again next time
+                        return false;
                     }
                 }
-            })
-            .await?;
-        mgr.GetCurrentSession().ok()
+            }
+        }
+        true
+    }
+
+    fn subscribe(&self, s: &Session) -> windows::core::Result<[i64; 3]> {
+        let wake = || {
+            let n = self.changed.clone();
+            move || {
+                n.notify_one();
+                Ok(())
+            }
+        };
+        let (a, b, c) = (wake(), wake(), wake());
+        let ta = s.MediaPropertiesChanged(&TypedEventHandler::new(move |_, _| a()))?;
+        let tb = match s.PlaybackInfoChanged(&TypedEventHandler::new(move |_, _| b())) {
+            Ok(t) => t,
+            Err(e) => {
+                let _ = s.RemoveMediaPropertiesChanged(ta);
+                return Err(e);
+            }
+        };
+        match s.TimelinePropertiesChanged(&TypedEventHandler::new(move |_, _| c())) {
+            Ok(tc) => Ok([ta, tb, tc]),
+            Err(e) => {
+                let _ = s.RemoveMediaPropertiesChanged(ta);
+                let _ = s.RemovePlaybackInfoChanged(tb);
+                Err(e)
+            }
+        }
+    }
+
+    /// Wait until Windows reports a media change, at most `max`.
+    pub async fn changed(&self, max: Duration) {
+        let _ = tokio::time::timeout(max, self.changed.notified()).await;
     }
 
     async fn read_inner(&self) -> windows::core::Result<Option<Value>> {
@@ -210,6 +351,29 @@ mod tests {
         assert_eq!(r.get(t0 + RETRY_AFTER, || make(Some(7))).await, Some(&7));
         assert_eq!(r.get(t0 + RETRY_AFTER * 5, || make(Some(9))).await, Some(&7), "kept");
         assert_eq!(calls.get(), 2);
+    }
+
+    #[test]
+    fn media_is_sent_when_it_changes_or_every_resend() {
+        let mut g = MediaGate::default();
+        let t0 = Instant::now();
+        let m = |title: &str, pos: i64| json!({"t": "media", "title": title, "state": "playing", "pos": pos});
+        assert!(g.should_send(&m("a", 0), t0), "first");
+        assert!(!g.should_send(&m("a", 1), t0 + Duration::from_secs(1)), "only the position moved");
+        assert_eq!(g.until_resend(t0 + Duration::from_secs(1)), RESEND - Duration::from_secs(1));
+        assert!(g.should_send(&m("b", 1), t0 + Duration::from_secs(2)), "new track at once");
+        assert!(!g.should_send(&m("b", 3), t0 + Duration::from_secs(6)));
+        assert!(g.should_send(&m("b", 5), t0 + Duration::from_secs(2) + RESEND), "resend");
+    }
+
+    /// On this PC: watching works or says it cannot, and a change wait returns within its limit.
+    #[tokio::test]
+    async fn watch_and_wait() {
+        let m = Media::default();
+        let _ = m.watch().await;
+        let t = Instant::now();
+        m.changed(Duration::from_millis(200)).await;
+        assert!(t.elapsed() < Duration::from_secs(2));
     }
 
     #[tokio::test]

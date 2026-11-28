@@ -11,6 +11,12 @@ use tokio::io::AsyncWriteExt;
 
 pub const UA: &str = "MeowBoxAgent";
 
+/// First `name.exe` on PATH (like shutil.which).
+pub fn which(name: &str) -> Option<std::path::PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path).map(|d| d.join(format!("{name}.exe"))).find(|p| p.is_file())
+}
+
 /// HTTP client for GitHub (system proxy from the environment, unlike the LAN client). Built once, no idle
 /// connections kept, for the same reason as `discovery::lan_client`.
 pub fn web_client() -> reqwest::Client {

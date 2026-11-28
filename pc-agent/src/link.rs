@@ -420,6 +420,41 @@ pub fn parse_incoming(text: &str) -> Option<Incoming> {
     })
 }
 
+/// How long a refusal (busy/auth/proto) may take to come back after hello before we count as admitted.
+const REFUSAL_WAIT: Duration = Duration::from_millis(300);
+
+/// The speaker refused us: say why in the state; returns the seconds to wait before trying again.
+fn refused(sh: &Shared, why: Incoming) -> u64 {
+    match why {
+        Incoming::Busy(pc) => {
+            tracing::info!("speaker busy with {pc}");
+            sh.state.update(|s| {
+                s.connected = false;
+                s.error = LinkError::Busy;
+                s.busy_with = pc;
+            });
+            60
+        }
+        Incoming::Auth => {
+            tracing::warn!("speaker refused the token: open 'Connect speaker' and enter it");
+            sh.state.update(|s| {
+                s.connected = false;
+                s.error = LinkError::Token;
+            });
+            60
+        }
+        Incoming::Proto(need) => {
+            tracing::warn!("speaker needs agent protocol {need} (have {})", crate::PROTO);
+            sh.state.update(|s| {
+                s.connected = false;
+                s.error = LinkError::ProtoAgent;
+            });
+            300
+        }
+        Incoming::MediaCmd(_) | Incoming::Other => 0,
+    }
+}
+
 /// One connection. Returns seconds to wait before the next attempt (0 = the normal reconnect backoff).
 async fn session(
     sh: &Shared,
@@ -438,7 +473,22 @@ async fn session(
         tracing::warn!("connection to {} failed: {e}", sp.host);
         return 0;
     }
-    // no "welcome" message: connected unless a busy/auth/proto answer comes back right away
+    // No "welcome" message: connected unless a busy/auth/proto answer comes back right away. Send nothing else
+    // until then: the speaker closes after refusing, and closing with our messages unread makes it reset the
+    // connection, which can throw its answer away before we read it.
+    match tokio::time::timeout(REFUSAL_WAIT, stream.next()).await {
+        Err(_) => {} // nothing: admitted
+        Ok(Some(Ok(Message::Text(text)))) => match parse_incoming(&text) {
+            Some(i @ (Incoming::Busy(_) | Incoming::Auth | Incoming::Proto(_))) => return refused(sh, i),
+            Some(Incoming::MediaCmd(cmd)) => feeds.media.command(&cmd).await, // media goes out with the first loop
+            Some(Incoming::Other) | None => {}
+        },
+        Ok(Some(Ok(Message::Close(_)) | Err(_)) | None) => {
+            tracing::warn!("{} closed the connection right after hello", sp.host);
+            return 0;
+        }
+        Ok(Some(Ok(_))) => {} // ping/pong
+    }
     sh.state.update(|s| {
         s.connected = true;
         s.error = LinkError::None;
@@ -456,7 +506,8 @@ async fn session(
             }
         }
     });
-    let sender = tokio::spawn(sender(sh.clone(), tx.clone(), feeds.stats.clone(), feeds.media.clone()));
+    let sender = tokio::spawn(sender(sh.clone(), tx.clone(), feeds.stats.clone()));
+    let media_sender = tokio::spawn(media_sender(tx.clone(), feeds.media.clone()));
 
     let mut hb = tokio::time::interval(HEARTBEAT);
     hb.tick().await;
@@ -485,22 +536,8 @@ async fn session(
                     continue;
                 };
                 match parse_incoming(&text) {
-                    Some(Incoming::Busy(pc)) => {
-                        // another PC holds the speaker (or just took it over from us)
-                        tracing::info!("speaker busy with {pc}");
-                        sh.state.update(|s| { s.connected = false; s.error = LinkError::Busy; s.busy_with = pc; });
-                        break 60;
-                    }
-                    Some(Incoming::Auth) => {
-                        tracing::warn!("speaker refused the token: open 'Connect speaker' and enter it");
-                        sh.state.update(|s| { s.connected = false; s.error = LinkError::Token; });
-                        break 60;
-                    }
-                    Some(Incoming::Proto(need)) => {
-                        tracing::warn!("speaker needs agent protocol {need} (have {})", crate::PROTO);
-                        sh.state.update(|s| { s.connected = false; s.error = LinkError::ProtoAgent; });
-                        break 300;
-                    }
+                    // busy: another PC holds the speaker, or just took it over from us
+                    Some(i @ (Incoming::Busy(_) | Incoming::Auth | Incoming::Proto(_))) => break refused(sh, i),
                     Some(Incoming::MediaCmd(cmd)) => {
                         feeds.media.command(&cmd).await;
                         let m = feeds.media.read().await;
@@ -514,15 +551,29 @@ async fn session(
         }
     };
     sender.abort();
+    media_sender.abort();
     drop(tx);
     let _ = tokio::time::timeout(Duration::from_secs(1), writer).await;
     wait
 }
 
-/// Every second: Meow Coding when changed (or every 30 s), stats unless paused, media when changed (or every 5 s).
-async fn sender(sh: Shared, tx: mpsc::Sender<Message>, stats: Arc<tokio::sync::Mutex<Stats>>, media: Arc<Media>) {
-    let mut media_last: Option<Value> = None;
-    let mut media_t = Instant::now();
+/// Media when Windows says it changed (or every 5 s); every second instead when its events are not available.
+async fn media_sender(tx: mpsc::Sender<Message>, media: Arc<Media>) {
+    let mut gate = crate::media::MediaGate::default();
+    loop {
+        let events = media.watch().await;
+        let m = media.read().await;
+        let now = Instant::now();
+        if gate.should_send(&m, now) && tx.send(Message::text(compact(&m))).await.is_err() {
+            return;
+        }
+        let wait = if events { gate.until_resend(now) } else { Duration::from_secs(1) };
+        media.changed(wait.max(Duration::from_millis(50))).await;
+    }
+}
+
+/// Every second: Meow Coding when changed (or every 30 s), stats unless paused.
+async fn sender(sh: Shared, tx: mpsc::Sender<Message>, stats: Arc<tokio::sync::Mutex<Stats>>) {
     let mut code_last: Option<(Vec<Value>, Map<String, Value>)> = None;
     let mut code_t = Instant::now();
     let send = |v: Value| {
@@ -557,22 +608,10 @@ async fn sender(sh: Shared, tx: mpsc::Sender<Message>, stats: Arc<tokio::sync::M
             code_t = Instant::now();
         }
         if !sh.cfg.get().paused {
-            let m = stats.lock().await.sample().await;
+            let m = stats.lock().await.sample();
             if !send(m).await {
                 return;
             }
-        }
-        let m = media.read().await;
-        let mut key = m.clone();
-        if let Some(o) = key.as_object_mut() {
-            o.remove("pos");
-        }
-        if media_last.as_ref() != Some(&key) || media_t.elapsed() >= Duration::from_secs(5) {
-            if !send(m).await {
-                return;
-            }
-            media_last = Some(key);
-            media_t = Instant::now();
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }

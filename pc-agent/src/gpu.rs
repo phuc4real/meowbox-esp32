@@ -3,8 +3,6 @@
 //!   is the GPU's load, as Task Manager shows it;
 //! - temperature: what the display driver reports through D3DKMT (ADAPTERPERFDATA), where Task Manager gets the GPU
 //!   temperature of a dedicated card. Integrated GPUs usually report none (0), then it stays unknown.
-//!
-//! On an NVIDIA card, nvidia-smi (it ships with the driver) still overrides these (stats.rs).
 
 use std::collections::HashMap;
 use windows::Wdk::Graphics::Direct3D::{

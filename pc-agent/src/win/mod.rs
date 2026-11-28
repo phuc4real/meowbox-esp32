@@ -14,7 +14,7 @@ use windows::core::{HSTRING, PCWSTR, w};
 
 pub use net::{allow_relay_on_this_network, local_ip_towards, network_category, wifi_name};
 
-/// Process creation flag: no console window for child processes (netsh, nvidia-smi, yt-dlp, ffmpeg).
+/// Process creation flag: no console window for child processes (netsh, yt-dlp, ffmpeg).
 pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";

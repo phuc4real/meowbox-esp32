@@ -101,7 +101,6 @@ meowbox tools status                         # yt-dlp and ffmpeg versions (updat
 meowbox config --set-host 192.168.1.50      # speaker IP (System tile)
 meowbox config --token <token> --speaker MeowBox-1A2B
 meowbox run                                  # the agent without a tray icon, --no-relay, --no-update
-meowbox tray                                 # starts MeowBoxAgent.exe
 ```
 
 `--config <file>` and `--host IP[:port]` work with every command; `-v` logs more.
@@ -110,8 +109,7 @@ meowbox tray                                 # starts MeowBoxAgent.exe
 Add voices*, add Vietnamese.
 
 GPU load and GPU temperature come from Windows itself, for any GPU (the "GPU Engine" counters and the display
-driver's report, as in Task Manager; some GPUs report no temperature). With an NVIDIA card the agent also reads
-`nvidia-smi`, which comes with the driver. Nothing else to install. There is no CPU temperature: Windows has no API
+driver's report, as in Task Manager; some GPUs report no temperature). Nothing else to install. There is no CPU temperature: Windows has no API
 for it without a kernel driver, so the speaker's temperature gauge shows the GPU's.
 
 ## Build from source

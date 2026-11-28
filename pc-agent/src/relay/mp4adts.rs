@@ -144,10 +144,13 @@ impl Mp4ToAdts {
         &self.buf[s..s + n]
     }
 
-    fn adts(&self, payload: &[u8], out: &mut Vec<u8>) {
+    /// The next `n` bytes as one ADTS frame into `out`, straight from the input buffer.
+    fn take_frame(&mut self, n: usize, out: &mut Vec<u8>) {
+        let s = self.head;
+        self.take(n);
         let (ot, sri, ch) = self.asc.unwrap_or((2, 4, 2));
         let profile = ot.clamp(1, 4) - 1; // 2-bit profile = object type - 1 (LC = 1); HE-AAC carries an LC base
-        let n = payload.len() + 7;
+        let n = n + 7;
         out.extend_from_slice(&[
             0xFF,
             0xF1,
@@ -157,7 +160,7 @@ impl Mp4ToAdts {
             (((n & 7) << 5) | 0x1F) as u8,
             0xFC,
         ]);
-        out.extend_from_slice(payload);
+        out.extend_from_slice(&self.buf[s..s + n - 7]);
     }
 
     fn parse_moov(&mut self, b: &[u8], hdr: usize) -> R<()> {
@@ -299,7 +302,7 @@ impl Mp4ToAdts {
             self.head = 0;
         }
         self.buf.extend_from_slice(data);
-        let mut out = Vec::new();
+        let mut out = Vec::with_capacity(data.len() + data.len() / 32); // + 7-byte headers
         loop {
             if self.in_mdat > 0 {
                 if self.fragmented || self.plain.is_empty() {
@@ -309,8 +312,7 @@ impl Mp4ToAdts {
                             break;
                         }
                         self.pending.pop_front();
-                        let frame = self.take(n as usize).to_vec();
-                        self.adts(&frame, &mut out);
+                        self.take_frame(n as usize, &mut out);
                         self.in_mdat -= n64;
                     }
                     if self.pending.is_empty() && self.in_mdat > 0 && self.avail() as u64 >= self.in_mdat {
@@ -338,8 +340,7 @@ impl Mp4ToAdts {
                         if self.avail() < n as usize {
                             return Ok(out);
                         }
-                        let frame = self.take(n as usize).to_vec();
-                        self.adts(&frame, &mut out);
+                        self.take_frame(n as usize, &mut out);
                         self.in_mdat = self.in_mdat.saturating_sub(n as u64);
                         self.plain.pop_front();
                     }

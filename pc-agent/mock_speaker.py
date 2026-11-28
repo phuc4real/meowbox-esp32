@@ -75,6 +75,10 @@ async def ping(req: web.Request) -> web.Response:
                               "proto_min": a["proto_min"], "mac": "02:00:00:00:00:01"})
 
 
+async def theme(req: web.Request) -> web.Response:
+    return web.json_response({"theme": req.app["theme"], "fonts": []})
+
+
 async def relay_test(req: web.Request) -> web.Response:
     check_token(req)
     relay = current["relay"].split("://")[-1]
@@ -134,11 +138,12 @@ def main() -> None:
     ap.add_argument("--proto-min", type=int, default=2, help="oldest agent protocol accepted")
     ap.add_argument("--quiet", action="store_true", help="don't print stats messages")
     ap.add_argument("--audio-dir", default=".")
+    ap.add_argument("--theme", default="swiss", help="what GET /api/theme answers (swiss, cyberpunk, zen, brutal)")
     a = ap.parse_args()
     app = web.Application()
     app.update(port=a.port, token=a.token, quiet=a.quiet, audio_dir=a.audio_dir, name=a.name, proto=a.proto,
-               proto_min=a.proto_min)
-    app.add_routes([web.get("/ws/pc", ws_pc), web.get("/api/ping", ping), web.post("/api/notify", notify),
+               proto_min=a.proto_min, theme=a.theme)
+    app.add_routes([web.get("/ws/pc", ws_pc), web.get("/api/ping", ping), web.get("/api/theme", theme), web.post("/api/notify", notify),
                     web.get("/api/notify", notify), web.get("/api/notify/history", notify_history),
                     web.post("/api/notify/audio", notify_audio), web.post("/api/pc/relay_test", relay_test),
                     web.get("/mock/cmd", mock_cmd)])

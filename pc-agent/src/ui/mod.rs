@@ -1,67 +1,72 @@
-//! Tray app (MeowBoxAgent.exe). Threads: the main thread runs the Win32 message loop that owns the tray icon and,
-//! when asked, an eframe window (Connect / Settings pages) that returns when closed. The core (phase 1) will run in
-//! its own tokio thread and wake the main thread through the tray's Waker.
+//! Tray app (MeowBoxAgent.exe). The main thread runs the Win32 message loop that owns the tray icon and, when asked,
+//! the one agent window (eframe, returns when closed); the core runs on its own tokio threads and wakes the main
+//! thread through the tray's Waker.
+//!
+//! The window (docs/enhance_agent.md, part B): a mirror of the speaker's Computer screen on top, then two tabs,
+//! Kết nối (three self-checking rows) and Cài đặt (one list), in the speaker's theme, light or dark as Windows is.
 
 pub mod connect;
-pub mod fonts;
 pub mod icon;
+pub mod mirror;
+pub mod notice;
 pub mod settings;
 pub mod strings;
 pub mod task;
+pub mod theme;
+#[rustfmt::skip]
+pub mod themes_gen;
 pub mod tray;
+pub mod widgets;
 
 use crate::config::Config;
 use crate::link::CoreHandle;
-use crate::state::{AgentState, LinkError};
+use crate::state::{AgentState, LinkError, ToastKind};
 use eframe::egui;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
-use strings as s;
+use std::time::{Duration, Instant};
+use strings::{f, s};
 use tray::{MenuItem, Tray, TrayEvent};
 
-/// Tray status line and dot colour, word for word as `status_line()` in the Python tray.
-pub fn status_line(st: &AgentState, cfg: &Config) -> (String, (u8, u8, u8)) {
-    let want = [st.name.as_str(), cfg.speaker.as_str()].into_iter().find(|x| !x.is_empty()).unwrap_or("MeowBox");
-    let how = match st.how.as_str() {
-        "last" => s::HOW_LAST,
-        "manual" => s::HOW_MANUAL,
-        other => other,
-    };
+/// Tray status line and icon state: what is going on and what to do, in at most ~45 characters (B3). The icon's
+/// eyes and dot repeat it; the words carry it. `ever_connected`: the speaker was connected earlier in this run, so a
+/// failed search means it was lost rather than never found.
+pub fn status_line(st: &AgentState, cfg: &Config, ever_connected: bool) -> (String, icon::State) {
+    let t = s();
     if st.connected {
-        return (format!("● Đã kết nối {} · {} ({how})", st.name, st.ip()), icon::GREEN);
+        return (f(t.st_connected, &[&st.name]), icon::State::Connected);
     }
-    let red = |t: String| (t, icon::RED);
+    let want = [st.name.as_str(), cfg.speaker.as_str()].into_iter().find(|x| !x.is_empty()).unwrap_or("MeowBox");
+    let bad = |text: String| (text, icon::State::Error);
     match st.error {
-        LinkError::Busy => return red(format!("✕ {want} đang nối với {}", st.busy_with)),
-        LinkError::Token => return red("✕ Loa cần token đúng: mở 'Kết nối loa…', bước 2".into()),
-        LinkError::ProtoAgent => {
-            return red("✕ Loa cần MeowBox Agent mới hơn: bấm 'Có bản mới' hoặc vào GitHub".into());
-        }
-        LinkError::Port => {
-            return red(format!("✕ Cổng relay {} đang bị app khác dùng: mở 'Kết nối loa…'", cfg.relay_port));
+        LinkError::Busy => return bad(f(t.st_busy, &[&want, &st.busy_with])),
+        LinkError::Token => return bad(t.st_token.into()),
+        LinkError::ProtoAgent => return bad(t.st_proto_agent.into()),
+        LinkError::ProtoSpeaker => return bad(t.st_proto_speaker.into()),
+        LinkError::Port => return bad(f(t.st_port, &[&cfg.relay_port])),
+        LinkError::NotFound if st.searching.is_empty() => {
+            if cfg.last_host.is_empty() && cfg.host.is_empty() {
+                return bad(t.st_no_ip.into());
+            }
+            let n = st.retry_in;
+            return bad(match (ever_connected, n > 0) {
+                (true, true) => f(t.st_lost_retry, &[&n]),
+                (true, false) => t.st_lost.into(),
+                (false, true) => f(t.st_not_found_retry, &[&n]),
+                (false, false) => t.st_not_found.into(),
+            });
         }
         _ => {}
     }
-    if !st.searching.is_empty() {
-        let step = if st.searching == "start" { "…" } else { st.searching.as_str() };
-        return (format!("○ Đang nối loa: {step}"), icon::GREY);
-    }
-    if st.error == LinkError::NotFound {
-        let retry = if st.retry_in > 0 { format!(" (thử lại sau {} s)", st.retry_in) } else { String::new() };
-        if cfg.last_host.is_empty() && cfg.host.is_empty() {
-            return red("✕ Chưa có IP loa: mở 'Kết nối loa…' để nhập".into());
-        }
-        return red(format!("✕ Không nối được {want}, mở 'Kết nối loa…' để kiểm tra IP{retry}"));
-    }
-    ("○ Đang nối loa…".into(), icon::GREY)
+    (t.st_searching.into(), icon::State::Connecting)
 }
 
-/// Tray icon size (px) and dot colour.
-type IconKey = (u32, (u8, u8, u8));
+/// Tray icon size (px) and state.
+type IconKey = (u32, icon::State);
 
 /// The key to draw when the icon must change, None when the one in the tray still fits.
-fn new_icon_key(current: Option<IconKey>, size: u32, color: (u8, u8, u8)) -> Option<IconKey> {
-    let key = (size, color);
+fn new_icon_key(current: Option<IconKey>, size: u32, state: icon::State) -> Option<IconKey> {
+    let key = (size, state);
     (current != Some(key)).then_some(key)
 }
 
@@ -73,63 +78,84 @@ pub enum Page {
 
 mod id {
     pub const TAKE_OVER: u32 = 1;
-    pub const OPEN_WEB: u32 = 2;
-    pub const TEST_NOTIFY: u32 = 3;
+    pub const OPEN_WINDOW: u32 = 2;
+    pub const OPEN_WEB: u32 = 3;
     pub const PAUSE: u32 = 4;
     pub const CODING: u32 = 5;
-    pub const CONNECT: u32 = 6;
-    pub const SETTINGS: u32 = 7;
-    pub const RECONNECT: u32 = 8;
-    pub const AUTOSTART: u32 = 9;
-    pub const LOG_DIR: u32 = 10;
-    pub const NEW_VERSION: u32 = 11;
-    pub const GITHUB: u32 = 12;
-    pub const ABOUT: u32 = 13;
-    pub const QUIT: u32 = 14;
+    pub const NEW_VERSION: u32 = 6;
+    pub const QUIT: u32 = 7;
+}
+
+/// A toast waiting for the main thread: from the core (throttled by kind) or answering the user's action (`None`,
+/// always shown).
+type Queued = (Option<ToastKind>, String);
+
+/// Dev overrides for screenshots (`MeowBoxAgent.exe --dev --theme zen --dark`).
+#[derive(Debug, Clone, Default)]
+pub struct DevLook {
+    pub theme: Option<String>,
+    pub dark: Option<bool>,
 }
 
 pub struct TrayApp {
     pub core: CoreHandle,
     tray: Tray,
     /// Toasts queued by other threads (shown on the next wake).
-    toasts: Arc<Mutex<VecDeque<String>>>,
+    toasts: Arc<Mutex<VecDeque<Queued>>>,
+    /// Link changes that make a toast, and the 10-minute limit per kind (B6).
+    watch: notice::Watch,
+    throttle: notice::Throttle,
     last_line: String,
-    /// Size and dot colour of the icon now in the tray: the icon is drawn again only when one of them changes.
+    /// Size and state of the icon now in the tray: it is drawn again only when one of them changes.
     icon_key: Option<IconKey>,
-    /// A page the user asked for; opened by the outer loop, or switched to if a dialog is already open.
+    /// A page the user asked for; opened by the outer loop, or switched to if the window is already open.
     open_request: Option<Page>,
+    /// Something to do in the window once it shows (a mirror button or a menu item asked for it).
+    then: Option<mirror::Act>,
+    /// The window is open: a left click on the icon brings it to the front instead.
+    dialog_open: bool,
+    focus_request: bool,
     quit: bool,
-    /// Dev check for the Phase 0 spike: open and close the dialog this many times by itself.
+    dev_look: DevLook,
+    /// Dev check: open and close the window this many times by itself.
     selftest_reopen: u32,
     pub dialogs_opened: u32,
 }
 
 impl TrayApp {
     pub fn new(core: CoreHandle) -> anyhow::Result<Self> {
+        strings::set_lang(&core.cfg().get().lang);
         let size = tray::tray_icon_size();
-        let tray = Tray::new(tray::make_icon(&icon::cat_rgba(size, Some(icon::GREY)), size), s::APP)?;
+        let st = icon::State::Connecting;
+        let tray = Tray::new(tray::make_icon(&icon::tray_rgba(st, size), size), s().app)?;
         let waker = tray.waker();
         core.on_state_change(move || waker.wake());
-        let toasts: Arc<Mutex<VecDeque<String>>> = Arc::default();
+        let toasts: Arc<Mutex<VecDeque<Queued>>> = Arc::default();
         let (q, w) = (toasts.clone(), tray.waker());
-        core.set_toast(move |text| {
-            q.lock().unwrap_or_else(|e| e.into_inner()).push_back(text);
+        core.set_toast(move |kind, text| {
+            q.lock().unwrap_or_else(|e| e.into_inner()).push_back((Some(kind), text));
             w.wake();
         });
         let mut app = Self {
             core,
             tray,
             toasts,
+            watch: notice::Watch::default(),
+            throttle: notice::Throttle::default(),
             last_line: String::new(),
-            icon_key: Some((size, icon::GREY)),
+            icon_key: Some((size, st)),
             open_request: None,
+            then: None,
+            dialog_open: false,
+            focus_request: false,
             quit: false,
+            dev_look: DevLook::default(),
             selftest_reopen: 0,
             dialogs_opened: 0,
         };
         app.refresh();
         if app.cfg().speaker.is_empty() {
-            app.open_request = Some(Page::Connect); // first run: the connect window opens by itself
+            app.open_request = Some(Page::Connect); // first run: the window opens by itself
         }
         Ok(app)
     }
@@ -142,12 +168,48 @@ impl TrayApp {
         self.core.state().get()
     }
 
-    /// A toast from any thread.
+    pub fn set_dev_look(&mut self, dev: DevLook) {
+        self.dev_look = dev;
+    }
+
+    /// A toast from any thread, answering the user's action (never throttled).
     fn toaster(&self) -> impl Fn(String) + Send + Sync + 'static {
         let (q, w) = (self.toasts.clone(), self.tray.waker());
         move |text| {
-            q.lock().unwrap_or_else(|e| e.into_inner()).push_back(text);
+            q.lock().unwrap_or_else(|e| e.into_inner()).push_back((None, text));
             w.wake();
+        }
+    }
+
+    /// The status line as the tray shows it now.
+    pub fn status(&self) -> String {
+        status_line(&self.state(), &self.cfg(), self.watch.ever_connected).0
+    }
+
+    /// Left click / "Open window": the window, or bring it to the front if it is open.
+    fn open_window(&mut self) {
+        if self.dialog_open {
+            self.focus_request = true;
+        } else {
+            self.open_request = Some(Page::Connect);
+        }
+    }
+
+    /// A toast for a link change or from the core, at most one per kind every 10 minutes; each new agent version
+    /// is announced once, also across restarts.
+    fn toast_kind(&mut self, kind: notice::Kind, text: String) {
+        if let notice::Kind::Core(ToastKind::NewVersion(v)) = &kind {
+            if self.cfg().toasted_version == *v {
+                return;
+            }
+            let v = v.clone();
+            self.core.cfg().update(|c| c.toasted_version = v);
+        }
+        if self.throttle.allow(&kind, Instant::now()) {
+            tracing::info!("tray toast {kind:?}: {text}");
+            self.tray.notify(&text, s().toast_title);
+        } else {
+            tracing::debug!("tray toast {kind:?} held back (one per 10 minutes)");
         }
     }
 
@@ -162,24 +224,30 @@ impl TrayApp {
         }
     }
 
-    /// Icon dot and tooltip follow the state.
+    /// Icon and tooltip follow the state; link changes that matter make a toast.
     fn refresh(&mut self) {
         let st = self.state();
-        let (line, color) = status_line(&st, &self.cfg());
-        if line == self.last_line {
+        let cfg = self.cfg();
+        if let Some(kind) = self.watch.update(&st, Instant::now()) {
+            let t = s();
+            let name = if st.name.is_empty() { "MeowBox" } else { &st.name };
+            let text = match &kind {
+                notice::Kind::Lost => f(t.t_lost, &[&name]),
+                notice::Kind::Token => t.t_token.into(),
+                notice::Kind::TakenOver => f(t.t_taken_over, &[&name, &st.busy_with]),
+                notice::Kind::Core(_) => String::new(),
+            };
+            self.toast_kind(kind, text);
+        }
+        let (line, state) = status_line(&st, &cfg, self.watch.ever_connected);
+        let size = tray::tray_icon_size();
+        if line == self.last_line && self.icon_key == Some((size, state)) {
             return;
         }
-        let size = tray::tray_icon_size();
-        let ip = if st.ip().is_empty() { "—" } else { st.ip() };
-        let tail = if st.connected {
-            s::CONNECTED.to_owned()
-        } else {
-            line.trim_start_matches(['●', '○', '✕', ' ']).to_owned()
-        };
-        let tip = format!("{} · {ip} · {tail}", if st.name.is_empty() { "MeowBox" } else { &st.name });
-        // the line changes every second while a retry counts down; the dot does not
-        if let Some(key) = new_icon_key(self.icon_key, size, color) {
-            self.tray.set(tray::make_icon(&icon::cat_rgba(size, Some(color)), size), &tip);
+        let tip = if st.ip().is_empty() { line.clone() } else { format!("{line} · {}", st.ip()) };
+        // the line changes every second while a retry counts down; the icon does not
+        if let Some(key) = new_icon_key(self.icon_key, size, state) {
+            self.tray.set(tray::make_icon(&icon::tray_rgba(state, size), size), &tip);
             self.icon_key = Some(key);
         } else {
             self.tray.set_tip(&tip);
@@ -187,35 +255,28 @@ impl TrayApp {
         self.last_line = line;
     }
 
+    /// The short menu of B3; everything else is in the window.
     fn menu(&self) -> Vec<MenuItem> {
+        let t = s();
         let st = self.state();
         let cfg = self.cfg();
-        let mut m = vec![MenuItem::label(status_line(&st, &cfg).0)];
+        let mut m = vec![MenuItem::label(self.status())];
         if st.error == LinkError::Busy {
-            m.push(MenuItem::item(id::TAKE_OVER, s::M_TAKE_OVER));
+            m.push(MenuItem::item(id::TAKE_OVER, t.m_take_over));
         }
         m.extend([
             MenuItem::Separator,
-            MenuItem::default(id::OPEN_WEB, s::M_OPEN_WEB),
-            MenuItem::item(id::TEST_NOTIFY, s::M_TEST_NOTIFY),
-            MenuItem::check(id::PAUSE, s::M_PAUSE, cfg.paused),
-            MenuItem::check(id::CODING, s::M_CODING, crate::coding::hooks::hooks_installed()),
+            MenuItem::default(id::OPEN_WINDOW, t.m_open_window),
+            MenuItem::item(id::OPEN_WEB, t.m_open_web),
             MenuItem::Separator,
-            MenuItem::item(id::CONNECT, s::M_CONNECT),
-            MenuItem::item(id::SETTINGS, s::M_SETTINGS),
-            MenuItem::item(id::RECONNECT, s::M_RECONNECT),
-            MenuItem::check(id::AUTOSTART, s::M_AUTOSTART, crate::win::autostart_enabled()),
-            MenuItem::item(id::LOG_DIR, s::M_LOG_DIR),
+            MenuItem::check(id::PAUSE, t.m_pause, cfg.paused),
+            MenuItem::check(id::CODING, t.m_coding, crate::coding::hooks::hooks_installed()),
             MenuItem::Separator,
         ]);
         if !st.new_version.is_empty() {
-            m.push(MenuItem::item(id::NEW_VERSION, s::m_new_version(&st.new_version)));
+            m.extend([MenuItem::item(id::NEW_VERSION, f(t.m_new_version, &[&st.new_version])), MenuItem::Separator]);
         }
-        m.extend([
-            MenuItem::item(id::GITHUB, s::M_GITHUB),
-            MenuItem::item(id::ABOUT, s::m_about(crate::VERSION)),
-            MenuItem::item(id::QUIT, s::M_QUIT),
-        ]);
+        m.push(MenuItem::item(id::QUIT, t.m_quit));
         m
     }
 
@@ -231,73 +292,69 @@ impl TrayApp {
 
     fn command(&mut self, cmd: u32) {
         match cmd {
+            id::OPEN_WINDOW => self.open_window(),
             id::OPEN_WEB => self.open_web(),
             id::TAKE_OVER => self.core.reconnect_now(true),
-            id::RECONNECT => self.core.reconnect_now(false),
-            id::TEST_NOTIFY => self.test_notify(),
             id::PAUSE => self.core.cfg().update(|c| c.paused = !c.paused),
             id::CODING => self.toggle_coding(),
-            id::AUTOSTART => {
-                if let Err(e) = crate::win::set_autostart(!crate::win::autostart_enabled()) {
-                    tracing::warn!("autostart: {e}");
-                }
+            // the Settings page has the version and the install button
+            id::NEW_VERSION => {
+                self.open_request = Some(Page::Settings);
+                self.then = Some(mirror::Act::SeeUpdate);
             }
-            id::CONNECT => self.open_request = Some(Page::Connect),
-            id::SETTINGS => self.open_request = Some(Page::Settings),
-            id::LOG_DIR => crate::win::open(&crate::app_dir().to_string_lossy()),
-            id::NEW_VERSION => crate::win::open(&format!("https://github.com/{}/releases", crate::REPO)),
-            id::GITHUB => crate::win::open(&format!("https://github.com/{}", crate::REPO)),
-            id::ABOUT => crate::win::open(&format!("https://github.com/{}#readme", crate::REPO)),
             id::QUIT => {
                 tracing::info!("quit");
                 self.quit = true;
                 self.core.stop();
             }
-            other => tracing::debug!("menu item {other}: not in this build yet"),
+            other => tracing::debug!("menu item {other}: unknown"),
         }
     }
 
     /// Add / remove MeowBox's hooks and status line in ~/.claude/settings.json (new Claude Code sessions pick them up).
     fn toggle_coding(&self) {
+        let t = s();
         let r = if crate::coding::hooks::hooks_installed() {
-            crate::coding::hooks::uninstall().map(|_| s::T_CODING_OFF)
+            crate::coding::hooks::uninstall().map(|_| t.t_coding_off)
         } else {
-            crate::coding::hooks::install(self.cfg().coding_port).map(|_| s::T_CODING_ON)
+            crate::coding::hooks::install(self.cfg().coding_port).map(|_| t.t_coding_on)
         };
         match r {
-            Ok(msg) => self.tray.notify(msg, s::TOAST_TITLE),
+            Ok(msg) => self.tray.notify(msg, t.toast_title),
             Err(e) => {
                 tracing::warn!("Claude Code settings: {e}");
-                self.tray.notify(&s::t_coding_failed(&e), s::TOAST_TITLE);
+                self.tray.notify(&f(t.t_coding_failed, &[&e]), t.toast_title);
             }
         }
     }
 
-    /// "Gửi thông báo thử": a test notification through the speaker's API, toast on failure.
+    /// "Gửi thông báo thử": a test notification through the speaker's API; the toast says how it went, with the
+    /// button's words.
     fn test_notify(&self) {
+        let t = s();
         let (host, token) = (self.state().host, self.cfg().token);
         let toast = self.toaster();
         if host.is_empty() || token.is_empty() {
-            toast(s::T_NO_SPEAKER.into());
+            toast(t.t_no_speaker.into());
             return;
         }
         self.core.spawn(async move {
-            let body = serde_json::json!({"title": "MeowBox Agent", "text": s::TEST_NOTIFY_TEXT, "sound": "chime"});
+            let body = serde_json::json!({"title": t.test_title, "text": t.test_text, "sound": "chime"});
             match crate::speaker_api::notify(&host, &token, &body).await {
-                Ok((code, _)) if code >= 400 => toast(s::t_speaker_error(code)),
-                Ok(_) => {}
-                Err(e) => toast(s::t_send_failed(&e)),
+                Ok((code, _)) if code >= 400 => toast(f(t.t_speaker_error, &[&code])),
+                Ok(_) => toast(t.t_test_sent.into()),
+                Err(e) => toast(f(t.t_send_failed, &[&e])),
             }
         });
     }
 
-    /// Handle everything queued by the tray window. Safe to call from the dialog's frame: it never opens a dialog
+    /// Handle everything queued by the tray window. Safe to call from the window's frame: it never opens a window
     /// itself, it only records `open_request`.
     fn process(&mut self) {
         while let Some(ev) = tray::pop() {
             tracing::debug!("tray event {ev:?}");
             match ev {
-                TrayEvent::Click => self.open_web(),
+                TrayEvent::Click => self.open_window(),
                 TrayEvent::Menu(x, y) => {
                     let items = self.menu();
                     if let Some(cmd) = self.tray.popup(&items, x, y) {
@@ -306,9 +363,12 @@ impl TrayApp {
                 }
                 TrayEvent::Wake => {
                     self.refresh();
-                    let q: Vec<String> = self.toasts.lock().unwrap_or_else(|e| e.into_inner()).drain(..).collect();
-                    for t in q {
-                        self.tray.notify(&t, s::TOAST_TITLE);
+                    let q: Vec<Queued> = self.toasts.lock().unwrap_or_else(|e| e.into_inner()).drain(..).collect();
+                    for (kind, text) in q {
+                        match kind {
+                            Some(k) => self.toast_kind(notice::Kind::Core(k), text),
+                            None => self.tray.notify(&text, s().toast_title),
+                        }
                     }
                 }
                 TrayEvent::TaskbarCreated => self.tray.add(),
@@ -316,12 +376,12 @@ impl TrayApp {
         }
     }
 
-    /// The main loop: messages, queued tray events, and dialogs when asked. Returns on Quit.
+    /// The main loop: messages, queued tray events, and the window when asked. Returns on Quit.
     pub fn run(&mut self) {
         loop {
             if let Some(page) = self.open_request.take() {
                 self.run_dialog(page);
-                self.process(); // events that arrived while the dialog was closing
+                self.process(); // events that arrived while the window was closing
             }
             if self.quit || !tray::pump_one() {
                 tracing::debug!("tray loop ends (quit {})", self.quit);
@@ -334,40 +394,70 @@ impl TrayApp {
         }
     }
 
+    fn look(&self) -> theme::Look {
+        let st = self.state();
+        let id = self.dev_look.theme.clone().unwrap_or(st.theme);
+        theme::Look::new(&id, self.dev_look.dark.unwrap_or_else(theme::windows_dark))
+    }
+
     fn run_dialog(&mut self, page: Page) {
         tracing::debug!("window open ({page:?})");
         self.dialogs_opened += 1;
+        self.dialog_open = true;
         let icon = egui::IconData { rgba: icon::cat_rgba(32, None), width: 32, height: 32 };
+        let saved = self.cfg().window.filter(|w| on_screen(w[0], w[1]));
+        let mut vp = egui::ViewportBuilder::default()
+            .with_title(s().app)
+            .with_inner_size(saved.map_or([560.0, 660.0], |w| [w[2] as f32, w[3] as f32]))
+            .with_min_inner_size([480.0, 480.0])
+            .with_resizable(true)
+            .with_maximize_button(false)
+            .with_icon(icon);
+        if let Some(w) = saved {
+            vp = vp.with_position([w[0] as f32, w[1] as f32]);
+        }
         let options = eframe::NativeOptions {
-            viewport: egui::ViewportBuilder::default()
-                .with_title(s::APP)
-                .with_inner_size([580.0, 560.0])
-                .with_resizable(false)
-                .with_maximize_button(false)
-                .with_icon(icon),
-            centered: true,
+            viewport: vp,
+            centered: saved.is_none(),
             run_and_return: true,
             ..Default::default()
         };
         let auto_close = self.selftest_reopen > 0;
+        let look = self.look();
+        self.core.refresh_theme();
         let app: &mut TrayApp = &mut *self;
         let r = eframe::run_native(
-            s::APP,
+            s().app,
             options,
             Box::new(move |cc| {
-                cc.egui_ctx.set_fonts(fonts::definitions());
-                cc.egui_ctx.set_theme(egui::Theme::Light);
+                cc.egui_ctx.set_fonts(theme::fonts(look.def));
                 style(&cc.egui_ctx);
+                theme::apply(&cc.egui_ctx, &look);
                 tray::set_dialog_ctx(Some(cc.egui_ctx.clone()));
                 let (connect, settings) = (connect::Connect::new(&app.core), settings::Settings::new(&app.core));
-                Ok(Box::new(Dialog { app, page, connect, settings, frames: 0, auto_close }))
+                let now = Instant::now();
+                Ok(Box::new(Dialog {
+                    app,
+                    page,
+                    connect,
+                    settings,
+                    look,
+                    look_at: now,
+                    theme_at: now,
+                    rect: None,
+                    frames: 0,
+                    auto_close,
+                }))
             }),
         );
         tray::set_dialog_ctx(None);
+        self.dialog_open = false;
+        self.focus_request = false;
+        self.then = None;
         tracing::debug!("window closed, back in the tray loop");
         crate::win::trim_memory();
         if let Err(e) = r {
-            tracing::error!("dialog failed: {e}");
+            tracing::error!("window failed: {e}");
         }
         if self.selftest_reopen > 0 {
             self.selftest_reopen -= 1;
@@ -381,33 +471,20 @@ impl TrayApp {
     }
 }
 
-/// Text colours of the Python dialogs: ok #080, error #b00, hints #666.
-#[derive(Clone, Copy)]
-pub enum Look {
-    Good,
-    Bad,
-    Hint,
-    Text,
-}
-
-impl Look {
-    pub fn color(self) -> egui::Color32 {
-        match self {
-            Self::Good => egui::Color32::from_rgb(0x00, 0x88, 0x00),
-            Self::Bad => egui::Color32::from_rgb(0xbb, 0x00, 0x00),
-            Self::Hint => egui::Color32::from_rgb(0x66, 0x66, 0x66),
-            Self::Text => egui::Color32::from_rgb(0x55, 0x55, 0x55),
-        }
-    }
-}
-
-pub fn msg(text: &str, look: Look) -> Option<(String, egui::Color32)> {
-    Some((text.to_owned(), look.color()))
-}
-
-pub fn hint(ui: &mut egui::Ui, text: &str) {
-    if !text.is_empty() {
-        ui.label(egui::RichText::new(text).color(Look::Hint.color()));
+/// A saved window position (points) is used only if a monitor is still there (a laptop off its dock).
+fn on_screen(x: i32, y: i32) -> bool {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::Graphics::Gdi::{
+        GetDC, GetDeviceCaps, LOGPIXELSX, MONITOR_DEFAULTTONULL, MonitorFromPoint, ReleaseDC,
+    };
+    // SAFETY: plain GDI queries on the screen DC.
+    unsafe {
+        let dc = GetDC(None);
+        let dpi = GetDeviceCaps(Some(dc), LOGPIXELSX).max(96);
+        ReleaseDC(None, dc);
+        let px = |v: i32| v.saturating_mul(dpi) / 96;
+        // the title bar's left part must be on a monitor
+        !MonitorFromPoint(POINT { x: px(x) + 40, y: px(y) + 10 }, MONITOR_DEFAULTTONULL).is_invalid()
     }
 }
 
@@ -416,7 +493,7 @@ fn style(ctx: &egui::Context) {
     ctx.all_styles_mut(|st| {
         use egui::{FontFamily::Proportional, FontId, TextStyle};
         st.text_styles = [
-            (TextStyle::Heading, FontId::new(18.0, Proportional)),
+            (TextStyle::Heading, FontId::new(20.0, theme::display_family())),
             (TextStyle::Body, FontId::new(14.0, Proportional)),
             (TextStyle::Button, FontId::new(14.0, Proportional)),
             (TextStyle::Small, FontId::new(12.0, Proportional)),
@@ -429,86 +506,164 @@ fn style(ctx: &egui::Context) {
     });
 }
 
+/// Content column width at most (B2).
+const MAX_W: f32 = 520.0;
+
 /// The one agent window. Borrows the tray app for as long as it is open (eframe's run_and_return).
 struct Dialog<'a> {
     app: &'a mut TrayApp,
     page: Page,
     connect: connect::Connect,
     settings: settings::Settings,
+    look: theme::Look,
+    /// Last time the theme / Windows dark mode were looked at, and the speaker asked for its theme.
+    look_at: Instant,
+    theme_at: Instant,
+    /// Window position and size (points) as last seen, saved when it closes.
+    rect: Option<[i32; 4]>,
     frames: u32,
     auto_close: bool,
 }
 
 impl Dialog<'_> {
-    fn close(&self, ctx: &egui::Context) {
+    fn close(&mut self, ctx: &egui::Context) {
+        self.save_rect();
         self.connect.close(&self.app.core);
         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+    }
+
+    fn save_rect(&self) {
+        if let Some(r) = self.rect {
+            self.app.core.cfg().update(|c| c.window = Some(r));
+        }
+    }
+
+    /// Follow the speaker's theme and Windows' dark mode while the window is open.
+    fn follow_look(&mut self, ctx: &egui::Context) {
+        let now = Instant::now();
+        if now.duration_since(self.theme_at) >= Duration::from_secs(30) {
+            self.theme_at = now;
+            self.app.core.refresh_theme();
+        }
+        if now.duration_since(self.look_at) < Duration::from_secs(2) {
+            return;
+        }
+        self.look_at = now;
+        let want = self.app.look();
+        if want.def.id != self.look.def.id {
+            ctx.set_fonts(theme::fonts(want.def));
+        }
+        if want.def.id != self.look.def.id || want.dark != self.look.dark {
+            theme::apply(ctx, &want);
+            self.look = want;
+        }
+    }
+
+    fn mirror_act(&mut self, ui: &egui::Ui, a: mirror::Act) {
+        let core = &self.app.core;
+        match a {
+            mirror::Act::EnterIp => {
+                self.page = Page::Connect;
+                self.connect.focus(connect::Row::Ip);
+            }
+            mirror::Act::EnterToken => {
+                self.page = Page::Connect;
+                self.connect.focus(connect::Row::Token);
+            }
+            mirror::Act::Retry => core.reconnect_now(false),
+            mirror::Act::TakeOver => core.reconnect_now(true),
+            mirror::Act::ChangePort => {
+                self.page = Page::Settings;
+                self.settings.focus_port = true;
+            }
+            mirror::Act::SeeUpdate => {
+                self.page = Page::Settings;
+                self.settings.check_agent(ui, core);
+            }
+            mirror::Act::OpenWeb => self.app.open_web(),
+            mirror::Act::Resume => core.cfg().update(|c| c.paused = false),
+        }
     }
 }
 
 impl eframe::App for Dialog<'_> {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
         // tray events keep working while the window is open
         self.app.process();
         if let Some(p) = self.app.open_request.take() {
             self.page = p;
-            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Focus);
+            self.app.focus_request = true;
+        }
+        if std::mem::take(&mut self.app.focus_request) {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+            ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+        }
+        if let Some(a) = self.app.then.take() {
+            self.mirror_act(ui, a);
         }
         if self.app.quit {
-            self.close(ui.ctx());
+            self.close(&ctx);
         }
         self.frames += 1;
         if self.auto_close && self.frames > 3 {
-            self.close(ui.ctx());
+            self.close(&ctx);
         }
-        if ui.ctx().input(|i| i.viewport().close_requested()) {
-            self.connect.close(&self.app.core);
-        }
-
-        let frame = egui::Frame::central_panel(ui.style()).inner_margin(egui::Margin::symmetric(16, 12));
-        egui::CentralPanel::default().frame(frame).show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.selectable_value(&mut self.page, Page::Connect, s::PAGE_CONNECT);
-                ui.selectable_value(&mut self.page, Page::Settings, s::PAGE_SETTINGS);
-            });
-            ui.separator();
-            match self.page {
-                Page::Connect => {
-                    self.connect.ui(ui, &self.app.core);
-                    if self.connect.finished {
-                        self.close(ui.ctx());
-                    }
-                }
-                Page::Settings => {
-                    egui::Panel::bottom("settings_nav").show_separator_line(false).show(ui, |ui| {
-                        ui.add_space(6.0);
-                        ui.horizontal(|ui| {
-                            if ui.button(s::M_LOG_DIR).clicked() {
-                                crate::win::open(&crate::app_dir().to_string_lossy());
-                            }
-                            if ui.button(s::M_GITHUB).clicked() {
-                                crate::win::open(&format!("https://github.com/{}", crate::REPO));
-                            }
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                if ui.button(s::CLOSE).clicked() {
-                                    self.close(ui.ctx());
-                                }
-                            });
-                        });
-                    });
-                    let core = &self.app.core;
-                    let act = egui::CentralPanel::default()
-                        .frame(egui::Frame::NONE)
-                        .show(ui, |ui| egui::ScrollArea::vertical().show(ui, |ui| self.settings.ui(ui, core)).inner)
-                        .inner;
-                    if let Some(settings::Action::Quit) = act {
-                        self.app.quit = true;
-                        self.app.core.stop();
-                        self.close(ui.ctx());
-                    }
-                }
+        ctx.input(|i| {
+            let vp = i.viewport();
+            if let (Some(o), Some(inner)) = (vp.outer_rect, vp.inner_rect) {
+                let r = [o.min.x, o.min.y, inner.width(), inner.height()].map(|v| v.round() as i32);
+                self.rect = Some(r);
             }
         });
+        if ctx.input(|i| i.viewport().close_requested()) {
+            self.save_rect();
+            self.connect.close(&self.app.core);
+        }
+        self.follow_look(&ctx);
+        // the mirror shows what the core sends every second
+        ctx.request_repaint_after(Duration::from_secs(1));
+
+        let look = self.look;
+        let t = s();
+        let panel = egui::Frame::NONE.fill(look.c(|p| p.bg)).inner_margin(egui::Margin::same(16));
+        egui::CentralPanel::default().frame(panel).show(ui, |ui| {
+            let r = ui.available_rect_before_wrap();
+            let w = r.width().min(MAX_W);
+            let column =
+                egui::Rect::from_min_size(egui::pos2(r.center().x - w / 2.0, r.top()), egui::vec2(w, r.height()));
+            ui.scope_builder(egui::UiBuilder::new().max_rect(column), |ui| {
+                let (st, cfg, m) = (self.app.state(), self.app.cfg(), self.app.core.mirror());
+                if let Some(a) = mirror::show(ui, &look, &st, &cfg, &m, self.app.watch.ever_connected) {
+                    self.mirror_act(ui, a);
+                }
+                ui.add_space(10.0);
+                ui.horizontal(|ui| {
+                    for (p, label) in [(Page::Connect, t.tab_connect), (Page::Settings, t.tab_settings)] {
+                        if widgets::tab(ui, &look, self.page == p, label).clicked() {
+                            self.page = p;
+                        }
+                    }
+                });
+                ui.add_space(10.0);
+                egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| match self.page {
+                    Page::Connect => {
+                        if let Some(connect::Act::TestNotify) = self.connect.ui(ui, &look, &self.app.core) {
+                            self.app.test_notify();
+                        }
+                    }
+                    Page::Settings => {
+                        if let Some(settings::Act::Quit) = self.settings.ui(ui, &look, &self.app.core) {
+                            self.app.quit = true;
+                            self.app.core.stop();
+                        }
+                    }
+                });
+            });
+        });
+        if self.app.quit {
+            self.close(&ctx);
+        }
     }
 }
 
@@ -517,43 +672,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn status_lines_match_python() {
+    fn status_lines_say_what_to_do() {
         let cfg = Config::default();
         let mut st = AgentState::default();
-        assert_eq!(status_line(&st, &cfg).0, "○ Đang nối loa…");
+        let line = |st: &AgentState, cfg: &Config, ever| status_line(st, cfg, ever).0;
+        assert_eq!(line(&st, &cfg, false), "Đang tìm loa…");
         st.error = LinkError::NotFound;
-        assert_eq!(status_line(&st, &cfg).0, "✕ Chưa có IP loa: mở 'Kết nối loa…' để nhập");
+        assert_eq!(line(&st, &cfg, false), "Chưa có IP loa: mở cửa sổ để nhập");
         let mut cfg2 = Config::default();
         cfg2.last_host = "192.168.1.50".into();
         st.retry_in = 8;
-        assert_eq!(
-            status_line(&st, &cfg2).0,
-            "✕ Không nối được MeowBox, mở 'Kết nối loa…' để kiểm tra IP (thử lại sau 8 s)"
-        );
-        st = AgentState {
-            connected: true,
-            name: "MeowBox-1A2B".into(),
-            host: "192.168.1.50".into(),
-            how: "last".into(),
-            ..st
-        };
-        assert_eq!(
-            status_line(&st, &cfg2),
-            ("● Đã kết nối MeowBox-1A2B · 192.168.1.50 (IP lần trước)".into(), icon::GREEN)
-        );
+        assert_eq!(line(&st, &cfg2, false), "Không thấy loa, thử lại sau 8 s");
+        assert_eq!(line(&st, &cfg2, true), "Mất kết nối với loa, thử lại sau 8 s");
+        st.searching = "start".into();
+        assert_eq!(line(&st, &cfg2, true), "Đang tìm loa…");
+        st = AgentState { error: LinkError::Busy, busy_with: "DESKTOP-ABC".into(), ..Default::default() };
+        cfg2.speaker = "MeowBox-1A2B".into();
+        assert_eq!(status_line(&st, &cfg2, true), ("MeowBox-1A2B đang nối với DESKTOP-ABC".into(), icon::State::Error));
+        st.error = LinkError::Token;
+        assert_eq!(line(&st, &cfg2, true), "Loa không nhận token");
+        st = AgentState { connected: true, name: "MeowBox-1A2B".into(), host: "192.168.1.50".into(), ..st };
+        assert_eq!(status_line(&st, &cfg2, true), ("Đã nối MeowBox-1A2B".into(), icon::State::Connected));
     }
 
-    /// The retry countdown changes the line every second; the icon is drawn only when its dot or size changes.
+    /// The retry countdown changes the line every second; the icon is drawn only when its state or size changes.
     #[test]
     fn countdown_does_not_redraw_the_icon() {
         let mut cfg = Config::default();
         cfg.last_host = "192.168.1.50".into();
         let st = |n| AgentState { error: LinkError::NotFound, retry_in: n, ..Default::default() };
-        let (l8, c8) = status_line(&st(8), &cfg);
-        let (l7, c7) = status_line(&st(7), &cfg);
+        let (l8, c8) = status_line(&st(8), &cfg, true);
+        let (l7, c7) = status_line(&st(7), &cfg, true);
         assert_ne!(l8, l7);
-        let key = new_icon_key(Some((16, icon::GREY)), 16, c8).expect("grey to red draws once");
-        assert_eq!(new_icon_key(Some(key), 16, c7), None, "same dot: tooltip only");
+        let key = new_icon_key(Some((16, icon::State::Connecting)), 16, c8).expect("connecting to error draws once");
+        assert_eq!(new_icon_key(Some(key), 16, c7), None, "same state: tooltip only");
         assert!(new_icon_key(Some(key), 24, c7).is_some(), "DPI change draws again");
         assert!(new_icon_key(None, 16, c7).is_some());
     }

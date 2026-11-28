@@ -115,6 +115,18 @@ impl Waker {
     }
 }
 
+/// Second launch: ask the agent already running to open its window, as a left click on its icon would. False if
+/// no running agent was found.
+pub fn open_running() -> bool {
+    // SAFETY: finding a window by class and posting it a message; a stale handle just fails.
+    unsafe {
+        let Ok(h) = FindWindowW(w!("MeowBoxAgentTray"), PCWSTR::null()) else { return false };
+        // the running agent may bring its window to the front: this process has the foreground right now
+        let _ = AllowSetForegroundWindow(ASFW_ANY);
+        PostMessageW(Some(h), WM_TRAY, WPARAM(ICON_ID as usize), LPARAM(WM_LBUTTONUP as isize)).is_ok()
+    }
+}
+
 fn wide<const N: usize>(s: &str) -> [u16; N] {
     let mut out = [0u16; N];
     for (i, c) in s.encode_utf16().take(N - 1).enumerate() {

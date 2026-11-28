@@ -114,8 +114,8 @@ Design notes: [../docs/ui_redesign.md](../docs/ui_redesign.md).
 
 | What | Source | Command | Output |
 |---|---|---|---|
-| Theme tables | `themes/*.json` | `python tools/gen_themes.py` | `components/ui/themes_gen.c`, `web/src/themes.css`, `web/themes.json` |
-| Fonts (LVGL + web) | `tools/fonts/src/` (OFL fonts) | `python tools/fonts/gen_theme_fonts.py` (base font: `tools/fonts/gen_fonts.ps1`) | `components/fonts/*.c`, `web/assets/fonts/*.woff2` |
+| Theme tables | `themes/*.json` | `python tools/gen_themes.py` | `components/ui/themes_gen.c`, `web/src/themes.css`, `web/themes.json`, `../pc-agent/src/ui/themes_gen.rs` (the PC agent window, from each theme's `"agent"` block) |
+| Fonts (LVGL + web + PC agent) | `tools/fonts/src/` (OFL fonts) | `python tools/fonts/gen_theme_fonts.py` (base font: `tools/fonts/gen_fonts.ps1`) | `components/fonts/*.c`, `web/assets/fonts/*.woff2`, `../pc-agent/assets/fonts/*.ttf` |
 | Cat sprites | `tools/cat_sprites/sprites.py` (text art) | `python tools/cat_sprites/sprites.py` | `components/cat_sprites/`, previews |
 | Ensō image | `tools/ui_assets/enso.png` | `python tools/ui_assets/gen_ui_assets.py` | `components/ui/ui_assets.c` |
 | Web UI | `web/src/`, `web/assets/` | `python web/build.py` | `components/webui/web.pack` |

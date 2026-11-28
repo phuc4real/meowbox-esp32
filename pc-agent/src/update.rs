@@ -55,6 +55,9 @@ pub fn valid_version(v: &str) -> bool {
         && parts.iter().all(|p| !p.is_empty() && p.len() <= 6 && p.bytes().all(|b| b.is_ascii_digit()))
 }
 
+/// Bytes of the installer download running now.
+pub static METER: crate::tools::Meter = crate::tools::Meter::new();
+
 /// Download MeowBoxAgent-Setup-<v>.exe into the temp folder and check it against the release's SHA2-256SUMS (made by
 /// firmware/tools/release.py) before anything runs it. A release without that file is refused: the user downloads
 /// it from the release page instead.
@@ -70,7 +73,9 @@ pub async fn download_installer(v: &str) -> anyhow::Result<std::path::PathBuf> {
     let want = crate::tools::checksum_for(&String::from_utf8_lossy(&sums), &name)
         .ok_or_else(|| anyhow::anyhow!("no checksum for {name}"))?;
     let dst = std::env::temp_dir().join(&name);
-    crate::tools::download_checked(&format!("{base}{name}"), &dst, &want, |_, _| {}).await?;
+    let r = crate::tools::download_checked(&format!("{base}{name}"), &dst, &want, |d, t| METER.set(d, t)).await;
+    METER.clear();
+    r?;
     Ok(dst)
 }
 

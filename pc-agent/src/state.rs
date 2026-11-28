@@ -27,6 +27,18 @@ pub struct AgentState {
     pub relay_ok: Option<bool>,
     /// Newer agent release found on GitHub.
     pub new_version: String,
+    /// The speaker's theme (GET /api/theme after connecting): the agent window wears it. "" = not known yet.
+    pub theme: String,
+}
+
+/// What a toast from the core is about: the tray shows at most one per kind every 10 minutes, and a new agent
+/// version only once (docs/enhance_agent.md, B6).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ToastKind {
+    FfmpegStart,
+    FfmpegDone,
+    FfmpegFailed,
+    NewVersion(String),
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

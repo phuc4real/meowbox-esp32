@@ -28,6 +28,9 @@ try {
 if (Test-Path $Dist) { Remove-Item -Recurse -Force $Dist }
 New-Item -ItemType Directory -Force $Dist | Out-Null
 foreach ($exe in "MeowBoxAgent.exe", "meowbox.exe") { Copy-Item "$Here\target\release\$exe" $Dist }
+# the window's display fonts are embedded in MeowBoxAgent.exe; their SIL OFL goes with them
+New-Item -ItemType Directory -Force "$Dist\licenses" | Out-Null
+Copy-Item "$Here\assets\fonts\OFL-*.txt" "$Dist\licenses"
 
 $Iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
           "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1

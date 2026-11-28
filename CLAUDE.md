@@ -35,8 +35,9 @@ Overview and layout: @README.md. Build, flash, asset generators, partitions: @fi
 
 | Don't hand-edit | Edit instead | Run (from `firmware/`) |
 |---|---|---|
-| `components/ui/themes_gen.c`, `web/src/themes.css`, `web/themes.json` | `themes/*.json` | `python tools/gen_themes.py` |
-| `components/fonts/*.c`, `web/assets/fonts/*` | `tools/fonts/` | `python tools/fonts/gen_theme_fonts.py` |
+| `components/ui/themes_gen.c`, `web/src/themes.css`, `web/themes.json`, `pc-agent/src/ui/themes_gen.rs` | `themes/*.json` | `python tools/gen_themes.py` |
+| `components/fonts/*.c`, `web/assets/fonts/*`, `pc-agent/assets/fonts/*` | `tools/fonts/` | `python tools/fonts/gen_theme_fonts.py` |
+| `pc-agent/assets/meowbox.ico`, `pc-agent/packaging/wizard-*.bmp` | `pc-agent/assets/make_art.py` (tray icons: the hand-drawn `pc-agent/assets/icons/*.png` are the sources) | `py -3.14 ../pc-agent/assets/make_art.py` |
 | `components/cat_sprites/*` | `tools/cat_sprites/sprites.py` | `python tools/cat_sprites/sprites.py` |
 | `components/ui/ui_assets.c` | `tools/ui_assets/` | `python tools/ui_assets/gen_ui_assets.py` |
 | `components/webui/web.pack` | `web/src/`, `web/assets/` | `python web/build.py` (fails if the gzipped first page load exceeds 30 KB); the web UI is embedded in the app |

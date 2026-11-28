@@ -1,6 +1,6 @@
 # PC agent: enhancements after 0.3.0
 
-Status: plan, nothing started (2026-11-28). Everything here ships as **0.3.1**, together with the tray fix and the
+Status (2026-11-28): parts A and B done, not released yet. Everything here ships as **0.3.1**, together with the tray fix and the
 GPU stats already on `main`. Two parts: **A**, the engine (what the agent does every second, found by
 a review of the Rust code after 0.3.0) and **B**, the UI/UX redesign parked in `docs/roadmap.md` ("PC agent UI/UX",
 written for the Python/tkinter agent, updated here for Rust/egui). The agent no longer has to mirror the Python one:
@@ -101,7 +101,15 @@ included**, and its one memorable element is a **mirror of the speaker's Compute
 Everything else stays quiet: left-aligned lists, grouping by space, no card grid, no decoration the speaker does not
 have. Status never relies on colour alone.
 
-### B1. The window wears the speaker's theme
+### B1. The window wears the speaker's theme — done
+Done as below. Each `themes/<id>.json` has an `"agent"` block: `display_font`, `light` (overrides of the day colours
+where the window needs more contrast than the speaker: Swiss `alert`, Zen `dim` and `line`, Cyberpunk `line`,
+Brutalism `alert` and `ok`) and `dark`. Display fonts: Swiss Archivo ExtraBold at 72 % width (the speaker's clock),
+Cyberpunk Chakra Petch Bold (VT323 has no Vietnamese), Zen Cormorant Garamond SemiBold, Brutalism Windows' Times New
+Roman Bold; 25–69 KB each, 140 KB in all, their OFL texts go into the installer. The speaker's theme comes from
+`GET /api/theme` after each connection and every 30 s while the window is open; the window checks the theme and
+Windows' dark mode every 2 s and restyles. `theme::tests::every_theme_is_readable` is the contrast check.
+
 - **Palettes and shapes:** `firmware/tools/gen_themes.py` also writes `pc-agent/src/ui/themes_gen.rs` (generated and
   committed with its source, like every generated file here; add it to the "Generated files" table in CLAUDE.md): per
   theme the day colours (`bg`, `surface`, `text`, `dim`, `line`, `accent`, `on_accent`, `ok`, `warn`, `alert`) and
@@ -124,7 +132,18 @@ have. Status never relies on colour alone.
 - **No `fx`:** scanlines, RGB split, HUD corners, tilt and segmented bars stay on the speaker. Brutalism keeps its hard
   offset shadow on buttons (a shape, not an effect).
 
-### B2. The window: speaker mirror + one quiet list
+### B2. The window: speaker mirror + one quiet list — done
+Done as below, with these choices: the mirror's numbers come from `CoreHandle::mirror()`, the last `stats` and
+`media` the core sent (kept in the core, so the tray is not woken every second); GPU and GPU temperature cells show
+only when the PC reports them. The connect rows save the IP and the token the moment they pass (no Finish button) and
+show "Kiểm tra" only while not passed; "Nối lại loa ngay" sits next to "Gửi thông báo thử" under them. A field is
+"labelled by" its row's label for Narrator. The window is resizable (min 480×480, content at most 520 px wide) and
+its position and size are saved as `window` in agent.json, used again only if a monitor is still there. Dev flags for
+screenshots: `--dev --theme <id> --dark|--light --page settings`. Screenshots taken through `PrintWindow` in a scratch
+profile against `mock_speaker.py --theme <id>`: the four themes in light, Swiss in dark, and in Vietnamese no IP yet
+(Swiss), token refused (Zen dark), relay port taken (Cyberpunk). Not done: the 4 × 2 × every-state matrix and 125–200 %
+scaling (only 100 % was checked).
+
 - **Speaker mirror** at the top, in the theme's display font and colours: the speaker's name and IP, the link state as
   words, and the same numbers the speaker's Computer screen shows (CPU, RAM, GPU, temperature) plus what is playing.
   The data is what the core just sent (`stats` and `media`), so the window shows exactly what the speaker gets. Not
@@ -167,7 +186,11 @@ have. Status never relies on colour alone.
 - **Screenshots** of every state above × 4 themes × light/dark through UI Automation (the `run-meowbox` recipe),
   compared before/after.
 
-### B3. Tray
+### B3. Tray — done
+Done as below. A left click opens the window at Kết nối (a second click brings it to the front); "Có bản x.y.z" opens
+Settings and checks for the version there, where the install button is. Starting `MeowBoxAgent.exe` again (Start
+menu, the installer's finish page) posts the running agent the same click instead of opening the speaker's page.
+
 - **Left click opens the agent window** (the mirror), as Windows users expect from a tray icon; the speaker's web page
   moves into the menu.
 - Menu:
@@ -182,7 +205,11 @@ have. Status never relies on colour alone.
   "Đã nối MeowBox-1A2B", "Đang tìm loa…", "Mất kết nối với loa, thử lại sau 8 s", "Loa không nhận token",
   "MeowBox-1A2B đang nối với DESKTOP-ABC".
 
-### B4. Words: English, and one voice
+### B4. Words: English, and one voice — done
+`ui/strings.rs` is one struct with a Vietnamese and an English table (a missing key does not compile; a test checks
+both take the same `{}` arguments and that status lines fit). Language: `lang` in agent.json, `auto` by default.
+Toasts from the core (ffmpeg, new version) use the same tables. Every string was rewritten by the rules below.
+
 - `ui/strings.rs` gets an English table with the same keys (a test checks both have the same keys, as `test_api.py`
   does for the web's `lang/*.json`).
 - Language follows Windows (`GetUserDefaultUILanguage`: Vietnamese → vi, anything else → en), with a setting in Cài đặt
@@ -195,7 +222,13 @@ have. Status never relies on colour alone.
   - Sentence case, plain verbs, no filler.
 - The command line keeps its messages as they are (they are for the terminal).
 
-### B5. Icon: the cat shows the state
+### B5. Icon: the cat shows the state — done
+`assets/make_art.py --pixel` drew the first version of the 15 PNGs: the favicon's outline snapped to the pixel grid,
+eyes, nose and dot placed by hand per size (a table in the script); from now on the PNGs are the sources, edited by
+hand. `build.rs` turns them into raw RGBA (no PNG decoder in the exe); other sizes fall back to the vector cat, which
+also has the three eye states. `make_art.py` also writes `assets/meowbox.ico` (pixel 16–40 without the dot, vector
+48–256) and the installer's images.
+
 - **State by the cat's eyes, not by colour alone** (red/green is the pair colour-blind users miss, and a 4–5 px dot at
   16 px is hard to read anyway): connected = eyes open, connecting = eyes half closed, error = × eyes. A small colour
   dot stays as a second cue.
@@ -203,7 +236,14 @@ have. Status never relies on colour alone.
   PNG sources in `pc-agent/assets/icons/`, embedded; 48 px and up (Explorer, installer, `assets/meowbox.ico`) keep the
   vector drawing, rebuilt by a small generator script.
 
-### B6. Toasts
+### B6. Toasts — done
+`ui/notice.rs`: `Watch` turns link changes into events, once per episode (reset when connected again), `Throttle`
+lets one per kind through every 10 minutes; both are unit-tested on (state, time). The core's toasts carry a
+`ToastKind` (ffmpeg start / done / failed, new version); the version announced last is saved as `toasted_version` in
+agent.json. Being busy at start (another PC had the speaker first) shows only in the status line. Checked against
+`mock_speaker.py` in a scratch profile: left click opens the window once, the test notification arrives, and stopping
+the mock gives the lost toast after 2 minutes.
+
 At most one toast per event kind per 10 minutes. Windows' Focus Assist (do not disturb) is respected by the balloon
 API in use (`NIF_INFO`); keep that API.
 
@@ -217,7 +257,14 @@ API in use (`NIF_INFO`); keep that API.
 | New agent version | yes, once per version |
 | Meow Coding on/off, test notification sent / failed | yes (the user's action, same verb as its button) |
 
-### B7. Installer
+### B7. Installer — done
+`packaging/Vietnamese.isl` (Inno's unofficial translation, 6.5.0+, all 302 messages, saved with a UTF-8 BOM),
+`ShowLanguageDialog=no`. Wizard images at 100/150/200 % as BMP: a red Swiss band, the cat, "MeowBox Agent" in
+Archivo. Task, status and uninstall texts in both languages. The finish page starts the agent with `--open` on a first
+install; the Ready page of an upgrade (same AppId found in the uninstall keys) starts with "your speaker, token and
+other settings are kept". Compiled with ISCC 6.5 (no new warnings); not run here, as it would replace the installed
+agent.
+
 - Vietnamese installer language (Inno Setup's unofficial `Vietnamese.isl`, vendored in `packaging/`) besides English,
   picked from the Windows language.
 - **Wizard images:** the cat in Swiss colours for Inno's large side image (164×314) and the small top-right image
@@ -248,6 +295,13 @@ Measured after all of part A (same setup, three runs each, against a build of `1
 counters; the installed 0.3.0 reads no GPU at all, so it is not a fair base): `176b042` 0.68 / 0.36 / 0.47 % of one
 core, 8.0–8.1 MB private; part A 0.31 / 0.47 / 0.31 %, 7.8–7.9 MB private. About a quarter less CPU, within a noisy
 measurement. `media` messages with nothing playing: one every 5 s, as before.
+
+Measured after part B (`MeowBoxAgent.exe --dev`, scratch profile, connected to `mock_speaker.py`, idle, 30 s after a
+12 s warm-up, one run): window closed 0.31 % of one core, 9.9 MB private, 28 MB working set (0.3.0 installed: 0.5 %,
+10.7 MB, 34 MB). Window open 0.23 %, 109 MB private, 115 MB working set (0.3.0: ~88 MB working set; three font files
+and a larger window now). After closing it: 6 MB working set, but 52 MB private stays committed (the OpenGL driver's
+heaps, see `win::trim_memory`); not compared with 0.3.0, whose window was not measured that way. Exes:
+`MeowBoxAgent.exe` 9.65 MB (+0.33 MB: fonts, icons, the new window), `meowbox.exe` 4.16 MB; installer 5.6 MB.
 
 After each step: `cargo test`, `cargo clippy --all-targets -- -D warnings`, the CPU/memory measurement above (connected,
 idle, 30 s) written into this file, and for B steps screenshots through UI Automation in a scratch profile.

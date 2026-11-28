@@ -11,5 +11,9 @@
   "shape": {"radius": 0, "border": 3, "btn": "raw", "shadow": [5, 5], "hover_shadow": [5, 5]},
   "fx": {"aberration": false, "scanline": false, "grid": true, "hud": false, "tilt": true, "segments": false, "shadow": true},
   "clock": {"layout": "block"},
+  "agent": {"display_font": "system:timesbd.ttf",
+            "light": {"alert": "#D00000", "ok": "#007A00"},
+            "dark": {"bg": "#000000", "surface": "#000000", "text": "#FFFFFF", "dim": "#BFBFBF", "line": "#FFFFFF",
+                     "accent": "#FFFF00", "on_accent": "#000000", "ok": "#00FF00", "warn": "#FFFF00", "alert": "#FF5050"}},
   "cat": {"palette": "fur"}
 }

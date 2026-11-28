@@ -11,6 +11,38 @@ use tokio::io::AsyncWriteExt;
 
 pub const UA: &str = "MeowBoxAgent";
 
+/// Bytes done / total of the download running now (one per kind: yt-dlp, ffmpeg, the agent installer), for the
+/// window's progress bars. `total` 0 = nothing running or size unknown.
+pub struct Meter {
+    done: std::sync::atomic::AtomicU64,
+    total: std::sync::atomic::AtomicU64,
+}
+
+impl Meter {
+    pub const fn new() -> Self {
+        Self { done: std::sync::atomic::AtomicU64::new(0), total: std::sync::atomic::AtomicU64::new(0) }
+    }
+    pub fn set(&self, done: u64, total: u64) {
+        use std::sync::atomic::Ordering::Relaxed;
+        self.done.store(done, Relaxed);
+        self.total.store(total, Relaxed);
+    }
+    /// (done, total) in bytes.
+    pub fn get(&self) -> (u64, u64) {
+        use std::sync::atomic::Ordering::Relaxed;
+        (self.done.load(Relaxed), self.total.load(Relaxed))
+    }
+    pub fn clear(&self) {
+        self.set(0, 0);
+    }
+}
+
+impl Default for Meter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// First `name.exe` on PATH (like shutil.which).
 pub fn which(name: &str) -> Option<std::path::PathBuf> {
     let path = std::env::var_os("PATH")?;

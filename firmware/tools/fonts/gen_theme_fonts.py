@@ -7,6 +7,7 @@
     python gen_theme_fonts.py             # everything
     python gen_theme_fonts.py --lvgl      # only components/fonts/mb_<theme>_*.c
     python gen_theme_fonts.py --web       # only web/assets/fonts/*.woff2 + fonts.json
+    python gen_theme_fonts.py --agent     # only pc-agent/assets/fonts/*.ttf (the agent window's display fonts)
 
 Called from gen_fonts.ps1 as well. Sources are downloaded from the google/fonts
 GitHub repo into ./src/<family>/ (with their OFL.txt) if they are missing.
@@ -33,6 +34,7 @@ from fontTools import subset
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_C = os.path.normpath(os.path.join(HERE, '..', '..', 'components', 'fonts'))
 OUT_WEB = os.path.normpath(os.path.join(HERE, '..', '..', 'web', 'assets', 'fonts'))
+OUT_AGENT = os.path.normpath(os.path.join(HERE, '..', '..', '..', 'pc-agent', 'assets', 'fonts'))
 GF = 'https://raw.githubusercontent.com/google/fonts/main/'
 
 # local path (relative to HERE) -> download URL
@@ -74,6 +76,7 @@ INSTANCES = {
     'src/static/CormorantGaramond-Light.ttf':  ('src/cormorantgaramond/CormorantGaramond[wght].ttf', {'wght': 300}, None),
     'src/static/CormorantGaramond-Medium.ttf': ('src/cormorantgaramond/CormorantGaramond[wght].ttf', {'wght': 500}, None),
     'src/static/CormorantGaramond-SemiBoldItalic.ttf': ('src/cormorantgaramond/CormorantGaramond-Italic[wght].ttf', {'wght': 600}, None),
+    'src/static/CormorantGaramond-SemiBold.ttf': ('src/cormorantgaramond/CormorantGaramond[wght].ttf', {'wght': 600}, None),
     # only U+732B (猫) is needed; subset first, the full CJK font is 13 MB
     'src/static/NotoSerifJP-SemiBold-732B.ttf': ('src/notoserifjp/NotoSerifJP[wght].ttf', {'wght': 600}, [0x732B]),
     'src/static/JetBrainsMono-Regular.ttf': ('src/jetbrainsmono/JetBrainsMono[wght].ttf', {'wght': 400}, None),
@@ -146,6 +149,19 @@ WEB_FONTS = {
     'be-vietnam-pro-light-vi.woff2': ('src/BeVietnamPro-Light.ttf', WEB_UNICODES,
                                       {'family': 'Be Vietnam Pro', 'weight': '300', 'style': 'normal'}),
 }
+
+
+# PC agent window (docs/enhance_agent.md, B1): each theme's display font for headings and the speaker mirror's big
+# numbers, as static TTF (egui reads TrueType outlines only), Vietnamese subset, embedded in MeowBoxAgent.exe.
+# File names = "agent.display_font" in themes/<id>.json; Brutalism uses Windows' own Times New Roman Bold.
+AGENT_FONTS = {
+    'archivo-display.ttf': 'src/static/Archivo-ExtraBold-wdth72.ttf',
+    'chakra-petch-display.ttf': 'src/chakrapetch/ChakraPetch-Bold.ttf',
+    'cormorant-display.ttf': 'src/static/CormorantGaramond-SemiBold.ttf',
+}
+AGENT_LICENSES = {'Archivo': 'src/archivo/OFL.txt', 'ChakraPetch': 'src/chakrapetch/OFL.txt',
+                  'CormorantGaramond': 'src/cormorantgaramond/OFL.txt'}
+AGENT_BUDGET = 150 * 1024
 
 
 def p(rel):
@@ -287,18 +303,49 @@ def gen_web():
         fp.write('\n')
 
 
+def gen_agent():
+    os.makedirs(OUT_AGENT, exist_ok=True)
+    want = parse_ranges(WEB_UNICODES)
+    for fname, src in AGENT_FONTS.items():
+        missing = [c for c in want if c not in cmap(src)]
+        if missing:
+            print('  note: %s lacks %s (Segoe UI fills in)' % (fname, fmt_ranges(missing)))
+        opts = subset.Options()
+        opts.name_IDs = ['*']
+        opts.notdef_outline = True
+        opts.hinting = False
+        opts.layout_features = ['kern', 'liga', 'ccmp', 'mark', 'mkmk']
+        f = TTFont(p(src))
+        s = subset.Subsetter(opts)
+        s.populate(unicodes=want)
+        s.subset(f)
+        out = os.path.join(OUT_AGENT, fname)
+        subset.save_font(f, out, opts)
+        size = os.path.getsize(out)
+        print('%-40s %8d bytes' % (fname, size))
+        if size > AGENT_BUDGET:
+            raise SystemExit('%s is over the %d KB budget' % (fname, AGENT_BUDGET // 1024))
+    # the SIL OFL travels with the fonts
+    for family, lic in AGENT_LICENSES.items():
+        with open(p(lic), 'rb') as src, open(os.path.join(OUT_AGENT, 'OFL-%s.txt' % family), 'wb') as dst:
+            dst.write(src.read().replace(b'\r\n', b'\n'))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--lvgl', action='store_true')
     ap.add_argument('--web', action='store_true')
+    ap.add_argument('--agent', action='store_true')
     a = ap.parse_args()
-    both = not (a.lvgl or a.web)
+    both = not (a.lvgl or a.web or a.agent)
     ensure_sources()
     ensure_instances()
     if a.lvgl or both:
         gen_lvgl()
     if a.web or both:
         gen_web()
+    if a.agent or both:
+        gen_agent()
 
 
 if __name__ == '__main__':

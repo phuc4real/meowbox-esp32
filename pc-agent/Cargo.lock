@@ -2006,6 +2006,7 @@ dependencies = [
  "eframe",
  "futures-util",
  "hex",
+ "png",
  "reqwest",
  "serde",
  "serde_json",

@@ -138,14 +138,17 @@ curl -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" \
 1. Tải `MeowBoxAgent-Setup-x.y.z.exe` ở
    [Releases](https://github.com/phuc4real/meowbox-esp32/releases/latest) rồi chạy.
    Windows có thể báo "Unknown publisher": bấm *More info → Run anyway*.
-2. Cài xong, icon con mèo hiện ở khay hệ thống và cửa sổ **Kết nối loa** tự mở. Nhập IP của loa (xem ở tile Hệ thống
-   trên màn hình loa), dán token (bắt buộc, lấy ở trang Thông báo) và bấm Kiểm tra, rồi kiểm tra loa có gọi được
-   máy tính không. Loa đổi IP thì mở lại
-   **Kết nối loa** trong menu và nhập IP mới.
-3. Ý nghĩa chấm trên icon:
-   - xanh: đã nối loa;
-   - xám: đang nối loa;
-   - đỏ: có lỗi, di chuột vào icon để xem lỗi gì.
+2. Cài xong, icon con mèo hiện ở khay hệ thống và cửa sổ MeowBox Agent tự mở ở trang **Kết nối**. Nhập IP của loa
+   (xem ở tile Hệ thống trên màn hình loa) và dán token (bắt buộc, lấy ở trang Thông báo của loa). Agent tự kiểm tra
+   từng dòng: IP, token, rồi loa có gọi được máy tính không (YouTube relay). Dòng nào qua thì hiện ✓; dòng nào lỗi thì
+   mở ra lý do và cách sửa. Loa đổi IP thì bấm vào icon con mèo để mở cửa sổ và nhập IP mới.
+3. Cửa sổ mặc cùng theme với loa (Swiss, Cyberpunk, Zen, Brutalism), sáng hay tối theo Windows. Trên cùng là màn
+   Máy tính của loa thu nhỏ: CPU, RAM, GPU, nhiệt độ và bài đang phát, đúng như loa đang hiện. Khi chưa nối được, chỗ
+   đó nói lý do và có nút để sửa. Trang **Cài đặt**: cập nhật agent, yt-dlp, ffmpeg, chạy cùng Windows, ngôn ngữ.
+4. Mắt mèo trên icon cho biết trạng thái (kèm chấm màu):
+   - mắt mở, chấm xanh: đã nối loa;
+   - mắt lim dim, chấm xám: đang nối loa;
+   - mắt ×, chấm đỏ: có lỗi, di chuột vào icon hoặc bấm chuột phải để xem lỗi gì và cách sửa.
 
 Agent gửi số liệu máy và bài đang phát lên màn Máy tính, nhận lệnh ⏮ ⏯ ⏭ và âm lượng từ loa, và làm relay cho
 YouTube. Mỗi loa chỉ nhận một máy tính mỗi lúc. Muốn đổi sang máy khác thì chọn "Giành quyền nối loa" trong menu.

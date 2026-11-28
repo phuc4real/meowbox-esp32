@@ -31,6 +31,8 @@ struct State {
 
 static STATE: Mutex<State> = Mutex::new(State { busy: false, error: String::new(), pct: 0, fresh: false });
 /// One download at a time; a second caller waits for the first.
+/// Bytes of the download running now.
+pub static METER: super::Meter = super::Meter::new();
 static INSTALL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 fn state() -> std::sync::MutexGuard<'static, State> {
@@ -153,7 +155,9 @@ async fn install_inner() -> anyhow::Result<String> {
     tracing::info!("ffmpeg: downloading {name} ({} MB)", size / 1_048_576);
     let tmp = std::env::temp_dir().join(format!("meowbox-{name}"));
     super::download_checked(&url, &tmp, &want, |done, total| {
-        state().pct = (done * 100 / total.max(size).max(1)) as u32;
+        let total = total.max(size);
+        METER.set(done, total);
+        state().pct = (done * 100 / total.max(1)) as u32;
     })
     .await?;
     let build = name.trim_end_matches(".zip").to_owned();
@@ -190,6 +194,7 @@ struct Busy;
 
 impl Drop for Busy {
     fn drop(&mut self) {
+        METER.clear();
         state().busy = false;
     }
 }

@@ -11,5 +11,8 @@
   "shape": {"radius": 0, "border": 0, "btn": "cut", "shadow": [0, 0], "hover_shadow": [0, 0]},
   "fx": {"aberration": true, "scanline": true, "grid": false, "hud": true, "tilt": false, "segments": true, "shadow": false},
   "clock": {"layout": "center"},
+  "agent": {"display_font": "chakra-petch-display.ttf",
+            "light": {"line": "#6874A0"},
+            "dark": {"line": "#6874A0"}},
   "cat": {"palette": "neon"}
 }

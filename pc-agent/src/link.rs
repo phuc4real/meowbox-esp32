@@ -61,6 +61,15 @@ struct Shared {
     coding: Arc<Tracker>,
     /// Toasts for the tray (set by the tray; the CLI only logs them).
     toast: Arc<Mutex<Option<crate::relay::Toast>>>,
+    /// What was last sent to the speaker, for the agent window's mirror of its Computer screen.
+    mirror: Arc<Mutex<Mirror>>,
+}
+
+/// The last `stats` and `media` messages sent (or read, while stats are paused), cleared when the link drops.
+#[derive(Debug, Clone, Default)]
+pub struct Mirror {
+    pub stats: Option<Value>,
+    pub media: Option<Value>,
 }
 
 impl Shared {
@@ -73,15 +82,16 @@ impl Shared {
             extra_allowed: Arc::default(),
             coding: Arc::default(),
             toast: Arc::default(),
+            mirror: Arc::default(),
         }
     }
 
     fn toast(&self) -> crate::relay::Toast {
         let t = self.toast.clone();
-        Arc::new(move |text: String| {
+        Arc::new(move |kind: crate::state::ToastKind, text: String| {
             tracing::info!("toast: {text}");
             if let Some(f) = t.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
-                f(text);
+                f(kind, text);
             }
         })
     }
@@ -144,7 +154,7 @@ impl CoreHandle {
     }
 
     /// Where the core's short messages go (the tray's balloon).
-    pub fn set_toast(&self, f: impl Fn(String) + Send + Sync + 'static) {
+    pub fn set_toast(&self, f: impl Fn(crate::state::ToastKind, String) + Send + Sync + 'static) {
         *self.shared.toast.lock().unwrap_or_else(|e| e.into_inner()) = Some(Arc::new(f));
     }
 
@@ -158,6 +168,19 @@ impl CoreHandle {
 
     pub fn state(&self) -> &SharedState {
         &self.shared.state
+    }
+
+    /// What the speaker's Computer screen shows now (the last stats and media sent).
+    pub fn mirror(&self) -> Mirror {
+        self.shared.mirror.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+
+    /// Ask the connected speaker for its theme again (the window does it when it opens and now and then).
+    pub fn refresh_theme(&self) {
+        let st = self.shared.state.get();
+        if st.connected {
+            self.rt.spawn(fetch_theme(self.shared.state.clone(), st.host));
+        }
     }
 
     pub fn cfg(&self) -> &SharedConfig {
@@ -262,11 +285,19 @@ async fn update_check(sh: Shared) {
                 && crate::update::newer_than_running(&v)
             {
                 sh.state.update(|s| s.new_version = v.clone());
-                (sh.toast())(crate::ui::strings::t_new_agent(&v));
+                let text = crate::ui::strings::f(crate::ui::strings::s().t_new_agent, &[&v]);
+                (sh.toast())(crate::state::ToastKind::NewVersion(v.clone()), text);
             }
             crate::tools::ytdlp::maintain(true).await;
         }
         tokio::time::sleep(Duration::from_secs(24 * 3600)).await;
+    }
+}
+
+/// The speaker's theme into the state (kept as it was if the speaker does not answer).
+async fn fetch_theme(state: SharedState, host: String) {
+    if let Some(t) = crate::speaker_api::theme(&host).await {
+        state.update(|s| s.theme = t);
     }
 }
 
@@ -496,6 +527,7 @@ async fn session(
     });
     remember(&sh.cfg, sp);
     tracing::info!("connected to {} ({}, {})", sp.name, sp.host, sp.how);
+    tokio::spawn(fetch_theme(sh.state.clone(), sp.host.clone()));
 
     let (tx, mut rx) = mpsc::channel::<Message>(32);
     let writer = tokio::spawn(async move {
@@ -507,7 +539,7 @@ async fn session(
         }
     });
     let sender = tokio::spawn(sender(sh.clone(), tx.clone(), feeds.stats.clone()));
-    let media_sender = tokio::spawn(media_sender(tx.clone(), feeds.media.clone()));
+    let media_sender = tokio::spawn(media_sender(tx.clone(), feeds.media.clone(), sh.mirror.clone()));
 
     let mut hb = tokio::time::interval(HEARTBEAT);
     hb.tick().await;
@@ -541,6 +573,7 @@ async fn session(
                     Some(Incoming::MediaCmd(cmd)) => {
                         feeds.media.command(&cmd).await;
                         let m = feeds.media.read().await;
+                        sh.mirror.lock().unwrap_or_else(|e| e.into_inner()).media = Some(m.clone());
                         if tx.send(Message::text(compact(&m))).await.is_err() {
                             break 0;
                         }
@@ -552,17 +585,19 @@ async fn session(
     };
     sender.abort();
     media_sender.abort();
+    *sh.mirror.lock().unwrap_or_else(|e| e.into_inner()) = Mirror::default();
     drop(tx);
     let _ = tokio::time::timeout(Duration::from_secs(1), writer).await;
     wait
 }
 
 /// Media when Windows says it changed (or every 5 s); every second instead when its events are not available.
-async fn media_sender(tx: mpsc::Sender<Message>, media: Arc<Media>) {
+async fn media_sender(tx: mpsc::Sender<Message>, media: Arc<Media>, mirror: Arc<Mutex<Mirror>>) {
     let mut gate = crate::media::MediaGate::default();
     loop {
         let events = media.watch().await;
         let m = media.read().await;
+        mirror.lock().unwrap_or_else(|e| e.into_inner()).media = Some(m.clone());
         let now = Instant::now();
         if gate.should_send(&m, now) && tx.send(Message::text(compact(&m))).await.is_err() {
             return;
@@ -609,9 +644,12 @@ async fn sender(sh: Shared, tx: mpsc::Sender<Message>, stats: Arc<tokio::sync::M
         }
         if !sh.cfg.get().paused {
             let m = stats.lock().await.sample();
+            sh.mirror.lock().unwrap_or_else(|e| e.into_inner()).stats = Some(m.clone());
             if !send(m).await {
                 return;
             }
+        } else {
+            sh.mirror.lock().unwrap_or_else(|e| e.into_inner()).stats = None;
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }

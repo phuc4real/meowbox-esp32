@@ -21,6 +21,12 @@ pub struct Config {
     pub paused: bool,
     /// Check GitHub daily for a newer agent and yt-dlp (Settings window).
     pub auto_update: bool,
+    /// The newest agent version a toast was shown for: each new version is announced once, also across restarts.
+    pub toasted_version: String,
+    /// Window and tray language: "auto" (Windows' language), "vi" or "en".
+    pub lang: String,
+    /// Agent window position and size in points (x, y, width, height), as it was last closed.
+    pub window: Option<[i32; 4]>,
     /// Everything as read from the file, known keys included; known keys are overwritten on save.
     extra: Map<String, Value>,
 }
@@ -36,6 +42,9 @@ impl Default for Config {
             coding_port: 8767,
             paused: false,
             auto_update: true,
+            toasted_version: String::new(),
+            lang: "auto".into(),
+            window: None,
             extra: Map::new(),
         }
     }
@@ -58,6 +67,21 @@ fn get_bool(m: &Map<String, Value>, k: &str, d: bool) -> bool {
     m.get(k).and_then(Value::as_bool).unwrap_or(d)
 }
 
+/// [x, y, w, h] with a sane size; anything else is "no saved window".
+fn get_window(m: &Map<String, Value>) -> Option<[i32; 4]> {
+    let a = m.get("window")?.as_array()?;
+    let v: Vec<i32> = a.iter().filter_map(|x| x.as_i64().and_then(|n| i32::try_from(n).ok())).collect();
+    let w: [i32; 4] = v.try_into().ok()?;
+    (w[2] >= 200 && w[3] >= 200 && w[2] <= 10_000 && w[3] <= 10_000).then_some(w)
+}
+
+fn get_lang(m: &Map<String, Value>) -> String {
+    match m.get("lang").and_then(Value::as_str) {
+        Some(l @ ("vi" | "en")) => l.to_owned(),
+        _ => "auto".into(),
+    }
+}
+
 impl Config {
     pub fn from_map(m: Map<String, Value>) -> Self {
         let d = Self::default();
@@ -70,6 +94,9 @@ impl Config {
             coding_port: get_port(&m, "coding_port", d.coding_port),
             paused: get_bool(&m, "paused", d.paused),
             auto_update: get_bool(&m, "auto_update", d.auto_update),
+            toasted_version: get_str(&m, "toasted_version", &d.toasted_version),
+            lang: get_lang(&m),
+            window: get_window(&m),
             extra: m,
         }
     }
@@ -85,9 +112,15 @@ impl Config {
             ("coding_port", json!(self.coding_port)),
             ("paused", json!(self.paused)),
             ("auto_update", json!(self.auto_update)),
+            ("toasted_version", json!(self.toasted_version)),
+            ("lang", json!(self.lang)),
         ] {
             m.insert(k.to_owned(), v);
         }
+        match self.window {
+            Some(w) => m.insert("window".to_owned(), json!(w)),
+            None => m.remove("window"),
+        };
         m
     }
 
@@ -204,5 +237,17 @@ mod tests {
         let m: Map<String, Value> = serde_json::from_str(r#"{"relay_port":0,"coding_port":70000}"#).unwrap();
         let c = Config::from_map(m);
         assert_eq!((c.relay_port, c.coding_port), (8765, 8767));
+    }
+
+    #[test]
+    fn window_and_language() {
+        let m: Map<String, Value> = serde_json::from_str(r#"{"window":[10,-20,560,600],"lang":"en"}"#).unwrap();
+        let c = Config::from_map(m);
+        assert_eq!((c.window, c.lang.as_str()), (Some([10, -20, 560, 600]), "en"));
+        assert_eq!(c.to_map()["window"], json!([10, -20, 560, 600]));
+        for bad in [r#"{"window":[1,2,3],"lang":"fr"}"#, r#"{"window":[0,0,50,50]}"#, r#"{"window":"x"}"#] {
+            let c = Config::from_map(serde_json::from_str(bad).unwrap());
+            assert_eq!((c.window, c.lang.as_str()), (None, "auto"), "{bad}");
+        }
     }
 }

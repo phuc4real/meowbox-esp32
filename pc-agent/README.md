@@ -24,21 +24,45 @@ Download `MeowBoxAgent-Setup-x.y.z.exe` (~6 MB) from
 - opens the firewall for the agent on **Private** networks (YouTube relay);
 - options: run at Windows start (on by default), add `meowbox.exe` to PATH;
 - downloads the latest yt-dlp into `%LOCALAPPDATA%\MeowBox\bin\yt-dlp` (not bundled, so it can always be updated);
-- removes what the Python agent left (its `_internal` folder, `yt-dlp.pyz`), keeping the settings.
+- removes what the Python agent left (its `_internal` folder, `yt-dlp.pyz`), keeping the settings;
+- speaks Vietnamese on a Vietnamese Windows, English otherwise.
 
-After installing, the agent starts, shows a cat in the system tray, and the first time opens the **Kết nối loa**
-(connect speaker) window:
+After installing, the agent starts, shows a cat in the system tray, and the first time opens its window.
 
-1. **IP loa**: type the IP shown on the speaker's System tile, click Thử (the agent calls `/api/ping`).
-2. **Token**: paste the token from the speaker's Notifications page and click Kiểm tra. Required: the speaker only
-   accepts an agent with the right token (stats, media, YouTube, `notify`, `say`, `wifi-setup`).
-3. **Kiểm tra**: the speaker tries to call the relay on this PC. If that fails on a network Windows calls Public,
-   a "Cho phép trên mạng này" button adds a firewall rule for that network type only (asks for admin).
+**The window** wears the speaker's theme (Swiss, Cyberpunk, Zen or Brutalism, with the theme's display font; asked
+from the speaker's `GET /api/theme`), light or dark as Windows is set. On top, a mirror of the speaker's Computer
+screen: the speaker's name, IP and link state, and the numbers it shows (CPU, RAM, GPU, GPU temperature) and what is
+playing, exactly as the agent just sent them. When the link is not up, the mirror says why in one sentence with the
+one button that fixes it (enter the IP, enter the token, retry, take the speaker over, change the relay port, ...).
+Below it, two tabs:
 
-The dot on the icon: green = connected, grey = connecting, red = error (hover the icon to see which). The right-click
-menu: open the speaker's web page, send a test notification, pause stats, Meow Coding, connect speaker, settings,
-reconnect now, run at Windows start, log folder. When the speaker is held by another PC, "Giành quyền nối loa" takes
-it over. When GitHub has a newer agent, the menu shows "Có bản x.y.z".
+- **Kết nối** (connect): three rows the agent checks by itself, in order, each turning ✓ when it passes. The first
+  one that fails opens in place with the reason and the fix, and the cursor goes to it.
+  1. **IP loa**: the IP shown on the speaker's System tile (the agent calls `/api/ping`). Saved as soon as it answers.
+  2. **Token**: from the speaker's Notifications page. Required: the speaker only accepts an agent with the right
+     token (stats, media, YouTube, `notify`, `say`, `wifi-setup`). Saved as soon as the speaker accepts it.
+  3. **YouTube relay**: the speaker tries to call the relay on this PC. If that fails on a network Windows calls
+     Public, a "Cho phép trên mạng này" button adds a firewall rule for that network type only (asks for admin).
+
+  Under the rows: "Gửi thông báo thử" (test notification) and "Nối lại loa ngay" (reconnect now).
+- **Cài đặt** (settings), one list: agent version and update (downloads the new installer with a progress bar,
+  checks it against the release's `SHA2-256SUMS` and runs it; a release without that file opens the release page
+  instead), yt-dlp, ffmpeg (progress bars too), daily update check, run at Windows start, relay port, language
+  (follows Windows: Vietnamese, else English; or pick one); log folder, GitHub, about.
+
+The window remembers its position and size. Every control is reachable with Tab and has a name for Narrator.
+
+**The tray icon** shows the state in the cat's eyes: open = connected, half closed = connecting, × = error, with a
+green / grey / red dot as a second cue; the tooltip and the first menu line say what is going on and what to do. A
+left click opens the window (or brings it to the front). The right-click menu: open the window, open the speaker's
+web page, pause stats, Meow Coding, quit. When the speaker is held by another PC, "Giành quyền nối loa" takes it
+over. When GitHub has a newer agent, the menu shows "Có bản x.y.z", which opens Settings. Starting the agent again
+(Start menu) opens the running agent's window.
+
+Toasts, at most one of each kind every 10 minutes: the speaker lost for more than 2 minutes after having been
+connected, the token refused, the speaker taken over by another PC, the ffmpeg download (started, done, failed), and
+each new agent version once. Connecting is silent (the cat opens its eyes). Meow Coding on/off and the test
+notification answer with a toast every time.
 
 The agent does not look for the speaker on the network (no mDNS, no UDP broadcast): security software on company
 PCs blocks or flags that kind of scan. It only connects to the IP you typed (`host`) or the last one that worked
@@ -47,10 +71,6 @@ does not connect to the wrong one. When the speaker's IP changes, type it again 
 `meowbox config --set-host IP`); better, give the speaker a fixed IP on the router. A speaker takes one PC at a time.
 
 Settings: `%APPDATA%\MeowBox\agent.json`. Log: `%APPDATA%\MeowBox\agent.log` (rotated at 1 MB × 3).
-
-**Cài đặt…** (tray menu, the second page of the same window): agent version and update (downloads the new installer,
-checks it against the release's `SHA2-256SUMS` and runs it; a release without that file opens the release page
-instead), yt-dlp, ffmpeg; daily update check; run at Windows start; relay port; log folder.
 
 ### YouTube
 
@@ -125,11 +145,20 @@ cargo fmt
 ```
 
 `MeowBoxAgent.exe` dev flags: `--dev` (skip the single-instance check), `--open` (open the window at start),
-`--selftest-dialog N` (open and close the window N times, then quit), `-v`.
+`--selftest-dialog N` (open and close the window N times, then quit), `-v`. With `--dev`, for screenshots:
+`--theme <id>` (instead of the speaker's), `--dark` / `--light` (instead of Windows'), `--page settings`.
+
+Generated, edit the source instead: `src/ui/themes_gen.rs` (window palettes, from `firmware/themes/*.json` by
+`firmware/tools/gen_themes.py`; the `"agent"` block of each theme holds the window's colours and dark palette),
+`assets/fonts/*.ttf` (display fonts, `firmware/tools/fonts/gen_theme_fonts.py --agent`), `assets/meowbox.ico` and
+`packaging/wizard-*.bmp` (`py -3.14 assets/make_art.py`). The tray icons `assets/icons/cat-<state>-<size>.png` are
+hand-drawn pixel art and the sources themselves (`make_art.py --pixel` redraws them from scratch); `build.rs` embeds
+them. `cargo test` fails if a theme's colours are not readable in the window (WCAG contrast).
 
 Layout (`src/`): `link.rs` (the `/ws/pc` link and the core), `discovery.rs`, `stats.rs`, `media.rs`, `tts.rs`,
 `relay/` (YouTube relay, MP4 → ADTS, job objects), `tools/` (yt-dlp, ffmpeg), `coding/` (Meow Coding), `ui/` (tray,
-egui window), `win/` (Windows bits), `cli.rs`, `config.rs`, `log.rs`. Tests that need the network or touch a real
+toasts, the egui window: `mirror.rs`, `connect.rs`, `settings.rs`, `theme.rs`, `strings.rs` in Vietnamese and
+English), `win/` (Windows bits), `cli.rs`, `config.rs`, `log.rs`. Tests that need the network or touch a real
 profile are off by default (`cargo test -- --ignored` downloads ffmpeg into `%LOCALAPPDATA%`, point it somewhere
 disposable).
 
@@ -160,7 +189,7 @@ Output: `packaging\build\MeowBoxAgent-Setup-<version>.exe` (~6 MB, no yt-dlp or 
 ## Test without a speaker (mock)
 
 `mock_speaker.py` (Python, aiohttp) plays the speaker: `/ws/pc` (one PC at a time, `busy`, `take`), `/api/ping`,
-`/api/notify*`, `/api/pc/relay_test` as the firmware does (no mDNS/UDP: the agent does not use them).
+`/api/theme` (`--theme zen`), `/api/notify*`, `/api/pc/relay_test` as the firmware does (no mDNS/UDP: the agent does not use them).
 
 ```powershell
 py -3.14 mock_speaker.py --port 8081 --name MeowBox-AAAA

@@ -16,6 +16,8 @@ const REPO: &str = "yt-dlp/yt-dlp";
 static RUNNING: AtomicUsize = AtomicUsize::new(0);
 /// One install at a time: the agent's start-up maintenance, the tray's daily check and the Settings button can all
 /// ask at once, and they would write the same zip and folder.
+/// Bytes of the download running now.
+pub static METER: super::Meter = super::Meter::new();
 static UPDATING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// Held while a yt-dlp process runs.
@@ -145,7 +147,9 @@ pub async fn update(progress: impl Fn(&str)) -> anyhow::Result<String> {
     progress("download");
     std::fs::create_dir_all(root())?;
     let zip_path = root().join(format!("{tag}.zip"));
-    super::download_checked(&format!("{base}{ASSET}"), &zip_path, &want, |_, _| {}).await?;
+    let r = super::download_checked(&format!("{base}{ASSET}"), &zip_path, &want, |d, t| METER.set(d, t)).await;
+    METER.clear();
+    r?;
     progress("unpack");
     let partial = root().join(format!("{tag}.partial"));
     let dest = root().join(&tag);

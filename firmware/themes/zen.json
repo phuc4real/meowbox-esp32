@@ -11,5 +11,9 @@
   "shape": {"radius": 20, "border": 1, "btn": "text", "shadow": [0, 0], "hover_shadow": [0, 0]},
   "fx": {"aberration": false, "scanline": false, "grid": false, "hud": false, "tilt": false, "segments": false, "shadow": false},
   "clock": {"layout": "enso"},
+  "agent": {"display_font": "cormorant-display.ttf",
+            "light": {"dim": "#6A5D47", "line": "#857865"},
+            "dark": {"bg": "#1F1C18", "surface": "#2B2722", "text": "#EDE5D6", "dim": "#B3A486", "line": "#7D705A",
+                     "accent": "#A8322A", "on_accent": "#F3EDE1", "ok": "#9DBA88", "warn": "#E08A80", "alert": "#E08A80"}},
   "cat": {"palette": "sumi"}
 }

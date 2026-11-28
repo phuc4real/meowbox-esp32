@@ -40,3 +40,13 @@ pub async fn speaker_request(
 pub async fn notify(host: &str, token: &str, body: &serde_json::Value) -> reqwest::Result<(u16, String)> {
     speaker_request(host, "/api/notify", token, Some((body.to_string().into_bytes(), "application/json"))).await
 }
+
+/// GET /api/theme (no auth): the id of the speaker's theme, for the agent window. None if it does not answer.
+pub async fn theme(host: &str) -> Option<String> {
+    let (code, text) = request(host, "/api/theme", "", None, Duration::from_secs(5)).await.ok()?;
+    if code != 200 {
+        return None;
+    }
+    let v: serde_json::Value = serde_json::from_str(&text).ok()?;
+    v.get("theme").and_then(|t| t.as_str()).filter(|t| !t.is_empty() && t.len() <= 32).map(str::to_owned)
+}

@@ -1,71 +1,89 @@
-//! "Kết nối loa" (docs/firmware_v0.2.0.md, 2.2): 1 speaker IP, 2 notify token, 3 YouTube relay check. On Finish
-//! it saves speaker/token/last_host and asks the core to reconnect now. Port of connect_dialog.py.
+//! "Kết nối" (B2): one page, three rows checked in order, each by itself: 1 the speaker's IP (`/api/ping`), 2 the
+//! notify token (`/api/notify/history`), 3 the YouTube relay (the speaker calls back, `/api/pc/relay_test`). The
+//! numbers stay because the rows really are a sequence. A row turns ✓ when it passes; the first one that fails
+//! opens in place with the reason and the fix, and the cursor goes to it. A passing IP or token is saved at once and
+//! the core reconnects with it.
 
-use super::strings::connect as t;
+use super::strings::{f, s};
 use super::task::{Task, blocking, poll};
-use super::{Look, hint, msg};
+use super::theme::Look;
+use super::widgets::{self, Mark};
 use crate::discovery::{PingError, Speaker};
 use crate::link::CoreHandle;
-use eframe::egui::{self, RichText};
+use eframe::egui::{self, RichText, Ui};
 use std::time::Duration;
 
-type Msg = Option<(String, egui::Color32)>;
+const WIFI_HELP: &str = "https://github.com/phuc4real/meowbox-esp32#readme";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Row {
+    Ip,
+    Token,
+    Relay,
+}
+
+#[derive(Debug, Clone)]
+enum Check<T> {
+    Idle,
+    Running,
+    Ok(T),
+    Fail(String),
+}
+
 /// (host checked, result, why it failed)
 type IpCheck = (String, Result<Speaker, PingError>, String);
-/// (ok, ms or error, network category)
-type RelayCheck = Result<(bool, String, String), String>;
+/// (token checked, HTTP status or error)
+type TokenCheck = (String, Result<u16, String>);
+/// Ok(ms) or Err((reason, network category)); Err(NO_LINK) when the speaker never took our hello.
+type RelayCheck = Result<String, (String, String)>;
+const NO_LINK: &str = "no_link";
 
 pub struct Connect {
-    pub step: usize,
     ip: String,
-    sel: Option<Speaker>,
-    ip_msg: Msg,
-    reasons: Option<String>,
+    ip_check: Check<Speaker>,
     ip_task: Option<Task<IpCheck>>,
+    wifi: Option<String>,
     wifi_task: Option<Task<String>>,
-    tried_on_open: bool,
 
     token: String,
-    token_ok: bool,
-    tok_msg: Msg,
-    tok_task: Option<Task<Result<u16, String>>>,
-    tok_checked_on_open: bool,
+    tok_check: Check<()>,
+    tok_task: Option<Task<TokenCheck>>,
 
-    new_port: String,
-    port_msg: Msg,
-    relay_msg: Msg,
-    relay_public: bool,
+    relay_check: Check<String>,
     relay_task: Option<Task<RelayCheck>>,
-    relay_tested_on_open: bool,
+    relay_public: bool,
+    relay_note: Option<String>,
+    new_port: String,
+    port_note: Option<String>,
 
-    /// Set when Finish was pressed: the window closes.
-    pub finished: bool,
+    started: bool,
+    focus: Option<Row>,
+}
+
+pub enum Act {
+    TestNotify,
 }
 
 impl Connect {
     pub fn new(core: &CoreHandle) -> Self {
         let cfg = core.cfg().get();
         Self {
-            step: 0,
             ip: cfg.known_host().to_owned(),
-            sel: None,
-            ip_msg: None,
-            reasons: None,
+            ip_check: Check::Idle,
             ip_task: None,
+            wifi: None,
             wifi_task: None,
-            tried_on_open: false,
             token: cfg.token.clone(),
-            token_ok: false,
-            tok_msg: None,
+            tok_check: Check::Idle,
             tok_task: None,
-            tok_checked_on_open: false,
-            new_port: (cfg.relay_port.saturating_add(1)).to_string(),
-            port_msg: None,
-            relay_msg: None,
-            relay_public: false,
+            relay_check: Check::Idle,
             relay_task: None,
-            relay_tested_on_open: false,
-            finished: false,
+            relay_public: false,
+            relay_note: None,
+            new_port: cfg.relay_port.saturating_add(1).to_string(),
+            port_note: None,
+            started: false,
+            focus: None,
         }
     }
 
@@ -74,83 +92,29 @@ impl Connect {
         core.clear_allowed();
     }
 
-    fn save(&self, core: &CoreHandle, reconnect: bool) {
-        let (sel, token) = (self.sel.clone(), self.token.trim().to_owned());
-        core.cfg().update(|c| {
-            if let Some(sp) = &sel {
-                c.speaker = sp.name.clone();
-                c.host = sp.host.clone();
-                c.last_host = sp.host.clone();
-            }
-            c.token = token;
-        });
-        if reconnect {
-            core.reconnect_now(false);
+    /// Put the cursor in a row (the mirror's "Enter IP" / "Enter token").
+    pub fn focus(&mut self, row: Row) {
+        self.focus = Some(row);
+    }
+
+    fn speaker(&self) -> Option<&Speaker> {
+        match &self.ip_check {
+            Check::Ok(sp) => Some(sp),
+            _ => None,
         }
     }
 
-    fn next(&mut self, core: &CoreHandle) {
-        match self.step {
-            0 => {
-                if self.sel.is_none() {
-                    return;
-                }
-                self.save(core, true);
-            }
-            1 => {
-                if !self.token_ok {
-                    self.tok_msg = msg(t::TOKEN_NEED, Look::Bad);
-                    return;
-                }
-                self.save(core, true); // the hello carries the token now
-            }
-            _ => {
-                self.save(core, false);
-                self.finished = true;
-                return;
-            }
-        }
-        self.step += 1;
-    }
-
-    pub fn ui(&mut self, ui: &mut egui::Ui, core: &CoreHandle) {
-        let head = t::STEPS
-            .iter()
-            .enumerate()
-            .map(|(k, s)| if k == self.step { format!("● {s}") } else { (*s).to_owned() })
-            .collect::<Vec<_>>()
-            .join("  ›  ");
-        ui.label(RichText::new(head).size(15.0));
-        ui.add_space(8.0);
-
-        egui::Panel::bottom("connect_nav").show_separator_line(false).show(ui, |ui| {
-            ui.add_space(6.0);
-            ui.horizontal(|ui| {
-                if ui.add_enabled(self.step > 0, egui::Button::new(t::BACK)).clicked() {
-                    self.step -= 1;
-                }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let label = if self.step == 2 { t::FINISH } else { t::NEXT };
-                    let enabled = self.step != 0 || self.sel.is_some();
-                    if ui.add_enabled(enabled, egui::Button::new(label)).clicked() {
-                        self.next(core);
-                    }
-                });
-            });
-        });
-
-        egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| match self.step {
-            0 => self.page_ip(ui, core),
-            1 => self.page_token(ui, core),
-            _ => self.page_relay(ui, core),
-        });
-    }
-
-    // -- step 1
-    fn try_ip(&mut self, ui: &egui::Ui, core: &CoreHandle) {
+    // -- 1: IP
+    fn check_ip(&mut self, ui: &Ui, core: &CoreHandle) {
         let host = self.ip.trim().to_owned();
-        self.ip_msg = msg("…", Look::Hint);
-        self.reasons = None;
+        if host.is_empty() {
+            self.focus = Some(Row::Ip);
+            return;
+        }
+        self.ip_check = Check::Running;
+        self.tok_check = Check::Idle;
+        self.relay_check = Check::Idle;
+        self.wifi = None;
         self.ip_task = Some(Task::spawn(core, ui.ctx(), async move {
             let r = crate::discovery::ping_detail(&host).await;
             let mut why = String::new();
@@ -161,128 +125,108 @@ impl Connect {
         }));
     }
 
-    fn page_ip(&mut self, ui: &mut egui::Ui, core: &CoreHandle) {
-        let mut failed = false;
-        poll(&mut self.ip_task, |(host, r, why)| {
-            if self.step != 0 || self.ip.trim() != host {
-                return; // left the page or edited the IP while checking
-            }
-            match r {
-                Ok(sp) => {
-                    self.ip_msg = msg(&t::ok_ip(&sp.name, if sp.ver.is_empty() { "?" } else { &sp.ver }), Look::Good);
-                    self.sel = Some(sp);
-                    self.reasons = None;
-                }
-                Err(_) => {
-                    self.ip_msg = msg(t::error(&why), Look::Bad);
-                    failed = true;
-                }
-            }
-        });
-        if failed {
-            // the Wi-Fi name needs netsh / the network list: off the UI thread
-            self.reasons = Some(t::reasons("…"));
-            self.wifi_task = Some(Task::spawn(core, ui.ctx(), async {
-                blocking(crate::win::wifi_name).await.filter(|w| !w.is_empty()).unwrap_or_else(|| t::NOT_WIFI.into())
-            }));
+    fn ip_done(&mut self, ui: &Ui, core: &CoreHandle, host: String, r: Result<Speaker, PingError>, why: String) {
+        if self.ip.trim() != host {
+            return; // edited while checking
         }
-        poll(&mut self.wifi_task, |w| {
-            if self.reasons.is_some() {
-                self.reasons = Some(t::reasons(&w));
+        match r {
+            Ok(sp) => {
+                let cfg = core.cfg().get();
+                if cfg.speaker != sp.name || cfg.host != sp.host || cfg.last_host != sp.host {
+                    let sp2 = sp.clone();
+                    core.cfg().update(|c| {
+                        c.speaker = sp2.name.clone();
+                        c.host = sp2.host.clone();
+                        c.last_host = sp2.host.clone();
+                    });
+                    core.reconnect_now(false);
+                }
+                self.ip_check = Check::Ok(sp);
+                if self.token.trim().is_empty() {
+                    self.focus = Some(Row::Token);
+                } else {
+                    self.check_token(ui, core);
+                }
             }
-        });
-        ui.label(t::IP);
-        ui.horizontal(|ui| {
-            let r = ui.add(egui::TextEdit::singleline(&mut self.ip).desired_width(200.0));
-            if r.changed() && self.sel.as_ref().is_some_and(|s| s.host != self.ip.trim()) {
-                // a different IP than the one checked: check again before Next
-                self.sel = None;
-                self.ip_msg = None;
-            }
-            let enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-            if ui.button(t::TRY).clicked() || enter {
-                self.try_ip(ui, core);
-            }
-        });
-        if !self.tried_on_open {
-            self.tried_on_open = true;
-            if !self.ip.trim().is_empty() {
-                self.try_ip(ui, core);
-            }
-        }
-        show_msg(ui, &self.ip_msg);
-        ui.add_space(6.0);
-        hint(ui, t::IP_TIP);
-        if let Some(r) = &self.reasons {
-            ui.add_space(8.0);
-            ui.label(RichText::new(r).color(Look::Text.color()));
-            if ui.button(t::WIFI_HELP_BTN).clicked() {
-                crate::win::open(t::WIFI_HELP);
+            Err(_) => {
+                let t = s();
+                let reason = match why.as_str() {
+                    "not_meowbox" => t.c_err_not_meowbox,
+                    "bad_address" => t.c_err_bad_address,
+                    "other_network" => t.c_err_other_network,
+                    _ => t.c_err_no_answer,
+                };
+                self.ip_check = Check::Fail(reason.into());
+                self.focus = Some(Row::Ip);
+                // the Wi-Fi name needs netsh / the network list: off the UI thread
+                self.wifi_task = Some(Task::spawn(core, ui.ctx(), async {
+                    blocking(crate::win::wifi_name).await.filter(|w| !w.is_empty()).unwrap_or_default()
+                }));
             }
         }
     }
 
-    // -- step 2
-    fn check_token(&mut self, ui: &egui::Ui, core: &CoreHandle) {
-        let (host, tok) = (self.sel.as_ref().map(|s| s.host.clone()).unwrap_or_default(), self.token.trim().to_owned());
-        self.tok_msg = msg("…", Look::Hint);
+    // -- 2: token
+    fn check_token(&mut self, ui: &Ui, core: &CoreHandle) {
+        let Some(sp) = self.speaker() else {
+            self.focus = Some(Row::Ip);
+            return;
+        };
+        let (host, tok) = (sp.host.clone(), self.token.trim().to_owned());
+        if tok.is_empty() {
+            self.focus = Some(Row::Token);
+            return;
+        }
+        self.tok_check = Check::Running;
+        self.relay_check = Check::Idle;
         self.tok_task = Some(Task::spawn(core, ui.ctx(), async move {
-            crate::speaker_api::request(&host, "/api/notify/history", &tok, None, Duration::from_secs(5))
+            let r = crate::speaker_api::request(&host, "/api/notify/history", &tok, None, Duration::from_secs(5))
                 .await
                 .map(|(code, _)| code)
-                .map_err(|e| e.to_string())
+                .map_err(|e| e.to_string());
+            (tok, r)
         }));
     }
 
-    fn page_token(&mut self, ui: &mut egui::Ui, core: &CoreHandle) {
-        poll(&mut self.tok_task, |r| {
-            self.token_ok = r == Ok(200);
-            self.tok_msg = match r {
-                Ok(200) => msg(t::TOKEN_OK, Look::Good),
-                Ok(401) => msg(t::TOKEN_BAD, Look::Bad),
-                Ok(code) => msg(&t::token_err(&code.to_string()), Look::Bad),
-                Err(e) => msg(&t::token_err(&e), Look::Bad),
-            };
-        });
-        ui.label(t::TOKEN_INTRO);
-        ui.add_space(8.0);
-        let host = self.sel.as_ref().map(|s| s.host.clone()).unwrap_or_default();
-        if ui.button(t::OPEN_NOTIFY).clicked() {
-            crate::win::open(&format!("http://{host}/#/notify"));
+    fn token_done(&mut self, ui: &Ui, core: &CoreHandle, (tok, r): TokenCheck) {
+        if self.token.trim() != tok {
+            return; // edited while checking: that one is checked again on Enter / Kiểm tra
         }
-        ui.add_space(8.0);
-        ui.horizontal(|ui| {
-            ui.label(t::TOKEN);
-            let r = ui.add(egui::TextEdit::singleline(&mut self.token).desired_width(300.0));
-            if r.changed() {
-                self.token_ok = false;
+        let t = s();
+        match r {
+            Ok(200) => {
+                if core.cfg().get().token != tok {
+                    core.cfg().update(|c| c.token = tok);
+                    core.reconnect_now(false); // the hello carries the token
+                }
+                self.tok_check = Check::Ok(());
+                self.check_relay(ui, core);
             }
-            let enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-            if ui.button(t::CHECK).clicked() || enter {
-                self.check_token(ui, core);
-            }
-        });
-        if !self.tok_checked_on_open {
-            self.tok_checked_on_open = true;
-            if !self.token.trim().is_empty() {
-                // saved earlier: check it right away
-                self.check_token(ui, core);
-            }
+            Ok(401) => self.tok_check = Check::Fail(t.c_token_bad.into()),
+            Ok(code) => self.tok_check = Check::Fail(f(t.c_token_err, &[&format!("HTTP {code}")])),
+            Err(e) => self.tok_check = Check::Fail(f(t.c_token_err, &[&e])),
         }
-        show_msg(ui, &self.tok_msg);
+        if matches!(self.tok_check, Check::Fail(_)) {
+            self.focus = Some(Row::Token);
+        }
     }
 
-    // -- step 3
-    fn relay_test(&mut self, ui: &egui::Ui, core: &CoreHandle) {
+    // -- 3: relay
+    fn check_relay(&mut self, ui: &Ui, core: &CoreHandle) {
+        let Some(sp) = self.speaker().cloned() else { return };
         let tok = self.token.trim().to_owned();
-        if tok.is_empty() {
-            self.relay_msg = msg(t::RELAY_NEED_TOKEN, Look::Hint);
+        if !matches!(self.tok_check, Check::Ok(_)) {
             return;
         }
-        let Some(sp) = self.sel.clone() else { return };
-        core.allow_ip(sp.ip());
-        self.relay_msg = msg(t::RELAY_WAIT, Look::Hint);
         self.relay_public = false;
+        self.relay_note = None;
+        if core.state().get().relay_port == 0 {
+            let port = core.cfg().get().relay_port;
+            self.relay_check = Check::Fail(f(s().c_port_busy, &[&port]));
+            return;
+        }
+        core.allow_ip(sp.ip());
+        self.relay_check = Check::Running;
         let state = core.state().clone();
         self.relay_task = Some(Task::spawn(core, ui.ctx(), async move {
             // the speaker learns the relay address from our hello
@@ -293,86 +237,278 @@ impl Connect {
                 }
                 tokio::time::sleep(Duration::from_millis(500)).await;
             }
+            let st = state.get();
+            if !(st.connected && st.name == sp.name) {
+                // the speaker would test the relay of the PC it is connected to (maybe another one)
+                return Err((NO_LINK.into(), String::new()));
+            }
             let body = Some((b"{}".to_vec(), "application/json"));
+            let fail = |e: String| (e, String::new());
             let (code, text) =
                 crate::speaker_api::request(&sp.host, "/api/pc/relay_test", &tok, body, Duration::from_secs(8))
                     .await
-                    .map_err(|e| e.to_string())?;
+                    .map_err(|e| fail(e.to_string()))?;
             if code != 200 {
-                return Err(format!("HTTP Error {code}"));
+                return Err(fail(format!("HTTP {code}")));
             }
-            let j: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
-            let ok = j.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
-            if ok {
-                let ms = j.get("ms").map(|v| v.to_string()).unwrap_or_else(|| "?".into());
-                return Ok((true, ms, String::new()));
+            let j: serde_json::Value = serde_json::from_str(&text).map_err(|e| fail(e.to_string()))?;
+            if j.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+                return Ok(j.get("ms").map(|v| v.to_string()).unwrap_or_else(|| "?".into()));
             }
             let err = j.get("err").and_then(|v| v.as_str()).unwrap_or("?").to_owned();
             let ip = sp.ip().to_owned();
             let cat = blocking(move || crate::win::network_category(&crate::win::local_ip_towards(&ip)))
                 .await
                 .unwrap_or_default();
-            Ok((false, err, cat))
+            Err((err, cat))
         }));
     }
 
-    fn page_relay(&mut self, ui: &mut egui::Ui, core: &CoreHandle) {
-        let cfg = core.cfg().get();
-        if core.state().get().relay_port == 0 {
-            ui.label(t::RELAY_PORT_BUSY);
-            ui.horizontal(|ui| {
-                ui.add(egui::TextEdit::singleline(&mut self.new_port).desired_width(80.0));
-                if ui.button("OK").clicked() {
-                    match self.new_port.trim().parse::<u16>() {
-                        Ok(p) if p > 1024 => {
-                            core.cfg().update(|c| c.relay_port = p);
-                            self.save(core, false);
-                            self.port_msg = msg(&t::saved_port(p), Look::Hint);
-                        }
-                        _ => self.port_msg = msg(super::strings::settings::PORT_RANGE, Look::Bad),
-                    }
+    fn relay_done(&mut self, core: &CoreHandle, r: RelayCheck) {
+        let t = s();
+        match r {
+            Ok(ms) => {
+                core.state().update(|s| s.relay_ok = Some(true));
+                self.relay_check = Check::Ok(f(t.c_relay_ok, &[&ms]));
+            }
+            Err((err, _)) if err == NO_LINK => self.relay_check = Check::Fail(t.c_relay_no_link.into()),
+            Err((err, cat)) => {
+                core.state().update(|s| s.relay_ok = Some(false));
+                self.relay_public = cat == "Public";
+                self.relay_check = Check::Fail(f(t.c_relay_fail, &[&err]));
+            }
+        }
+    }
+
+    pub fn ui(&mut self, ui: &mut Ui, look: &Look, core: &CoreHandle) -> Option<Act> {
+        let t = s();
+        let mut act = None;
+        if !self.started {
+            self.started = true;
+            if self.ip.trim().is_empty() {
+                self.focus = Some(Row::Ip);
+            } else {
+                self.check_ip(ui, core);
+            }
+        }
+        let mut done_ip = None;
+        poll(&mut self.ip_task, |r| done_ip = Some(r));
+        if let Some((host, r, why)) = done_ip {
+            self.ip_done(ui, core, host, r, why);
+        }
+        poll(&mut self.wifi_task, |w| self.wifi = Some(w));
+        let mut done_tok = None;
+        poll(&mut self.tok_task, |r| done_tok = Some(r));
+        if let Some(r) = done_tok {
+            self.token_done(ui, core, r);
+        }
+        let mut done_relay = None;
+        poll(&mut self.relay_task, |r| done_relay = Some(r));
+        if let Some(r) = done_relay {
+            self.relay_done(core, r);
+        }
+        let focus = self.focus.take();
+
+        // 1 IP
+        let (ip_mark, ip_fail) =
+            mark_of(&self.ip_check, |sp| f(t.c_ip_ok, &[&sp.name, &if sp.ver.is_empty() { "?" } else { &sp.ver }]));
+        let mut run_ip = false;
+        row(ui, look, "1", t.c_ip, |ui, label| {
+            let field = egui::TextEdit::singleline(&mut self.ip).desired_width(150.0).hint_text("192.168.1.50");
+            let r = ui.add(field).labelled_by(label);
+            if focus == Some(Row::Ip) {
+                r.request_focus();
+            }
+            if r.changed() {
+                self.ip_check = Check::Idle;
+                self.tok_check = Check::Idle;
+                self.relay_check = Check::Idle;
+            }
+            run_ip = enter(ui, &r);
+            run_ip |= check_button(ui, look, &self.ip_check);
+            widgets::mark(ui, look, &ip_mark);
+        });
+        if run_ip {
+            self.check_ip(ui, core);
+        }
+        if let Some(reason) = ip_fail {
+            expanded(ui, |ui| {
+                widgets::problem(ui, look, &reason);
+                let wifi = match self.wifi.as_deref() {
+                    None => "…",
+                    Some("") => t.c_not_wifi,
+                    Some(w) => w,
+                };
+                widgets::note(ui, look, &f(t.c_reasons, &[&wifi]));
+                if widgets::button(ui, look, t.c_wifi_help).clicked() {
+                    crate::win::open(WIFI_HELP);
                 }
             });
-            show_msg(ui, &self.port_msg);
-            return;
+        } else if matches!(self.ip_check, Check::Idle) && self.ip.trim().is_empty() {
+            expanded(ui, |ui| widgets::note(ui, look, t.c_ip_hint));
         }
-        poll(&mut self.relay_task, |r| match r {
-            Err(e) => self.relay_msg = msg(&t::relay_fail(&e), Look::Bad),
-            Ok((true, ms, _)) => {
-                core.state().update(|s| s.relay_ok = Some(true));
-                self.relay_msg = msg(&t::relay_ok(&ms), Look::Good);
+
+        // 2 token
+        let have_ip = self.speaker().is_some();
+        let (tok_mark, tok_fail) = if have_ip {
+            mark_of(&self.tok_check, |_| t.c_token_ok.to_owned())
+        } else {
+            (Mark::Dim(t.c_need_ip.into()), None)
+        };
+        let mut run_tok = false;
+        row(ui, look, "2", t.c_token, |ui, label| {
+            let field = egui::TextEdit::singleline(&mut self.token).desired_width(150.0).password(true);
+            let r = ui.add_enabled(have_ip, field).labelled_by(label);
+            if focus == Some(Row::Token) {
+                r.request_focus();
             }
-            Ok((false, err, cat)) => {
-                core.state().update(|s| s.relay_ok = Some(false));
-                let mut text = t::relay_fail(&err);
-                if cat == "Public" {
-                    text = format!("{text}\n{}", t::PUBLIC);
-                    self.relay_public = true;
-                }
-                self.relay_msg = msg(&text, Look::Bad);
+            if r.changed() {
+                self.tok_check = Check::Idle;
+                self.relay_check = Check::Idle;
             }
+            run_tok = enter(ui, &r);
+            if have_ip {
+                run_tok |= check_button(ui, look, &self.tok_check);
+            }
+            widgets::mark(ui, look, &tok_mark);
         });
-        ui.label(t::relay_intro(cfg.relay_port));
-        ui.add_space(8.0);
-        if ui.add_enabled(self.relay_task.is_none(), egui::Button::new(t::RELAY_RUN)).clicked() {
-            self.relay_test(ui, core);
+        if run_tok {
+            self.check_token(ui, core);
         }
-        if !self.relay_tested_on_open {
-            self.relay_tested_on_open = true;
-            self.relay_test(ui, core);
+        if let Some(reason) = tok_fail {
+            expanded(ui, |ui| {
+                widgets::problem(ui, look, &reason);
+                if let Some(sp) = self.speaker()
+                    && widgets::button(ui, look, t.c_open_notify).clicked()
+                {
+                    crate::win::open(&format!("http://{}/#/notify", sp.host));
+                }
+            });
+        } else if have_ip && matches!(self.tok_check, Check::Idle) && self.token.trim().is_empty() {
+            let host = self.speaker().map(|sp| sp.host.clone()).unwrap_or_default();
+            expanded(ui, |ui| {
+                widgets::note(ui, look, t.why_token);
+                if widgets::button(ui, look, t.c_open_notify).clicked() {
+                    crate::win::open(&format!("http://{host}/#/notify"));
+                }
+            });
         }
-        ui.add_space(6.0);
-        show_msg(ui, &self.relay_msg);
-        if self.relay_public && ui.button(t::ALLOW).clicked() {
-            crate::win::allow_relay_on_this_network(cfg.relay_port, "Public");
-            self.relay_msg = msg(t::ALLOWED, Look::Hint);
-            self.relay_public = false;
+
+        // 3 relay
+        let have_tok = matches!(self.tok_check, Check::Ok(_));
+        let (relay_mark, relay_fail) = if !have_tok {
+            (Mark::Dim(t.c_need_token.into()), None)
+        } else if matches!(self.relay_check, Check::Running) {
+            (Mark::Wait(t.c_relay_wait.into()), None)
+        } else {
+            mark_of(&self.relay_check, Clone::clone)
+        };
+        let mut run_relay = false;
+        row(ui, look, "3", t.c_relay, |ui, _| {
+            if have_tok {
+                run_relay = check_button(ui, look, &self.relay_check);
+            }
+            widgets::mark(ui, look, &relay_mark);
+        });
+        if run_relay {
+            self.check_relay(ui, core);
         }
+        if let Some(reason) = relay_fail {
+            expanded(ui, |ui| {
+                widgets::problem(ui, look, &reason);
+                if core.state().get().relay_port == 0 {
+                    ui.horizontal(|ui| {
+                        ui.add(egui::TextEdit::singleline(&mut self.new_port).desired_width(70.0));
+                        if widgets::button(ui, look, t.c_port_save).clicked() {
+                            match self.new_port.trim().parse::<u16>() {
+                                Ok(p) if p > 1024 => {
+                                    core.cfg().update(|c| c.relay_port = p);
+                                    self.port_note = Some(f(t.c_port_saved, &[&p]));
+                                }
+                                _ => self.port_note = Some(t.s_port_range.into()),
+                            }
+                        }
+                    });
+                }
+                if self.relay_public {
+                    widgets::note(ui, look, t.c_relay_public);
+                    if widgets::button(ui, look, t.c_allow).clicked() {
+                        crate::win::allow_relay_on_this_network(core.cfg().get().relay_port, "Public");
+                        self.relay_note = Some(t.c_allowed.into());
+                        self.relay_public = false;
+                    }
+                }
+                for n in [&self.relay_note, &self.port_note].into_iter().flatten() {
+                    widgets::note(ui, look, n);
+                }
+            });
+        }
+
+        ui.add_space(14.0);
+        ui.horizontal(|ui| {
+            widgets::right(ui, |ui| {
+                let connected = core.state().get().connected;
+                if widgets::button_enabled(ui, look, t.c_test, connected).clicked() {
+                    act = Some(Act::TestNotify);
+                }
+                if widgets::button(ui, look, t.c_reconnect).clicked() {
+                    core.reconnect_now(false);
+                }
+            });
+        });
+        act
     }
 }
 
-fn show_msg(ui: &mut egui::Ui, m: &Msg) {
-    if let Some((text, color)) = m {
-        ui.label(RichText::new(text).color(*color));
+fn mark_of<T>(c: &Check<T>, ok: impl FnOnce(&T) -> String) -> (Mark, Option<String>) {
+    let t = s();
+    match c {
+        Check::Idle => (Mark::Dim(String::new()), None),
+        Check::Running => (Mark::Wait(t.c_checking.into()), None),
+        Check::Ok(v) => (Mark::Good(ok(v)), None),
+        Check::Fail(e) => (Mark::Bad(String::new()), Some(e.clone())),
+    }
+}
+
+/// "1  IP loa  [field] [Kiểm tra] ✓ …"
+/// `body` gets the label's id, so a field can be "labelled by" it for screen readers.
+fn row(ui: &mut Ui, look: &Look, n: &str, label: &str, body: impl FnOnce(&mut Ui, egui::Id)) {
+    ui.horizontal(|ui| {
+        ui.set_min_height(32.0);
+        ui.label(RichText::new(n).color(look.dim()).size(15.0));
+        ui.add_space(4.0);
+        let label_id = ui.allocate_ui_with_layout(
+            egui::vec2(widgets::LABEL_W - 24.0, 28.0),
+            egui::Layout::left_to_right(egui::Align::Center),
+            |ui| {
+                ui.set_width(widgets::LABEL_W - 24.0);
+                ui.label(RichText::new(label).color(look.text())).id
+            },
+        );
+        body(ui, label_id.inner);
+    });
+}
+
+/// The opened part under a row that failed: indented to the field.
+fn expanded(ui: &mut Ui, body: impl FnOnce(&mut Ui)) {
+    ui.horizontal(|ui| {
+        ui.add_space(widgets::LABEL_W);
+        ui.vertical(|ui| {
+            ui.set_max_width(ui.available_width());
+            body(ui);
+        });
+    });
+    ui.add_space(6.0);
+}
+
+fn enter(ui: &Ui, r: &egui::Response) -> bool {
+    r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter))
+}
+
+/// "Kiểm tra" while the row has not passed (a row that passed shows only its ✓; Enter in its field checks again).
+fn check_button<T>(ui: &mut Ui, look: &Look, c: &Check<T>) -> bool {
+    match c {
+        Check::Ok(_) => false,
+        _ => widgets::button_enabled(ui, look, s().c_check, !matches!(c, Check::Running)).clicked(),
     }
 }

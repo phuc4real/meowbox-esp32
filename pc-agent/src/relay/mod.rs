@@ -10,6 +10,7 @@ pub mod job;
 pub mod mp4adts;
 pub mod yt;
 
+use crate::state::ToastKind;
 use crate::tools::{ffmpeg, ytdlp};
 use axum::Router;
 use axum::body::{Body, Bytes};
@@ -30,7 +31,7 @@ use tokio::io::AsyncReadExt;
 use tokio::process::{ChildStdout, Command};
 use tokio::sync::mpsc;
 
-pub type Toast = Arc<dyn Fn(String) + Send + Sync>;
+pub type Toast = Arc<dyn Fn(crate::state::ToastKind, String) + Send + Sync>;
 
 #[derive(Clone)]
 pub struct Ctx {
@@ -173,14 +174,16 @@ async fn need_ffmpeg(ctx: &Ctx) -> Option<PathBuf> {
         return Some(p);
     }
     if !ffmpeg::status().busy {
-        (ctx.toast)("Đang tải ffmpeg cho YouTube live (một lần, khoảng 75 MB)…".into());
+        let s = crate::ui::strings::s();
+        (ctx.toast)(ToastKind::FfmpegStart, s.t_ffmpeg_start.into());
         let toast = ctx.toast.clone();
         ffmpeg::install_background(move || {
-            toast(if ffmpeg::path().is_some() {
-                "Đã tải xong ffmpeg: YouTube live phát được.".into()
+            if ffmpeg::path().is_some() {
+                toast(ToastKind::FfmpegDone, s.t_ffmpeg_done.into());
             } else {
-                format!("Không tải được ffmpeg: {}", ffmpeg::status().error)
-            })
+                let e = ffmpeg::status().error;
+                toast(ToastKind::FfmpegFailed, crate::ui::strings::f(s.t_ffmpeg_failed, &[&e]));
+            }
         });
     }
     for _ in 0..12 {

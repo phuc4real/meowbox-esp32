@@ -11,5 +11,9 @@
   "shape": {"radius": 0, "border": 1, "btn": "fill", "shadow": [0, 0], "hover_shadow": [4, 4]},
   "fx": {"aberration": false, "scanline": false, "grid": false, "hud": false, "tilt": false, "segments": false, "shadow": false},
   "clock": {"layout": "left"},
+  "agent": {"display_font": "archivo-display.ttf",
+            "light": {"alert": "#B80F14"},
+            "dark": {"bg": "#121212", "surface": "#1E1E1E", "text": "#F2F0EA", "dim": "#A3A3A3", "line": "#8C8C8C",
+                     "accent": "#D7141A", "on_accent": "#FFFFFF", "ok": "#F2F0EA", "warn": "#FF6B6E", "alert": "#FF6B6E"}},
   "cat": {"palette": "fur"}
 }
